@@ -1718,8 +1718,11 @@ def review_gate_tests(tmp, good):
         hit = [ln for ln in text.splitlines() if ln.startswith("FAIL") and expect in ln]
         out.append((f"照合の門: {name} → FAIL" + ("" if hit else f"（「{expect}」が出ない）\n" + text[-600:]), code == 1 and bool(hit)))
     gate("採否表の判定を、報告と違う文にした", lambda x: edit(x / "review/F02.review.json", lambda r: r["verdicts"][0].update(evidence="言い換えた根拠")), "照合の報告（reports/）と違う")
-    gate("採用したのに、図を直していない", lambda x: (edit(x / "review/F01.review.json", lambda r: r["findings"][0].update(decision="採用", action="箱の名前を直した")),
-                                                os.utime(x / "flows/F01.flow.json", (1, 1))), "採否表より古い")
+    gate("採用したのに、図を直していない", lambda x: edit(x / "review/F01.review.json", lambda r: r["findings"][0].update(decision="採用", action="箱の名前を直した")),
+         "その指摘の報告を受けたときのまま")
+    gate("採用したのに、図を直していない（照合した版の写しの無い、前の版の採否表）",
+         lambda x: (edit(x / "review/F01.review.json", lambda r: (r["findings"][0].update(decision="採用", action="箱の名前を直した"), r.pop("reviewed"))),
+                    os.utime(x / "flows/F01.flow.json", (1, 1))), "採否表より古い")
     gate("支持率が 95% 未満", lambda x: [edit(x / f"review/{F}.review.json", lambda r: [v.update(verdict="一部支持") for v in r["verdicts"][:3]]) for F in ("F01", "F02", "F03")], "95% 未満")
     gate("図の無い採否表", lambda x: (x / "review/F09.review.json").write_text(json.dumps({"flow_id": "F09", "verdicts": [], "findings": []}), encoding="utf-8"),
          "業務フローにもアクティビティ図にも無い")
@@ -1753,7 +1756,10 @@ def review_gate_tests(tmp, good):
     run("renumber.py", z, "--only", "F02")
     out.append(("開始条件が空のフローに、renumber.py が機械の問い（m-start）を付ける",
                 any(q.get("id") == "m-start" for q in json.loads((z / "flows/F02.flow.json").read_text(encoding="utf-8"))["questions"])))
-    gate("採用の無いまま、判定したノードの番号が変わった", lambda x: edit(x / "flows/F02.flow.json", lambda f: RN.apply_ids(f, {f["nodes"][1]["id"]: "P-099"})), "判定したノード")
+    gate("採用の無いまま、判定したノードの番号が変わった（前の版の採否表）", lambda x: (edit(x / "review/F02.review.json", lambda r: r.pop("reviewed")),
+                                                                  edit(x / "flows/F02.flow.json", lambda f: RN.apply_ids(f, {f["nodes"][1]["id"]: "P-099"}))), "判定したノード")
+    gate("照合のあとに、箱の番号を振り直した", lambda x: edit(x / "flows/F02.flow.json", lambda f: RN.apply_ids(f, {f["nodes"][1]["id"]: "P-099"})), "P-099 照合のあとに足した")
+    out += diff_review_tests(tmp, w)
     # 照合のあとは番号を保つ（apply_edits）。直しの一覧のあるフローは、当て直したものと同じか
     k = tmp / "keepnum"
     shutil.copytree(good, k)
@@ -1790,6 +1796,98 @@ def review_gate_tests(tmp, good):
     run("renumber.py", x)
     out.append(("フローの名前は、renumber.py が業務分類から写す", json.loads((x / "flows/F01.flow.json").read_text(encoding="utf-8"))["name"]
                 == next(c["name"] for c in json.loads((x / "taxonomy.json").read_text(encoding="utf-8"))["categories"] if c["id"] == "F01")))
+    return out
+
+
+def diff_review_tests(tmp, w):
+    """差分照合（2026-10-15）: 採否表に照合した版の写しを残し、照合のあとに変わった・足した箱だけを照合し直させる"""
+    import review as RV
+    from validate import validate
+    out = []
+    flow = lambda x, F="F02": json.loads((x / "flows" / f"{F}.flow.json").read_text(encoding="utf-8"))
+    boxes = [n["id"] for n in flow(w)["nodes"] if n["type"] not in ("start", "end")]
+    P = boxes[1]
+
+    def case(name):
+        x = tmp / f"diff_{name}"
+        shutil.copytree(w, x)
+        return x
+
+    def fails(x):
+        code, text = run("check_flow.py", x, "--stage", "review")
+        return code, [ln for ln in text.splitlines() if ln.startswith("FAIL")], text
+    rv = json.loads((w / "review/F02.review.json").read_text(encoding="utf-8"))
+    out.append(("差分照合: 採否表の下書きに、照合した版の写し（箱ごとの要約・報告の印・報告を受けたときの図の印）が残り、形が正しい",
+                set(rv["reviewed"]["nodes"]) == set(boxes) and list(rv["reviewed"]["reports"]) == ["review_F02.json"]
+                and rv["reviewed"]["figures"] == {"review_F02.json": RV.figure_mark(RV.figures(w)["F02"])} and validate(rv, "review") == []))
+    x = case("label")
+    edit(x / "flows/F02.flow.json", lambda f: node(f, P).update(label="照合のあとに直した名前を付ける"))
+    code, hit, text = fails(x)
+    out.append(("差分照合: 照合のあとに箱の名前を変えると、その箱だけを「照合したあとに変わった」と FAIL にし、差分照合のコマンドを出す",
+                code == 1 and len(hit) == 1 and f"変わった・足した箱 1 個（{P} 名前が変わった）" in hit[0] and f"--only F02 --nodes {P}" in hit[0]))
+    y = case("edge")
+    e0 = flow(y)["edges"][1]
+    edit(y / "flows/F02.flow.json", lambda f: f["edges"][1].update(label="いいえ" if f["edges"][1].get("label") != "いいえ" else "はい"))
+    code, hit, text = fails(y)
+    out.append(("差分照合: 線のラベルを変えると、線の両端の箱を「線が変わった」と挙げる（開始・終了は照合しないので挙げない）",
+                code == 1 and all(f"{i} 線が変わった" in hit[0] for i in (e0["from"], e0["to"]) if i in boxes) and "start" not in hit[0]))
+    reports = x / "reports"
+    (reports / "review_F02_差分1.json").write_text(json.dumps({"verdicts": [{"node": P, "verdict": "支持", "evidence": "「直した名前」とある"}],
+                                                             "findings": [{"kind": "表記", "target": P, "text": "差分照合の指摘"}]}, ensure_ascii=False), encoding="utf-8")
+    code, hit, text = fails(x)
+    out.append(("差分照合: 差分照合の報告を置いたまま、下書きを作り直していなければ FAIL（報告が採否表より新しい）",
+                code == 1 and any("照合の報告（reports/）と違う" in ln or "増えた・変わった" in ln for ln in hit)))
+    c1, o1 = run("review.py", x, "draft", "--only", "F02")
+    edit(x / "review/F02.review.json", lambda r: [f.update(decision="不採用", action="原典の語のままでよい") for f in r["findings"] if not f["decision"]])
+    code, hit, text = fails(x)
+    rv = json.loads((x / "review/F02.review.json").read_text(encoding="utf-8"))
+    out.append(("差分照合: 差分照合の報告から下書きを作り直すと、その箱の判定を置き換え、写しも取り直して、門が通る（指摘は足される）",
+                c1 == 0 and code == 0 and rv["reviewed"]["nodes"][P]["label"] == "照合のあとに直した名前を付ける"
+                and next(v for v in rv["verdicts"] if v["node"] == P)["evidence"] == "「直した名前」とある" and rv["findings"][-1]["text"] == "差分照合の指摘"
+                and "review_F02_差分1.json" in rv["reviewed"]["reports"]))
+    edit(x / "review/F02.review.json", lambda r: r["findings"][-1].update(decision="採用", action="名前を直す"))
+    code, hit, _t = fails(x)
+    out.append(("差分照合: 差分照合の指摘を採用して、図を直していなければ FAIL（その報告を受けたときの図のまま）",
+                code == 1 and any(f"{rv['findings'][-1]['id']}）があるのに" in ln and "報告を受けたときのまま" in ln for ln in hit)))
+    edit(x / "flows/F02.flow.json", lambda f: node(f, P).update(label="差分照合の指摘で直した名前を付ける"))
+    code, hit, _t = fails(x)
+    out.append(("差分照合: 採用した指摘を図に反映すると、直した箱が、また照合していない箱になる（反映の FAIL は消える）",
+                code == 1 and len(hit) == 1 and f"{P} 名前が変わった" in hit[0]))
+    edit(reports / "review_F02_差分1.json", lambda d: d["verdicts"].append({"node": "P-999", "verdict": "支持", "evidence": "「無い」"}))
+    c2, o2 = run("review.py", x, "draft", "--only", "F02")
+    out.append(("差分照合: 差分照合の報告が、図に無い箱を判定していれば、下書きを作らずに止まる", c2 == 1 and "無い箱を判定している（P-999" in o2))
+    z = case("legacy")
+    edit(z / "review/F02.review.json", lambda r: r.pop("reviewed"))
+    code, _hit, text = fails(z)
+    c3, o3 = run("review.py", z, "snapshot", "--only", "F02")
+    c4, o4 = run("review.py", z, "snapshot", "--only", "F02", "--assume-current")
+    code2, _h, text2 = fails(z)
+    rv = json.loads((z / "review/F02.review.json").read_text(encoding="utf-8"))
+    out.append(("差分照合: 写しの無い前の版の採否表は WARN（FAIL にしない）。下書きを作り直しても、写しを勝手に作らない。"
+                "snapshot は --assume-current を付けたときだけ、いまの図を照合済みとして写し、日を残す",
+                code == 0 and "WARN  F02: 照合した版の写し（reviewed）が無い" in text and c3 != 0 and "--assume-current" in o3 and c4 == 0
+                and code2 == 0 and "照合した版の写し" not in text2 and rv["reviewed"]["figures"] == {} and rv["reviewed"].get("assumed")))
+    v = case("legacy_draft")
+    edit(v / "review/F02.review.json", lambda r: r.pop("reviewed"))
+    run("review.py", v, "draft")
+    out.append(("差分照合: 前の版の採否表から下書きを作り直しても、照合した版の写しを勝手に作らない",
+                "reviewed" not in json.loads((v / "review/F02.review.json").read_text(encoding="utf-8"))))
+    # 重ね方: 業務フローは、差分照合の判定が、前の判定を置き換える（厳しいほうではない）。アクティビティ図は、差分照合で見た箱の判定を置き換える
+    a = tmp / "diff_merge"
+    (a / "reports").mkdir(parents=True)
+    fig = {"nodes": [{"id": "start", "type": "start"}] + [{"id": f"P-00{i}", "type": "process"} for i in (1, 2, 3)] + [{"id": "end", "type": "end"}]}
+    (a / "reports/review_F05.json").write_text(json.dumps({"verdicts": [{"node": f"P-00{i}", "verdict": "一部支持" if i == 2 else "支持", "evidence": "前"} for i in (1, 2, 3)],
+                                                        "findings": []}, ensure_ascii=False), encoding="utf-8")
+    (a / "reports/review_F05_差分1.json").write_text(json.dumps({"verdicts": [{"node": "P-002", "verdict": "支持", "evidence": "後"}], "findings": []}, ensure_ascii=False), encoding="utf-8")
+    (a / "reports/code_review_A-01-1.json").write_text(json.dumps({"activities": ["A-01-1"], "checked": {"A-01-1": ["P-001", "P-002"]}, "findings": [
+        {"activity": "A-01-1", "kind": "条件・出口が逆", "node": "P-002", "what": "前の指摘"}]}, ensure_ascii=False), encoding="utf-8")
+    (a / "reports/code_review_A-01-1_差分1.json").write_text(json.dumps({"activities": ["A-01-1"], "checked": {"A-01-1": ["P-002", "P-003"]}, "findings": []},
+                                                                     ensure_ascii=False), encoding="utf-8")
+    fv, _f = RV.from_reports(a, "F05", fig)
+    av, af = RV.from_reports(a, "A-01-1", fig)
+    out.append(("差分照合: 差分照合の判定は、前の判定を置き換える（業務フロー: 一部支持 → 支持。アクティビティ図: 指摘のあった箱も、差分照合で見て指摘が無ければ支持。前の指摘は残る）",
+                {x["node"]: (x["verdict"], x["evidence"]) for x in fv} == {"P-001": ("支持", "前"), "P-002": ("支持", "後"), "P-003": ("支持", "前")}
+                and {x["node"]: x["verdict"] for x in av} == {"P-001": "支持", "P-002": "支持", "P-003": "支持"} and len(af) == 1))
     return out
 
 
@@ -2085,6 +2183,22 @@ def gate_tests(tmp, good):
     out.append(("納品の門: 照合が済めば、古い書き出し（PNG が無い）をやり直して通り、納品物・作業の記録（現状の処理時間の写しも）・納品の数（合計と基準の表の版）を写す。"
                 "進み具合は「10 納品の門 済み」"
                 + ("" if passed else f"\n{text[-1500:]}\n{sorted(want - files)}"), passed))
+    import fitz
+    import fnmatch
+    from common import RECORDS
+    f01 = json.loads((w / "flows/F01.flow.json").read_text(encoding="utf-8"))
+    P = next(n for n in f01["nodes"] if n["type"] == "process" and n.get("sources"))
+    cd, od = run("make_compare.py", w, "--only", "F01", "--nodes", P["id"])
+    diff = w / "out" / "差分照合シート_F01.pdf"
+    doc = fitz.open(str(diff)) if diff.exists() else None
+    first, pages = (doc[0].get_text().replace("\u2012", "-"), doc.page_count) if doc else ("", 0)   # 取り出すと、- が ‒ になる
+    cb, _ob = run("make_compare.py", w, "--only", "F01,F02", "--nodes", P["id"])
+    cc, oc = run("make_compare.py", w, "--only", "F01", "--nodes", "start")
+    run("make_compare.py", w, "--only", "F01")
+    out.append(("差分照合のシート: 1 ページ目に照合し直す箱、続けて、その箱の出典ページだけ。フローを 2 本・開始の箱を指定すると止まる。全体を作り直すと消える。門が写す記録には入らない",
+                cd == 0 and pages == 1 + len({(s["doc_id"], s["page"]) for s in P["sources"]}) and "差分照合" in first and P["id"] in first
+                and cb != 0 and cc != 0 and "開始・終了は照合しない" in oc and not diff.exists()
+                and not any(fnmatch.fnmatch(diff.name, pat) for pat in RECORDS)))
     os.utime(w / "flows" / "F02.flow.json")
     (w / "out" / "~$業務マトリクス一覧.xlsx").write_bytes(b"")
     code, text = run("deliver.py", w, "--to", str(dest))

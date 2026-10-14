@@ -1915,7 +1915,8 @@ def check_activity(cx, rp):
 # ---------- 業務マトリクス一覧 ----------
 
 def check_review(cx, rp):
-    """原典照合（工程 8）: 全部の図に採否表がある／形・全部の指摘の採否／判定したノードが図にある／照合の報告と同じ／採用した指摘の反映／支持率"""
+    """原典照合（工程 8）: 全部の図に採否表がある／形・全部の指摘の採否／照合したあとに変わった箱が無い（照合した版の写しと、いまの図）／
+    照合の報告と同じ／採用した指摘の反映／支持率"""
     import review as RV
     figs = RV.figures(cx.work)
     rdir = cx.work / "review"
@@ -1947,8 +1948,22 @@ def check_review(cx, rp):
         adopted = any(isinstance(x, dict) and x.get("decision") == "採用" for x in rv.get("findings") or [])
         ids = {n.get("id") for n in figs[F].get("nodes") or [] if isinstance(n, dict)}
         gone = [str(v.get("node")) for v in rv.get("verdicts") or [] if isinstance(v, dict) and v.get("node") not in ids]
-        if gone and not adopted:
-            rp.fail(f"{F}: 判定したノード（{'・'.join(gone[:8])}）が図に無い。採用した指摘が無いのに番号が変わっている（照合のあとに番号を振り直した・別の図の判定を写した疑い）")
+        gaps = RV.unreviewed(rv, figs[F])
+        act = F.startswith("A-")
+        if gaps is None:
+            rp.warn(f"{F}: 照合した版の写し（reviewed）が無い（前の版の採否表）。照合のあとに図を直していても、気づけない。"
+                    f"いまの図を照合済みと認めるなら python3 scripts/review.py snapshot -w <作業フォルダ> --only {F} --assume-current（利用者が決める）。"
+                    "全体を照合し直してもよい")
+            if gone and not adopted:
+                rp.fail(f"{F}: 判定したノード（{'・'.join(gone[:8])}）が図に無い。採用した指摘が無いのに番号が変わっている（照合のあとに番号を振り直した・別の図の判定を写した疑い）")
+        elif gaps:
+            ids_ = ",".join(i for i, _w in gaps)
+            rp.fail(f"{F}: 照合したあとに変わった・足した箱 {len(gaps)} 個（{'／'.join(f'{i} {w}' for i, w in gaps[:8])}{' …' if len(gaps) > 8 else ''}）。"
+                    "採用した指摘の直しも含めて、その箱だけを照合し直す（差分照合）: "
+                    + (f"references/code-review-prompt.md の差分照合で、報告を reports/code_review_<先頭の番号>_差分<N>.json に書かせ"
+                       if act else f"python3 scripts/make_compare.py -w <作業フォルダ> --only {F} --nodes {ids_} → references/source-review-prompt.md の差分照合で、"
+                                   f"報告を reports/review_{F}_差分<N>.json に書かせ")
+                    + f" → python3 scripts/review.py draft -w <作業フォルダ> --only {F}")
         try:
             want = RV.from_reports(cx.work, F, figs[F])
         except ValueError as e:
@@ -1962,9 +1977,19 @@ def check_review(cx, rp):
             got_f = collections.Counter(RV.key(x) for x in rv.get("findings") or [] if isinstance(x, dict))
             if got_v != {(v["node"], v["verdict"], v["evidence"]) for v in want[0]} or got_f != collections.Counter(RV.key(x) for x in want[1]):
                 rp.fail(f"{F}: 採否表の判定・指摘が、照合の報告（reports/）と違う（写し違い・言い換え）。python3 scripts/review.py draft -w <作業フォルダ> --only {F} で写し直す（採否は引き継ぐ）")
-        data = cx.work / ("activities" if F.startswith("A-") else "flows") / f"{F}.{'activity' if F.startswith('A-') else 'flow'}.json"
-        if adopted and data.exists() and data.stat().st_mtime < f.stat().st_mtime:
-            rp.fail(f"{F}: 採用した指摘があるのに、図のデータ（{data.parent.name}/{data.name}）が採否表より古い（採用した指摘を、まだ図に反映していない）")
+            elif gaps is not None and (rv.get("reviewed") or {}).get("reports") != RV.report_marks(cx.work, F):
+                rp.fail(f"{F}: 照合の報告（reports/）が、採否表を作ったあとに増えた・変わった（差分照合の報告など）。"
+                        f"python3 scripts/review.py draft -w <作業フォルダ> --only {F} で写し直す（照合した版の写しも取り直す）")
+        data = cx.work / ("activities" if act else "flows") / f"{F}.{'activity' if act else 'flow'}.json"
+        if gaps is None:                                             # 前の版の採否表: ファイルの日時で見る
+            if adopted and data.exists() and data.stat().st_mtime < f.stat().st_mtime:
+                rp.fail(f"{F}: 採用した指摘があるのに、図のデータ（{data.parent.name}/{data.name}）が採否表より古い（採用した指摘を、まだ図に反映していない）")
+        else:                                                        # 写しのある採否表: 指摘を書いた報告を受けたときの図と、いまの図を比べる
+            at, org, now = (rv.get("reviewed") or {}).get("figures") or {}, RV.origins(cx.work, F), RV.figure_mark(figs[F])
+            same = [str(x.get("id")) for x in rv.get("findings") or [] if isinstance(x, dict) and x.get("decision") == "採用" and at.get(org.get(RV.key(x))) == now]
+            if same:
+                rp.fail(f"{F}: 採用した指摘（{'・'.join(same[:8])}）があるのに、図のデータ（{data.parent.name}/{data.name}）が、その指摘の報告を受けたときのまま"
+                        "（採用した指摘を、まだ図に反映していない）")
     for kind, s in RV.tally(figs, reviews).items():
         if not s["figs"] or not s["judged"]:
             continue
