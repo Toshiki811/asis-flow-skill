@@ -21,7 +21,7 @@ import re
 import sys
 
 import extract_access
-from common import MASK, load, manifest, mask_secrets, page_json, load_page, save, work_dir  # noqa: F401（MASK は、ほかから cs.MASK で引く）
+from common import IO_KINDS, MASK, io_kind, load, manifest, mask_secrets, page_json, load_page, save, work_dir  # noqa: F401（MASK は、ほかから cs.MASK で引く）
 
 INLINE_MAX = 8                                                       # 呼ぶ所が1か所で、箱がこの数以下の手続きは、呼ぶ側の図に入れる
 CODE_KINDS = ("vba", "code")                                         # ページの種類（manifest の page_list[].kind）
@@ -643,6 +643,7 @@ class VbaParser:
         return None
 
     def add_io(self, out, kind, name, way, line, dynamic=None):
+        kind = io_kind(kind)
         item = {"kind": kind, "name": name, "way": way, "line": line}
         if (kind, name, way) not in [(x["kind"], x["name"], x["way"]) for x in out]:
             out.append(item)

@@ -10,8 +10,7 @@
  ],
  "properties": {
   "project": {
-   "type": "string",
-   "pattern": "^M[0-9]+$",
+   "$ref": "common#/$defs/doc_id",
    "description": "まとまりの ID（`code_struct.py` が出す、先頭の資料の ID）"
   },
   "skip": {
@@ -260,16 +259,7 @@
    ],
    "properties": {
     "kind": {
-     "enum": [
-      "ファイル",
-      "テーブル",
-      "データベース",
-      "帳票",
-      "画面",
-      "メール",
-      "外部プログラム",
-      "外部システム"
-     ],
+     "$ref": "common#/$defs/io_kind",
      "description": "何を触るか（メール・外部プログラム・外部システムは、外部のレーンの箱になる）"
     },
     "name": {

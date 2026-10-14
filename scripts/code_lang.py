@@ -51,6 +51,7 @@ class Info:
         self.pid, self.d = pid, {"calls": [], "io": [], "inter": [], "dynamic": []}
 
     def io(self, out, kind, name, way, line, dynamic=None):
+        kind = cs.io_kind(kind)
         if (kind, name, way) not in [(x["kind"], x["name"], x["way"]) for x in out]:
             out.append({"kind": kind, "name": name, "way": way, "line": line})
         self.d["io"].append({"kind": kind, "name": name, "way": way, "line": line, "procedure": self.pid})

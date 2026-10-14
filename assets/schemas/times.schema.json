@@ -18,7 +18,7 @@
    "required": ["flow", "node", "value"],
    "properties": {
     "flow": {"$ref": "common#/$defs/flow_id", "description": "フロー id"},
-    "node": {"$ref": "common#/$defs/node_id", "description": "ノード番号（振り直しでは、一緒に直る）"},
+    "node": {"$ref": "common#/$defs/flow_node_id", "description": "ノード番号（振り直しでは、一緒に直る）"},
     "value": {"type": "number", "minimum": 0, "description": "分"},
     "label": {"type": "string", "description": "入れたときの作業名（いまの名前と違えば、点検が見直しを促す）"},
     "lane": {"type": "string", "description": "その作業の担当の名前（機械が書く。同じ作業名の箱が 2 つ以上あるフローで、番号がずれたときに、どの箱の値かを決める手がかり）"},

@@ -79,6 +79,13 @@ SEV_LABEL = {"high": "高", "mid": "中", "low": "低"}
 EFFECTS = schema_enum("common", "$defs", "question", "properties", "effect")   # 確認事項の「答えで変わる所」。どれにも当たらない問いは、確認事項にしない
 # 動作の種類（処理時間の仮の値を、表から引く鍵）。人の作業（process）は、LLM がこの中から選ぶ。数字は、表（業務マトリクス一覧の「処理時間の基準」）からだけ
 ACTIONS = schema_enum("flow", "$defs", "node", "properties", "action")
+IO_KINDS = schema_enum("common", "$defs", "io_kind")                 # プログラムが触る相手の種類（機械の取り出しも、ブロックの木も）
+IO_KIND_WAS = {"レポート": "帳票", "印刷": "帳票", "フォーム": "画面"}       # 機械の取り出しの語 → 業務の語
+
+
+def io_kind(kind):
+    """入出力の種類を、決まった語（IO_KINDS）にそろえる"""
+    return IO_KIND_WAS.get(kind, kind)
 TYPE_ACTION = {"decision": "判断する", "system": "システムが処理する", "subprocess": "別のフローへ進む"}   # 人の作業でないノードは、種別から機械が決める（既定は、判断 2 分・ほかは 0 分）
 VOLUMES = schema_enum("flow", "$defs", "node", "properties", "volume")   # 量。書かなければ、機械が数えて決める（time_basis。小・中・大だけ）
 VOLUME_SPARE = {"特大": "大"}                                          # 無くてもよい量（機械は付けない。LLM が、理由つきで）と、基準の表にその列が無いとき（前の形のテンプレート）に引く列

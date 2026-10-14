@@ -5,7 +5,7 @@
  "additionalProperties": false,
  "required": ["activity", "name", "ops", "questions"],
  "properties": {
-  "activity": {"type": "string", "pattern": "^A-[0-9]{2,}-[0-9]+$", "description": "アクティビティ図の番号"},
+  "activity": {"$ref": "common#/$defs/activity_id", "description": "アクティビティ図の番号"},
   "name": {"type": "string", "minLength": 1, "description": "この処理の名前（「目的語＋動詞」。業務の言葉で。例「月次の請求を集計する」）"},
   "summary": {"type": "string", "description": "何をする処理か（1〜2文。as-is だけ）"},
   "operator": {"type": "string", "description": "操作者のレーンの名前（業務フローの担当の名前）。書かなければ、紐付けた手順の担当。それも無ければ「操作者」"},

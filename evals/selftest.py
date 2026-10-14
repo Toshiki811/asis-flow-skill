@@ -1605,6 +1605,12 @@ def schema_tests(tmp, good):
          and enum("common", "$defs", "question_draft", "properties", "category") == enum("common", "$defs", "question", "properties", "category")
          and enum("common", "$defs", "question_draft", "properties", "effect") == enum("common", "$defs", "question", "properties", "effect")
          and list(apply_edits.OPS) == enum("edits", "$defs", "op", "properties", "op") and list(activity.OPS) == enum("activity_edits", "$defs", "op", "properties", "op")),
+        ("決まった語: ID の書式（資料・フロー・図・ノード・業務の木・確認事項の番号）は common の 1 か所。ほかのスキーマは写さずに引く",
+         not [(f.name, p) for f in sorted((C.ASSETS / "schemas").glob("*.schema.json")) if f.name != "common.schema.json"
+              for p in re.findall(r'"pattern":\s*"((?:[^"\\]|\\.)*)"', f.read_text(encoding="utf-8"))
+              if json.loads(f'"{p}"') in {d.get("pattern") for d in json.loads((C.ASSETS / "schemas/common.schema.json").read_text(encoding="utf-8"))["$defs"].values()}]),
+        ("決まった語: 入出力の種類（機械の取り出しの語を、業務の語にそろえる。ブロックの木も同じ語を引く）", set(C.IO_KIND_WAS.values()) <= set(C.IO_KINDS)
+         and json.loads((C.ASSETS / "schemas/code_tree.schema.json").read_text(encoding="utf-8"))["$defs"]["io"]["properties"]["kind"]["$ref"] == "common#/$defs/io_kind"),
         ("決まった語: 照合の報告の種類は、採否表に書ける", set(enum("report_review", "$defs", "finding", "properties", "kind"))
          | set(enum("report_code_review", "$defs", "finding", "properties", "kind")) <= set(enum("review", "$defs", "finding", "properties", "kind"))),
     ]
@@ -2448,7 +2454,7 @@ def access_tests(tmp):
     out.append(("マクロ: アクションの並び・条件つきの行と「...」・VBA の関数の呼び出し・クエリの定義から引いたテーブル・書き出すファイル",
                 kinds == ["seq", "seq", "seq", "if", "seq", "call", "interact", "seq"] and [n["kind"] for n in mac["body"][3]["branches"][0]["body"]] == ["interact", "exit"]
                 and mac["body"][5]["to"] == "modCommon.月次ログを書く" and {("クエリ", "Q_月次売上_追加", "out"), ("テーブル", "T_月次売上", "out"), ("テーブル", "T_受注", "in"),
-                                                                      ("ファイル", "月次売上.xlsx", "out"), ("ファイル", "受注データ.csv", "in"), ("レポート", "請求書", "out")} <= io
+                                                                      ("ファイル", "月次売上.xlsx", "out"), ("ファイル", "受注データ.csv", "in"), ("帳票", "請求書", "out")} <= io
                 and mac["body"][2]["io"][2].get("via", {}).get("module") == "access_queries"))
     acc = st["access"]
     out.append(("Access の定義: フォーム 2・レポート 1・マクロ 2・クエリ 6・テーブル 6（うちリンク 1）・起動時に開くフォーム・書き出せなかったもの",
@@ -3096,6 +3102,7 @@ def code_tests():
     out.append(("コード: 入出力（シートの読み書き・Set で束ねた変数・組み立てたファイル名・SQL のテーブル・接続先）",
                 {("シート", "メニュー", "in"), ("シート", "一覧", "out"), ("シート", "一覧", "in"), ("ファイル", "一覧_＜月＞.pdf", "out"),
                  ("テーブル", "入金", "out"), ("データベース", "hanbai", "in")} <= io))
+    out.append(("コード: 入出力の種類は、決まった語（common の io_kind。レポート・印刷は帳票）", {k for k, _n, _w in io} <= set(cs.IO_KINDS)))
     out.append(("コード: 2か所から呼ばれる手続きは別の単位、1か所だけの小さな手続きは呼ぶ側に入れる",
                 [u["procedure"] for u in st["units"] if u["kind"] == "shared"] == ["集計.税額"] and st["inline"] == ["集計.保存する"] and st["unreached"] == []))
     out.append(("コード: 実行文の行が、どれも木のどこかに1回だけ入る", cs.tree_errors(st) == [] and procs["Main"]["exec"] == [8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 20, 21, 23]))

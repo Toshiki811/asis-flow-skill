@@ -21,7 +21,7 @@
   "questions"
  ],
  "properties": {
-  "flow_id": {"type": "string", "pattern": "^F[0-9]+(-[0-9]+)*$", "description": "業務分類の id と同じ"},
+  "flow_id": {"$ref": "common#/$defs/flow_id", "description": "業務分類の id と同じ"},
   "name": {"type": "string", "minLength": 1, "description": "業務分類の名前と同じ"},
   "number": {"type": "string", "description": "原典の番号"},
   "parent": {"type": ["string", "null"], "description": "上位の分類の id"},
@@ -56,8 +56,7 @@
    "required": ["id", "type", "lane", "label"],
    "properties": {
     "id": {
-     "type": "string",
-     "pattern": "^(start|end)[0-9]*$|^(P|D|S|F|SUB)-[0-9]{3}$",
+     "$ref": "common#/$defs/flow_node_id",
      "description": "`start`・`end`（複数なら end2…）、P-001（プロセス）・D-001（判断）・S-001（システム処理）・F-001（ファイル）・SUB-001（別フローへ）。番号は renumber.py が時系列に振り直す"
     },
     "type": {"enum": ["start", "end", "process", "decision", "system", "file", "subprocess"], "description": "ノードの種類"},
@@ -80,8 +79,7 @@
      "description": "札: その作業で使うシステムの名前（用語の正本の名前）。機械が付ける（`renumber.py`・`apply_edits.py`: 出典に引いたカードの手順の `system` と、その手順の文に出てくるシステム名）。図では箱の中の「［会計システム］」"
     },
     "activity": {
-     "type": "string",
-     "pattern": "^A-[0-9]{2,}-[0-9]+$",
+     "$ref": "common#/$defs/activity_id",
      "description": "system ノードだけ。そのプログラムのアクティビティ図の番号（A-02-1）。機械が置く箱に付く（システム台帳の紐付けから）。図では「▶ A-02-1」"
     },
     "inferred": {"type": "boolean", "description": "原典に無いノード（推定）。作業のノード（process・decision・system）は機械が付ける（`renumber.py`: 出典に `item` が1つも無ければ true）。確認事項が要る"},
@@ -121,8 +119,8 @@
    "additionalProperties": false,
    "required": ["from", "to"],
    "properties": {
-    "from": {"$ref": "common#/$defs/node_id"},
-    "to": {"$ref": "common#/$defs/node_id"},
+    "from": {"$ref": "common#/$defs/flow_node_id"},
+    "to": {"$ref": "common#/$defs/flow_node_id"},
     "label": {"type": "string", "description": "判断から出る線には必須（原典の言葉）"},
     "kind": {"enum": ["flow", "system", "data"], "description": "省略可。`flow` 通常／`system` システム連携／`data`"},
     "inferred": {"type": "boolean", "description": "原典に順が書かれていない線は true。確認事項が要る"}

@@ -18,7 +18,7 @@
    "additionalProperties": false,
    "required": ["id", "number", "name", "parent", "hierarchy_id", "level", "basis", "pages", "make_flow"],
    "properties": {
-    "id": {"type": "string", "pattern": "^F[0-9]+(-[0-9]+)*$", "description": "F01、F02…。下位は F01-1。`flows/<id>.flow.json` のファイル名になる"},
+    "id": {"$ref": "common#/$defs/flow_id", "description": "F01、F02…。下位は F01-1。`flows/<id>.flow.json` のファイル名になる"},
     "number": {"type": "string", "description": "原典の番号（「3.2」。無ければ空）"},
     "name": {"type": "string", "minLength": 1, "description": "名前。目次準拠なら目次の文字のまま"},
     "parent": {"type": ["string", "null"], "description": "上位の分類の id"},

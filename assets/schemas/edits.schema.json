@@ -5,7 +5,7 @@
  "additionalProperties": false,
  "required": ["flow_id", "start_condition", "end_condition", "ops", "questions"],
  "properties": {
-  "flow_id": {"type": "string", "pattern": "^F[0-9]+(-[0-9]+)*$", "description": "業務分類の id と同じ"},
+  "flow_id": {"$ref": "common#/$defs/flow_id", "description": "業務分類の id と同じ"},
   "summary": {"type": "string", "description": "書かなくてよい（機械は読まない。flow.json の要約には、業務分類の名前が入る）"},
   "start_condition": {"type": "string", "description": "開始条件（何を受けて始まるか）。原典に無ければ空にする（確認事項は機械が作る）"},
   "end_condition": {"type": "string", "description": "終了条件（何ができたら終わるか）。原典に成果が書かれているときだけ書く。無ければ空にする（機械が、終了に入る最後の作業から「〜したとき」を入れる。最後の作業が 1 つに決まらなければ、確認事項を作る）"},

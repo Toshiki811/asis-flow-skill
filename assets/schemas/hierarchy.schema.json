@@ -26,7 +26,7 @@
    "additionalProperties": false,
    "required": ["id", "level", "title", "kind", "source", "refs", "children"],
    "properties": {
-    "id": {"type": "string", "pattern": "^H[0-9]+(\\.[0-9]+)*$", "description": "H1、H1.2 …"},
+    "id": {"$ref": "common#/$defs/hier_id", "description": "H1、H1.2 …"},
     "level": {"type": "integer", "minimum": 1, "description": "段"},
     "number": {"type": "string", "description": "原典の番号（「第3章」「2.1」「（1）」。無ければ省く）"},
     "title": {"type": "string", "minLength": 1, "description": "名前（目次・見出しのまま）"},

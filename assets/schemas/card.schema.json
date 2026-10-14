@@ -24,7 +24,7 @@
   "uncertain"
  ],
  "properties": {
-  "doc_id": {"type": "string", "pattern": "^M[0-9]+$", "description": "資料 ID（ファイルの置き場所と同じ）"},
+  "doc_id": {"$ref": "common#/$defs/doc_id", "description": "資料 ID（ファイルの置き場所と同じ）"},
   "page": {"type": "integer", "minimum": 1, "description": "ファイル名 pNNNN の番号（データの鍵。資料の先頭から数えた番号で、納品物には出ない）"},
   "printed_page": {"type": ["string", "null"], "description": "そのページに刷られたページ番号を、番号だけで（「13」「3-2」「ii」。「- 13 -」「P.13」の飾りは外す）。刷られていなければ null。数えて作らない"},
   "page_type": {

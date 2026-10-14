@@ -32,7 +32,7 @@
     "pages": {"type": ["integer", "null"]},
     "has_macro": {"type": "boolean"},
     "pdf_text_layer": {"type": ["boolean", "null"], "description": "PDF に文字の層があるか（PDF 以外は null）"},
-    "duplicate_of": {"type": ["string", "null"], "pattern": "^M[0-9]+$", "description": "同じ中身の資料（その資料だけを読む）"},
+    "duplicate_of": {"$ref": "common#/$defs/doc_id", "type": ["string", "null"], "description": "同じ中身の資料（その資料だけを読む）"},
     "note": {"type": "string", "description": "棚卸しの注記"},
     "tool": {"type": "boolean", "description": "業務で使うツール（ブック・ソース）。入力の中のツールのフォルダにある"},
     "rendered": {"type": "boolean", "description": "描画したか（render_pages.py）"},

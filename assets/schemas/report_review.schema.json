@@ -16,7 +16,7 @@
    "additionalProperties": false,
    "required": ["node", "verdict", "evidence"],
    "properties": {
-    "node": {"$ref": "common#/$defs/node_id"},
+    "node": {"$ref": "common#/$defs/flow_node_id"},
     "verdict": {"enum": ["支持", "一部支持", "不支持"]},
     "evidence": {"type": "string", "description": "原典の該当箇所の引用（不支持・一部支持は、何が違うかを1文で添える）"}
    }

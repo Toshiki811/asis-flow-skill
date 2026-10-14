@@ -86,6 +86,8 @@ def export_check(root, spec, tmp):
         got = {"procedures": len(st["procedures"]), "entries": len(st["entries"]), "units": len(st["units"]),
                "layout_events": sum(f["events"] for f in st["access"]["forms"] + st["access"]["reports"])}
         say(f"Access の書き出し {rel}: 手続き・起動点・図にする単位・定義のイベント", got == want and cs.tree_errors(st) == [], "" if got == want else str(got))
+        odd = {x["kind"] for p in st["procedures"] for x in p["io"]} - set(cs.IO_KINDS)
+        say(f"Access の書き出し {rel}: 入出力の種類が、決まった語（common の io_kind）", not odd, "・".join(sorted(odd)))
         out[rel] = st
     return out
 
