@@ -913,6 +913,246 @@ CASES = [
 ]
 
 
+# ---- 発火の試験（2026-10-15）: LLM・人が書くファイルの点検は、どれも、誤りを 1 つ仕込むと FAIL が出る（evals/coverage.py が数える）----
+
+
+CASES += [
+    # ---- ページカード（LLM が書く）----
+    ("カード: 絞り込みに当たるページが無い", "check_extract.py", ["--only", "M09"], lambda w: None, "に当たるページが無い。何も点検していない"),
+    ("カード: 形の誤りが多い（一部だけ出して、残りの数を出す）", "check_extract.py", [],
+     lambda w: edit(w / "cards/M01/p0003.json", lambda c: [s.update(no="一", from_image="no", inputs="領収書", outputs="なし") for s in c["steps"]]), "形が違う — ほか"),
+    ("カード: doc_id・page が、ファイルの場所と合わない", "check_extract.py", [],
+     lambda w: edit(w / "cards/M01/p0003.json", lambda c: c.update(page=4)), "カードの doc_id / page がファイルの場所と合わない"),
+    ("カード: 項目の id が重複", "check_extract.py", [], lambda w: edit(w / "cards/M01/p0003.json", lambda c: c["steps"][1].update(id="s1")), "項目の id が重複: s1"),
+    ("カード: applies_to が、無い手順を指す", "check_extract.py", [],
+     lambda w: edit(w / "cards/M01/p0003.json", lambda c: c["steps"][0].update(applies_to="s9")), "applies_to「s9」という手順がこのカードに無い"),
+    ("カード: 手順に原文の引用が無い", "check_extract.py", [], lambda w: edit(w / "cards/M01/p0003.json", lambda c: c["steps"][0].update(quote="")), "原文の引用（quote）が無い"),
+    ("カード: 図の線が、定義していない箱を指す", "check_extract.py", [],
+     lambda w: edit(w / "cards/M01/p0004.json", lambda c: c["diagram"]["edges"][0].update(to="g99")), "定義していない箱を指している"),
+    ("カード: 文字のあるページを白紙にする", "check_extract.py", [], lambda w: edit(w / "cards/M03/p0001.json", lambda c: c.update(page_type="blank")),
+     "種別が blank なのに、機械抽出に文字が"),
+    ("カード: 刷られた番号が、前後の並びから 1 枚だけ飛ぶ", "check_extract.py", [],
+     lambda w: [edit(w / f"cards/M01/p000{p}.json", lambda c, v=v: c.update(printed_page=v)) for p, v in ((3, "3"), (4, "7"), (5, "5"))], "前後のページの並び（3・5）から飛んでいる"),
+]
+
+
+TX = lambda w, fn: edit(w / "taxonomy.json", fn)
+CAT = lambda t, i: t["categories"][i]
+QTX = {"id": "q9", "category": "分類", "effect": "フローの範囲", "question": "この分け方でよいですか、別の分け方ですか", "assumption": "この分け方とした",
+       "sources": [{"doc_id": "M01", "page": 2}], "ask": "経理部"}
+
+
+def _llm_named(ref):
+    def f(t):
+        c = CAT(t, 1)
+        c.update(basis="llm", name_ref=ref)
+        c.pop("toc_ref", None)
+    return f
+
+
+def _llm_axis(t):
+    t.update(basis="llm")
+    for c in t["categories"]:
+        c.update(basis="llm")
+        c.pop("toc_ref", None)
+
+
+def _orphan_page(w):
+    TX(w, lambda t: CAT(t, 3).update(pages=[p for p in CAT(t, 3)["pages"] if p["doc_id"] != "M04"]))
+    edit(w / "flows/F03.flow.json", lambda f: f.update(excluded_items=[]))
+
+
+CASES += [
+    # ---- 業務分類（LLM が書く）----
+    ("業務分類: 親が無い", "check_flow.py", ["--stage", "structure"], lambda w: TX(w, lambda t: CAT(t, 1).update(parent="F99")), "の parent「F99」が無い"),
+    ("業務分類: 無いページを割り当てる", "check_flow.py", ["--stage", "structure"], lambda w: TX(w, lambda t: CAT(t, 1)["pages"][0]["pages"].append(99)), "F01 が存在しないページを指す"),
+    ("業務分類: 目次準拠なのに、目次の場所が無い", "check_flow.py", ["--stage", "structure"], lambda w: TX(w, lambda t: CAT(t, 1).pop("toc_ref")),
+     "は目次準拠なのに、目次の場所（toc_ref）が無い"),
+    ("業務分類: 目次準拠なのに、名前の根拠（name_ref）を書く", "check_flow.py", ["--stage", "structure"],
+     lambda w: TX(w, lambda t: CAT(t, 1).update(name_ref={"kind": "heading", "doc_id": "M01", "page": 3, "text": "1. 経費申請"})), "は目次準拠なのに name_ref がある"),
+    ("業務分類: 名前の根拠が、無い資料を指す", "check_flow.py", ["--stage", "structure"],
+     lambda w: TX(w, _llm_named({"kind": "title", "doc_id": "M09", "text": "経費申請"})), "の name_ref が存在しない資料を指す: M09"),
+    ("業務分類: 名前の根拠が、無いページを指す", "check_flow.py", ["--stage", "structure"],
+     lambda w: TX(w, _llm_named({"kind": "heading", "doc_id": "M01", "page": 99, "text": "経費申請"})), "の name_ref が存在しないページを指す"),
+    ("業務分類: 名前の根拠（本文の見出し）にページが無い", "check_flow.py", ["--stage", "structure"],
+     lambda w: TX(w, _llm_named({"kind": "heading", "doc_id": "M01", "text": "経費申請"})), "の name_ref（本文の見出し）にページが無い"),
+    ("業務分類: 確認事項が、無い分類を指す", "check_flow.py", ["--stage", "structure"], lambda w: TX(w, lambda t: t["questions"].append(dict(QTX, flow="F99"))),
+     "確認事項 q9 の flow「F99」が、分類に無い"),
+    ("業務分類: フローを描く分類に、対象外の理由も書く", "check_flow.py", ["--stage", "structure"], lambda w: TX(w, lambda t: CAT(t, 1).update(out_of_scope="業務でない")),
+     "はフローを描く分類なのに、対象外の理由"),
+    ("業務分類: 束ねる見出しに、対象外の理由を書く", "check_flow.py", ["--stage", "structure"], lambda w: TX(w, lambda t: CAT(t, 0).update(out_of_scope="見出しだけ")),
+     "は下にフローを描く分類がある（束ねる見出し）のに、対象外の理由"),
+    ("業務分類: 原典に名前が無い分類なのに、分類を確かめる確認事項が無い", "check_flow.py", ["--stage", "structure"], lambda w: TX(w, _llm_axis),
+     "は原典に名前が無い分類（name_ref なし）なのに、分類を確かめる確認事項が無い"),
+    ("業務分類: 目次の業務の一覧の項目に、分類が無い", "check_flow.py", ["--stage", "structure"],
+     lambda w: edit(w / "structure/hierarchy.json", lambda h: h["toc_flow_list"]["entries"].append({"number": "4", "title": "仮払精算", "level": 1, "page": ""})),
+     "目次の項目「仮払精算」に対応する業務分類が無い"),
+    ("業務分類: id が重複", "check_flow.py", ["--stage", "structure"], lambda w: TX(w, lambda t: CAT(t, 2).update(id="F01")), "分類の id が重複: F01"),
+    ("業務分類: 目次に無い分類を足したのに、全体が目次準拠のまま", "check_flow.py", ["--stage", "structure"], lambda w: TX(w, lambda t: CAT(t, 3).update(basis="llm")),
+     "の basis が llm なのに、全体の basis が toc"),
+    ("業務分類: LLM が分類したのに、分類の考え方が空", "check_flow.py", ["--stage", "structure"], lambda w: TX(w, lambda t: t.update(basis="mixed", rationale="")),
+     "LLM が分類したのに、分類の考え方（rationale）が空"),
+    ("業務分類: 割り当てないページの理由が空", "check_flow.py", ["--stage", "structure"], lambda w: TX(w, lambda t: t["unassigned_pages"][0].update(reason="")),
+     "を割り当てない理由が空"),
+    ("業務分類: 割り当てないページが、無いページ", "check_flow.py", ["--stage", "structure"],
+     lambda w: TX(w, lambda t: t["unassigned_pages"].append({"doc_id": "M01", "page": 99, "reason": "白紙"})), "unassigned_pages が存在しないページを指す"),
+    ("業務分類: 同じページを、割り当てと、割り当てないページの両方に書く", "check_flow.py", ["--stage", "structure"],
+     lambda w: TX(w, lambda t: t["unassigned_pages"].append({"doc_id": "M01", "page": 3, "reason": "重複"})), "が、分類の pages と unassigned_pages の両方にある"),
+    ("フロー: どの分類にも割り当てず、どのノードにも使わない内容ページ", "check_flow.py", ["--stage", "flow"], _orphan_page,
+     "どのノードにも使われていない内容ページ 1 件"),
+]
+
+
+FL = lambda w, F, fn: edit(w / "flows" / f"{F}.flow.json", fn)
+
+
+def _alias_lane(w):
+    edit(w / "glossary.json", lambda g: g["terms"][0].update(aliases=["申請担当"], evidence="「申請者（以下、申請担当）」M01 p.3"))
+    FL(w, "F01", lambda f: f["lanes"][0].update(name="申請担当"))
+
+
+def _no_end(f):
+    f["nodes"] = [n for n in f["nodes"] if n["type"] != "end"]
+    f["edges"] = [e for e in f["edges"] if e["to"] != "end"]
+
+
+def _rename_file(w):
+    (w / "flows/F01.flow.json").rename(w / "flows/F01-old.flow.json")
+
+
+def _stray_flow(w):
+    f = json.loads((w / "flows/F01.flow.json").read_text(encoding="utf-8"))
+    f["flow_id"] = "F09"
+    (w / "flows/F09.flow.json").write_text(json.dumps(f, ensure_ascii=False), encoding="utf-8")
+
+
+def _bad_edits(w):
+    e = json.loads((SKILL / "evals/fixture_edits/F03.edits.json").read_text(encoding="utf-8"))
+    op = next(x for x in e["ops"] if x.get("item"))
+    op["item"] = "M02.1.s9"
+    (w / "flows/F03.edits.json").write_text(json.dumps(e, ensure_ascii=False), encoding="utf-8")
+
+
+def _no_flows(w):
+    for f in (w / "flows").glob("*.flow.json"):
+        f.unlink()
+
+
+CASES += [
+    # ---- 読めない・形の崩れたファイル（LLM・人が書く）----
+    ("業務分類: JSON として読めない", "check_flow.py", ["--stage", "structure"], lambda w: (w / "taxonomy.json").write_text('{"basis":', encoding="utf-8"), "taxonomy.json: JSON として読めない"),
+    ("用語の正本が無い", "check_flow.py", ["--stage", "structure"], lambda w: (w / "glossary.json").unlink(), "glossary.json が無い（担当・システム"),
+    ("業務分類: 全体がオブジェクトでない", "check_flow.py", ["--stage", "structure"], lambda w: (w / "taxonomy.json").write_text("[]", encoding="utf-8"),
+     "全体がオブジェクト（{ … }）になっていない"),
+    ("フロー: 形の誤りが多い（一部だけ出して、残りの数を出す）", "check_flow.py", ["--stage", "flow"],
+     lambda w: FL(w, "F01", lambda f: [n.update(inferred="はい", detail=5) for n in f["nodes"]]), "形が違う — ほか"),
+    # ---- フロー（LLM が書く）----
+    ("フロー: id の無いノード", "check_flow.py", ["--stage", "flow"], lambda w: FL(w, "F01", lambda f: f["nodes"][1].update(id=5)), "id の無い（または文字でない）ノードが 1 個ある"),
+    ("フロー: ファイル名と flow_id が違う", "check_flow.py", ["--stage", "flow"], _rename_file, "ファイル名（flows/F01-old.flow.json）と flow_id が違う"),
+    ("フロー: レーン名が、用語の正本の別の表記", "check_flow.py", ["--stage", "flow"], _alias_lane, "レーン名「申請担当」は、用語の正本では「申請者」の別の表記"),
+    ("フロー: 下位フローの行き先のフローが、まだ無い", "check_flow.py", ["--stage", "flow"], lambda w: (w / "flows/F02.flow.json").unlink(), "がまだ無い（F01 SUB-001 がリンクしている"),
+    ("フロー: 人の作業の箱に、アクティビティ図の番号を付ける", "check_flow.py", ["--stage", "flow"],
+     lambda w: FL(w, "F01", lambda f: node(f, "P-001").update(activity="A-01-1")), "activity（アクティビティ図の番号）は、システム処理のノードだけに付く"),
+    ("フロー: 起動点の箱があるのに、システム台帳が無い", "check_flow.py", ["--stage", "flow"],
+     lambda w: FL(w, "F03", lambda f: node(f, "S-001").update(activity="A-01-1")), "があるのに、システム台帳（structure/systems.json）が無い"),
+    ("フロー: 帳票の attach_to が、無い箱を指す", "check_flow.py", ["--stage", "flow"], lambda w: FL(w, "F01", lambda f: node(f, "F-001").update(attach_to="P-099")),
+     "ファイルの attach_to（どのプロセスで使うか）が無い・不正"),
+    ("フロー: 帳票の向きが、決まった語でない", "check_flow.py", ["--stage", "flow"], lambda w: FL(w, "F01", lambda f: node(f, "F-001").update(direction="both")),
+     "ファイルの direction は in（参照する）/ out（作る）のどちらか"),
+    ("フロー: 出典に引用が無い", "check_flow.py", ["--stage", "flow"], lambda w: FL(w, "F01", lambda f: node(f, "P-001")["sources"][0].update(quote="")), "に引用（quote）が無い"),
+    ("フロー: 引用が短すぎる", "check_flow.py", ["--stage", "flow"], lambda w: FL(w, "F01", lambda f: node(f, "P-001")["sources"][0].update(quote="申。")), "の引用「申。」が短すぎる"),
+    ("フロー: 画像由来の引用が、カードに読み取った文字と合わない", "check_flow.py", ["--stage", "flow"],
+     lambda w: FL(w, "F01", lambda f: node(f, "P-001")["sources"][0].update(quote="画像の中には、この文はどこにも書かれていない", from_image=True)),
+     "画像由来の引用が、ページカード"),
+    ("フロー: 線が、無いノードを指す", "check_flow.py", ["--stage", "flow"], lambda w: FL(w, "F01", lambda f: f["edges"][1].update(to="P-099")), "P-001→P-099 が存在しないノードを指す"),
+    ("フロー: 終了ノードが無い", "check_flow.py", ["--stage", "flow"], lambda w: FL(w, "F01", _no_end), "終了ノードが無い"),
+    ("フロー: 分岐の出口に、同じラベル", "check_flow.py", ["--stage", "flow"],
+     lambda w: FL(w, "F02", lambda f: [e.update(label="あり") for e in f["edges"] if e["from"] == "D-001"]), "同じラベルの分岐がある"),
+    ("フロー: 確認事項の質問文が空", "check_flow.py", ["--stage", "flow"], lambda w: FL(w, "F02", lambda f: f["questions"][0].update(question="")), "の質問文が空"),
+    ("フロー: 確認事項の出典が、無いページ", "check_flow.py", ["--stage", "flow"],
+     lambda w: FL(w, "F02", lambda f: f["questions"][0].update(sources=[{"doc_id": "M01", "page": 99}])), "の出典が、存在しないページを指す"),
+    ("フロー: 使わなかったページの理由が空", "check_flow.py", ["--stage", "flow"],
+     lambda w: FL(w, "F03", lambda f: f.update(unused_pages=[{"doc_id": "M04", "page": 3, "reason": ""}])), "unused_pages の M04/p0003 に理由が無い"),
+    ("フロー: 使わなかったページが、無いページ", "check_flow.py", ["--stage", "flow"],
+     lambda w: FL(w, "F03", lambda f: f.update(unused_pages=[{"doc_id": "M01", "page": 99, "reason": "白紙"}])), "unused_pages が存在しないページを指す"),
+    ("フロー: フローに入れなかった項目が、無い項目", "check_flow.py", ["--stage", "flow"],
+     lambda w: FL(w, "F03", lambda f: f["excluded_items"][0].update(item="s9")), "excluded_items が、存在しない項目を指す"),
+    ("フロー: 業務分類に無いフロー", "check_flow.py", ["--stage", "flow"], _stray_flow, "F09: 対応する業務分類が taxonomy.json に無い"),
+    ("フロー: フローを描かない分類の直しの一覧", "check_flow.py", ["--stage", "flow"], lambda w: (w / "flows/F00.edits.json").write_text("{}", encoding="utf-8"),
+     "フローを描かない分類（make_flow が false）の直しの一覧"),
+    ("フロー: 直しの一覧が読めない", "check_flow.py", ["--stage", "flow"], lambda w: (w / "flows/F01.edits.json").write_text("{", encoding="utf-8"),
+     "直しの一覧（flows/F01.edits.json）が読めない・形が違う"),
+    ("フロー: 直しの一覧に、当てられない直しがある", "check_flow.py", ["--stage", "flow"], _bad_edits, "F03: 直しの一覧に誤り"),
+    ("フロー: フローが 1 本も無い", "check_flow.py", ["--stage", "flow"], _no_flows, "flows/*.flow.json が無い"),
+    ("フロー: 絞り込みに当たるフローが無い", "check_flow.py", ["--stage", "flow", "--only", "F99"], lambda w: None, "--only の F99 に当たるフローが無い"),
+]
+
+
+def _swap_time_tags(wb):
+    from openpyxl.comments import Comment
+    ws = wb["業務マトリクス"]
+    a, b = [c for row in ws.iter_rows() for c in row if c.comment is not None and c.comment.text.startswith("処理時間 F01 ")][:2]
+    ta, tb = a.comment.text, b.comment.text
+    a.comment, b.comment = Comment(tb, "asis-flow-skill"), Comment(ta, "asis-flow-skill")
+
+
+def _count_tag(wb):
+    from openpyxl.comments import Comment
+    ws = wb["業務マトリクス"]
+    c = next(c for row in ws.iter_rows() for c in row if c.comment is not None and c.comment.text.startswith("件数 F01｜"))
+    c.comment = Comment(c.comment.text.replace("件数 F01｜", "件数 F02｜"), "asis-flow-skill")
+
+
+def _no_drawio(w):
+    for p in (w / "out").glob("*.drawio"):
+        p.unlink()
+
+
+CASES += [
+    # ---- 守り（ファイルが無い・指定の誤り）と、人がブックを動かしたとき ----
+    ("図: drawio が無い", "check_flow.py", ["--stage", "drawio"], _no_drawio, "out/*.drawio が無い"),
+    ("図: --styles のファイルが無い", "check_flow.py", ["--stage", "drawio", "--styles", "無い.json"], lambda w: None, "--styles のファイルが無い・読めない"),
+    ("配置: layout.json が無い", "check_layout.py", ["--no-png"], lambda w: [p.unlink() for p in (w / "out").glob("*.layout.json")], "out/*.layout.json が無い"),
+    ("マトリクス: 時間のセルの札が、隣の作業のもの（列を動かした）", "check_flow.py", ["--stage", "matrix"], lambda w: edit_book(w, _swap_time_tags),
+     "が、その作業の時間のセルでない"),
+    ("マトリクス: 件数のセルの札が、別のフローのもの（行を動かした）", "check_flow.py", ["--stage", "matrix"], lambda w: edit_book(w, _count_tag), "のコメントの札が、「件数 F01｜」で始まらない"),
+    ("報告書: 人が埋める欄の控え（answers.json）が読めない", "check_flow.py", ["--stage", "reports"], lambda w: (w / "answers.json").write_text("{", encoding="utf-8"), "answers.json（"),
+    ("マトリクス: 人が埋める欄の控え（answers.json）が読めない", "check_flow.py", ["--stage", "matrix"], lambda w: (w / "answers.json").write_text("{", encoding="utf-8"), "answers.json（"),
+    ("マトリクス: 人が入れた時間の控え（times.json）が読めない", "check_flow.py", ["--stage", "matrix"], lambda w: (w / "times.json").write_text("{", encoding="utf-8"), "times.json（"),
+]
+
+
+def _q_book_drop_row(w):
+    from openpyxl import load_workbook
+    p = w / "out" / "確認事項一覧.xlsx"
+    wb = load_workbook(p)
+    wb.worksheets[0].delete_rows(3)
+    wb.save(p)
+
+
+def _no_deliverables(w):
+    for p in (w / "out").iterdir():
+        if p.is_file():
+            p.unlink()
+
+
+def _bad_table(wb):
+    ws = wb["処理時間の基準"]
+    ws.cell(2, 3).value = "四分"
+
+
+CASES += [
+    ("報告書: 採否表が無いのに、照合の報告書が out/ に残る", "check_flow.py", ["--stage", "reports"],
+     lambda w: (w / "out/原典照合レビュー_採否表.md").write_text("# 古い報告書\\n", encoding="utf-8"), "があるのに、採否表（review/）が無い"),
+    ("報告書: 確認事項一覧（xlsx）が壊れている", "check_flow.py", ["--stage", "reports"], lambda w: (w / "out/確認事項一覧.xlsx").write_bytes(b"not a book"), "out/確認事項一覧.xlsx を読めない"),
+    ("報告書: 確認事項一覧（xlsx）の行を 1 つ消す", "check_flow.py", ["--stage", "reports"], _q_book_drop_row, "番号の並びが、いまの確認事項"),
+    ("納品物: out/ に納品物が無い", "check_flow.py", ["--stage", "deliverables"], _no_deliverables, "納品物（out/ の図"),
+    ("納品物: 業務マトリクス一覧（xlsx）が壊れている", "check_flow.py", ["--stage", "deliverables"], lambda w: (w / "out/業務マトリクス一覧.xlsx").write_bytes(b"not a book"),
+     "業務マトリクス一覧.xlsx: 読めない（"),
+    ("マトリクス: 処理時間の基準の表に、数でない値", "check_flow.py", ["--stage", "matrix"], lambda w: edit_book(w, _bad_table), "処理時間の基準の表を読めない"),
+]
+
+
 def matrix_looks(work):
     """業務マトリクス一覧（xlsx）を読み戻して、行・セル・行き先・確認事項が、もとのフローのとおりかを見る"""
     import zipfile
@@ -1479,8 +1719,26 @@ def tree_tests(tmp):
     from systems import machine_questions
     local = {k for k, _q in machine_questions(w)}
     out.append(("機械が作る確認事項: 読まないと決めたまとまり・読んだ範囲が一部だけのまとまり", {"skipped:M02"} <= local and "partial:M01" not in local))
+    ok_tree = tmp / "tree_ok"
+    shutil.copytree(w, ok_tree)
     code4, text4 = (edit(w / "code/M01.tree.json", lambda t: t["procedures"][0]["body"].pop()), run("check_flow.py", w, "--stage", "code"))[1]
     out.append(("木を直したあと作り直していない: 取り出し直した構造と違う", code4 != 0 and "LLM が書いた木から取り出し直した構造と違う" in text4))
+
+    def tree_case(name, change, expect, again=True):
+        x = tmp / f"tree_case{len(out)}"
+        shutil.copytree(ok_tree, x)
+        change(x)
+        if again:
+            run("code_struct.py", x)
+        code, text = run("check_flow.py", x, "--stage", "code")
+        hit = next((ln for ln in text.splitlines() if ln.startswith("FAIL") and expect in ln), None)
+        out.append((f"木の点検: {name}" + ("" if hit else f"（「{expect}」が出ない）\n{text[-500:]}"), code != 0 and bool(hit)))
+    tree = lambda x, fn: edit(x / "code/M01.tree.json", fn)
+    tree_case("構造（struct.json）が無い", lambda x: (x / "code/M01.struct.json").unlink(), "code/M01.struct.json が無い（python3 scripts/code_struct.py", again=False)
+    tree_case("木の誤り（手続きの範囲が重なる）を、点検が名指しする", lambda x: tree(x, lambda t: t["procedures"][1]["lines"].__setitem__(0, t["procedures"][0]["lines"][1])),
+              "code/M01.tree.json: ")
+    tree_case("手続きが 1 つも無い（読まない理由も無い）", lambda x: tree(x, lambda t: t.update(procedures=[], entries=[])), "手続きが1つも無い")
+    tree_case("起動点が 1 つも無い", lambda x: tree(x, lambda t: t.update(entries=[])), "起動点（entries）が1つも無い")
     return out
 
 
@@ -1732,6 +1990,8 @@ def review_gate_tests(tmp, good):
          lambda x: (edit(x / "review/F01.review.json", lambda r: (r["findings"][0].update(decision="採用", action="箱の名前を直した"), r.pop("reviewed"))),
                     os.utime(x / "flows/F01.flow.json", (1, 1))), "採否表より古い")
     gate("支持率が 95% 未満", lambda x: [edit(x / f"review/{F}.review.json", lambda r: [v.update(verdict="一部支持") for v in r["verdicts"][:3]]) for F in ("F01", "F02", "F03")], "95% 未満")
+    gate("採否表の flow_id が、ファイル名と違う", lambda x: edit(x / "review/F02.review.json", lambda r: r.update(flow_id="F03")), "flow_id が F03（ファイル名は F02）")
+    gate("照合の報告の形が崩れている", lambda x: edit(x / "reports/review_F02.json", lambda d: d["verdicts"][0].update(verdict="まあまあ")), "reports/review_F02.json の形が崩れている")
     gate("図の無い採否表", lambda x: (x / "review/F09.review.json").write_text(json.dumps({"flow_id": "F09", "verdicts": [], "findings": []}), encoding="utf-8"),
          "業務フローにもアクティビティ図にも無い")
     gate("採否表の無いフロー", lambda x: (x / "review/F02.review.json").unlink(), "採否表（review/F02.review.json）が無い")
@@ -1847,6 +2107,12 @@ def diff_review_tests(tmp, w):
                 code == 1 and any("照合の報告（reports/）と違う" in ln or "増えた・変わった" in ln for ln in hit)))
     c1, o1 = run("review.py", x, "draft", "--only", "F02")
     edit(x / "review/F02.review.json", lambda r: [f.update(decision="不採用", action="原典の語のままでよい") for f in r["findings"] if not f["decision"]])
+    x2 = tmp / "diff_report_rewritten"                                # 判定・指摘は同じで、報告のファイルだけが変わった（書き直した）
+    shutil.copytree(x, x2)
+    edit(x2 / "reports/review_F02_差分1.json", lambda d: d["verdicts"][0].update(node=P))
+    code_r, hit_r, _t = fails(x2)
+    out.append(("差分照合: 判定・指摘は同じでも、照合の報告が採否表を作ったあとに変わっていれば FAIL（下書きを作り直して、写しを取り直す）",
+                code_r == 1 and any("採否表を作ったあとに増えた・変わった" in ln for ln in hit_r)))
     code, hit, text = fails(x)
     rv = json.loads((x / "review/F02.review.json").read_text(encoding="utf-8"))
     out.append(("差分照合: 差分照合の報告から下書きを作り直すと、その箱の判定を置き換え、写しも取り直して、門が通る（指摘は足される）",
@@ -3512,6 +3778,43 @@ def code_pipeline_tests(tmp):
     case("用語の対応: 定義の場所に、その名前が無い", "check_flow.py", act_stage, lambda w: edit(w / termj, lambda t: t["terms"][0]["source"].update(line=5)), "定義の場所")
     case("用語の対応: 決まっていない根拠を書く", "check_flow.py", act_stage, lambda w: edit(w / termj, lambda t: t["terms"][1].update(basis="たぶん")), "terms[1].basis")
     case("用語の対応: 同じ名前を 2 回載せる", "check_flow.py", act_stage, lambda w: edit(w / termj, lambda t: t["terms"].append(dict(t["terms"][1]))), "2回載っている")
+    # 発火の試験（2026-10-15）: LLM・人が書くファイル（台帳・直しの一覧・用語の対応）と、図のデータの網羅
+    ad, sysst = f"{a2}.activity.json", ["--stage", "systems"]
+    case("台帳が無い（プログラムのソースがある）", "check_flow.py", sysst, lambda w: (w / sysj).unlink(), "structure/systems.json が無い（プログラムのソースがある")
+    case("台帳: システムの番号が重複", "check_flow.py", sysst, lambda w: edit(w / sysj, lambda s: s["systems"][1].update(id="SYS-01")), "システムの番号が重複: SYS-01")
+    case("台帳: 同じ名前のシステムが 2 つ", "check_flow.py", sysst, lambda w: edit(w / sysj, lambda s: s["systems"][1].update(name="月次集計")), "同じ名前のシステムが2つある")
+    case("台帳: システムが、用語の正本に無い", "check_flow.py", sysst, lambda w: edit(w / sysj, lambda s: s["systems"][1].update(name="在庫管理システム")),
+         "システム「在庫管理システム」が、用語の正本")
+    case("台帳: プログラムの無い資料を、システムの資料にする", "check_flow.py", sysst, lambda w: edit(w / sysj, lambda s: s["systems"][1].update(docs=["M03"])),
+         "の docs の M03 は、プログラムのある資料でない")
+    case("台帳: 同じ資料を、2 つのシステムに入れる", "check_flow.py", sysst, lambda w: edit(w / sysj, lambda s: s["systems"][1].update(docs=["M02"])), "資料 M02 が、2つのシステム")
+    case("台帳: プログラムの構造が無い", "check_flow.py", sysst, lambda w: (w / "code/M01.struct.json").unlink(), "code/M01.struct.json が無い（python3 scripts/code_struct.py")
+    case("台帳: 同じ紐付けを 2 回書く", "check_flow.py", sysst, lambda w: edit(w / sysj, lambda s: s["links"].append(dict(s["links"][0]))), "が、2回書かれている")
+    case("台帳: システムの番号の形が違う", "check_flow.py", sysst, lambda w: edit(w / sysj, lambda s: s["systems"][0].update(id="S1")), "の id が SYS-01 の形でない")
+    case("用語の対応が JSON として読めない", "check_flow.py", act_stage, lambda w: (w / termj).write_text("{", encoding="utf-8"), f"{termj}: JSON として読めない")
+    case("用語の対応の全体が、オブジェクトでない", "check_flow.py", act_stage, lambda w: (w / termj).write_text("[]", encoding="utf-8"), f"{termj}: 読めない（形が違う）")
+    case("アクティビティ図: 直しの一覧が無い", "check_flow.py", act_stage, lambda w: (w / f"{a2}.edits.json").unlink(), "直しの一覧（activities/A-01-2.edits.json）が無い・読めない")
+    case("アクティビティ図: 直しの一覧に、当てられない直し", "check_flow.py", act_stage, lambda w: edit(w / f"{a2}.edits.json", lambda e: e["ops"][0].update(item="Main.999")),
+         "A-01-2: 直しの一覧に誤り")
+    case("アクティビティ図: 同じ行を、2 つの箱・対象外に入れる", "check_flow.py", act_stage,
+         lambda w: edit(w / ad, lambda a: next(o for o in a["lines"] if o["state"] == "excluded")["lines"].extend(next(o for o in a["lines"] if o["state"] == "box")["lines"])),
+         "同じ行が、2つの箱・対象外に入っている")
+    case("アクティビティ図: 手続きに無い行を入れる", "check_flow.py", act_stage, lambda w: edit(w / ad, lambda a: next(o for o in a["lines"] if o["state"] == "box")["lines"].append(9999)),
+         "この図の手続きに無い行が入っている")
+    case("アクティビティ図: 行の持ち主の箱が、図に無い", "check_flow.py", act_stage, lambda w: edit(w / ad, lambda a: next(o for o in a["lines"] if o["state"] == "box").update(node="P-099")),
+         "行の持ち主の箱 P-099")
+    case("アクティビティ図: 分岐の箱が、図に無い", "check_flow.py", act_stage, lambda w: edit(w / ad, lambda a: a["branches"][0].update(node="D-099")), "の箱 D-099 が、図に無い")
+    case("アクティビティ図: 確認事項の重要度が、決まりと違う", "check_flow.py", act_stage, lambda w: edit(w / ad, lambda a: a["questions"][0].update(severity="low")),
+         "の重要度（low）が、決まり 5.4")
+    case("アクティビティ図: 図の説明の「」に、プログラムの中だけの名前", "check_flow.py", act_stage,
+         lambda w: edit(w / ad, lambda a: a.update(summary="売上データを「ws」に読み込み、税額を入れて、集計表を保存する。")), "図の名前・説明の、かぎかっこの中の「ws」は")
+    case("アクティビティ図: まとめた呼び出しの行き先の図が無い", "check_flow.py", act_stage,
+         lambda w: edit(w / ad, lambda a: next(n for n in a["nodes"] if n["type"] == "process").update(calls=[{"to": "A-01-9", "times": 2}])),
+         "まとめた呼び出しの行き先のアクティビティ図（A-01-9）が無い")
+    case("図: アクティビティ図を書き出していない", "check_flow.py", ["--stage", "drawio"], lambda w: [p.unlink() for p in (w / "out").glob("アクティビティ図*.drawio")],
+         "アクティビティ図 A-01-2 のページが draw.io に無い")
+    case("アクティビティ図: 図にする単位に無い番号の図が残る", "check_flow.py", act_stage, lambda w: shutil.copy2(w / ad, w / "activities/A-01-9.activity.json"),
+         "activities/A-01-9.activity.json: 図にする単位に無い番号の図が残っている")
     w = tmp / "code_terms"                                           # 意味が読めない名前: 「不明」として載せれば、もとの名前のまま「」で書ける。確認事項になる
     shutil.copytree(good, w)
     edit(w / termj, lambda t: t["terms"].append({"project": "M01", "name": "対象月", "word": "", "basis": "unknown"}))
@@ -4546,6 +4849,14 @@ def unit_tests():
     out.append(("上位フローの「続く」は、下位フローに置いたリンクで足りる（逆向き・無関係は足りない）",
                 tied(cats, fl, "F08-3-3", "F09", {("F08-3", "F09")}) and not tied(cats, fl, "F09", "F08-3-3", {("F08-3", "F09")})
                 and not tied(cats, fl, "F08-3", "F09", {("F08-3-3", "F09")})))
+    import importlib.util                                            # 被覆の道具（evals/coverage.py）: 試験しない点検の一覧の行が、どれも、いまの点検に当たる
+    spec = importlib.util.spec_from_file_location("fire_coverage", SKILL / "evals" / "coverage.py")
+    CV = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(CV)
+    rows, ss = CV.listed(), CV.sites()
+    stale = [f"{r['func']}「{r['part']}」" for r in rows if not any(CV.matches(r, s) for s in ss)]
+    out.append(("被覆: 試験しない点検の一覧（evals/untested_checks.md）の行が、どれも、いまの点検に当たる。点検の場所を構文から拾える"
+                + (f"（当たらない行: {'・'.join(stale[:4])}）" if stale else ""), bool(rows) and not stale and len(ss) > 250))
     return out
 
 

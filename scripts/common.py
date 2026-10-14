@@ -21,6 +21,7 @@ import collections
 import contextlib
 import difflib
 import json
+import os
 import pathlib
 import re
 import sys
@@ -482,6 +483,9 @@ def guarded(rp, what):
                 f"（python3 scripts/validate.py -w <作業フォルダ> で形だけを確かめられる）")
 
 
+FAIL_LOG = "ASIS_FAIL_LOG"                                            # これがあれば、Report.fail が、出した場所（ファイル:行）を、そのファイルに書き足す
+
+
 class Report:
     """FAIL / WARN / INFO を溜めて出す。FAIL があれば終了コード 1（consulting-pptx-skill の check_deck.py と同じ流儀）。
     画面には、同じ種類の行を fold 件まで出して残りは件数にする（大量の入力で、読む側の文脈をあふれさせないため）。
@@ -491,6 +495,10 @@ class Report:
         self.title, self.fails, self.warns, self.infos, self.fold = title, [], [], [], fold
 
     def fail(self, msg):
+        if FAIL_LOG in os.environ:                                    # 自己点検の被覆（evals/coverage.py）: FAIL を出した点検の場所を控える
+            at = sys._getframe(1)
+            with open(os.environ[FAIL_LOG], "a", encoding="utf-8") as fh:
+                fh.write(f"{os.path.basename(at.f_code.co_filename)}:{at.f_lineno}\n")
         self.fails.append(msg)
 
     def warn(self, msg):

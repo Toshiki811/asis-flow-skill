@@ -1686,7 +1686,7 @@ def check_code(cx, rp):
             if not rd.get("errors") and st["procedures"] and not st["entries"]:
                 rp.fail(f"{tree_name}: 起動点（entries）が1つも無い（外から始まる所を、根拠の行つきで書く）")
         for e in cs.tree_errors(st)[:STRUCT_ERRORS]:
-            rp.fail(f"{name}: {e}")
+            rp.fail(f"{name}: 取り出した構造の誤り — {e}")
         n.update(procs=len(st["procedures"]), entries=len(st["entries"]), units=len(st["units"]), unreached=len(st["unreached"]),
                  dynamic=sum(len(p.get("dynamic") or []) for p in st["procedures"]))
         n[st.get("tier")] += 1
@@ -1795,7 +1795,11 @@ def check_activity(cx, rp):
             rp.warn(f"{u['activity']}: 図にしない手続き（{u['procedure']}）なのに、前に作った図のデータが残っている（activities/{u['activity']}.*.json。図には出ない。消してよい）")
     n = collections.Counter()
     import terms as T
-    tm = T.Terms(cx.work, led.structs)
+    try:
+        tm = T.Terms(cx.work, led.structs)
+    except BadJson:
+        rp.fail(f"{T.FILE}: JSON として読めない。書きかけ・閉じ忘れを直す（名付けの点検ができないので、アクティビティ図の点検は、ここで止めた）")
+        return
     if tm.exists():                                                  # 用語の対応（プログラムの中の名前 → 業務の言葉）
         with guarded(rp, T.FILE):
             raw, terr = try_load(cx.work / T.FILE)
@@ -2312,6 +2316,11 @@ def check_matrix(cx, rp):
         rp.fail(f"out/{BOOK} が無い（python3 scripts/build_matrix.py -w <作業フォルダ> を実行する）")
         return
     again = "python3 scripts/build_matrix.py -w <作業フォルダ> で書き出し直す"
+    try:                                                             # 人が入れた時間の控え。読めなければ、組み立て直しもできないので、ここで止める
+        times = Times(cx.work)
+    except BadJson as e:
+        rp.fail(f"times.json: {e}")
+        return
     try:
         back = tt.read_back(book, SPEC)                                # テンプレートが決めた列の順を、欄の決まった順に戻して読む
     except tt.TemplateError as e:
@@ -2387,11 +2396,6 @@ def check_matrix(cx, rp):
     per = 2 if timed else 1                                          # 処理時間の行があれば、1 フロー＝2 行（作業の行・時間の行）
     if len(rows) != per * len(expect):
         return                                                       # 行の数の違いは、上で FAIL にしている
-    try:
-        times = Times(cx.work)
-    except BadJson as e:
-        rp.fail(f"{e}")
-        return
     loose = [f"{F} {i}" for (F, i), c in sorted(times.cells.items()) if not c.get("book")] + [f"{F} の件数" for F, c in sorted(times.counts.items()) if not c.get("book")]
     if loose:                                                        # ブックから取り込んだ値には、取り込み元（book）が必ず付く
         rp.fail(f"times.json に、ブックから取り込んでいない値がある（{'・'.join(loose[:8])}{' …' if len(loose) > 8 else ''}）。処理時間・件数は、人が業務マトリクス一覧に入れた値だけ"
