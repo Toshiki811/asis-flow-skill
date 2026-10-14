@@ -622,7 +622,7 @@ def draft_tests(tmp):
     out.append(("直しの一覧: 架空データの「支払処理」を直しの一覧から作ると、点検が FAIL 0・WARN 0。やり直しても同じ" + ("" if ok else "\n" + o0[-600:] + o1[-900:]), ok))
     acts = {n["label"]: (n.get("action"), n.get("volume"), n.get("volume_reason")) for n in f3["nodes"] if n["type"] == "process"}
     out.append(("直しの一覧: 動作の種類（op time・足す箱・分ける箱）が、人の作業の箱すべてに付く。量は、理由つきで変えた箱だけ。判断・システム処理には付かない",
-                all(a for a, _v, _r in acts.values()) and acts["支払データを作成する"][0] == "作成する" and acts["支払データを確認する"][0] == "確認する"
+                all(a for a, _v, _r in acts.values()) and acts["支払データを作成する"][0] == "入力する" and acts["支払データを確認する"][0] == "確認する"
                 and acts["再振込の記録を支払台帳に記入する"] == ("入力する", "小", "台帳に 1 行、書くだけ")
                 and sum(1 for _a, v, _r in acts.values() if v) == 1 and not any(n.get("action") for n in f3["nodes"] if n["type"] != "process")))
     lab = {n["id"]: n["label"] for n in f3["nodes"]}
@@ -1009,7 +1009,7 @@ def time_tests(tmp, good):
     rules = [f for rng in ws.conditional_formatting for r in rng.rules for f in r.formula]
     looked = lambda key: re.fullmatch(r'=VLOOKUP\("([^"]+)",.+,(\d),FALSE\)', t[key].value).groups()
     out.append(("処理時間: 仮の値は、基準の表を「動作の種類 × 量」で引く式（量は、理由つきの指定・見る帳票 2 つ以上で変わる。出典が 3 つあるだけでは変わらない。判断・システム処理・別のフローへは、機械が決める）",
-                all(soft(c) for c in t.values()) and looked(("F01", "P-001")) == ("入力する", "2") and looked(("F01", "P-002")) == ("作成する", "3")
+                all(soft(c) for c in t.values()) and looked(("F01", "P-001")) == ("入力する", "2") and looked(("F01", "P-002")) == ("入力する", "3")
                 and looked(("F02", "P-006")) == ("承認する", "3") and looked(("F03", "P-003")) == ("確認する", "4") and looked(("F03", "D-001")) == ("判断する", "3")
                 and looked(("F03", "S-001")) == ("システムが処理する", "3") and looked(("F01", "SUB-001")) == ("別のフローへ進む", "3")))
     out.append(("処理時間: 式のセル＝仮（条件付き書式 ISFORMULA）。基準の表に名前が付いている。人の値の置き場（times.json）は、値が入るまで作らない",
@@ -1030,13 +1030,14 @@ def time_tests(tmp, good):
         listed = {(r[col["フローID"]].value, r[col["ノード番号"]].value): (r[col["処理時間（分）"]].value, r[col["時間の根拠"]].value) for r in nl.iter_rows(min_row=2)}
         edited = tmp / "edited.xlsx"
         shutil.copy(book, edited)
-        human(lambda wb, _t, _n: setattr(base(wb, "作成する", "中"), "value", 30), edited)
+        human(lambda wb, _t, _n: setattr(base(wb, "入力する", "中"), "value", 30), edited)
         v1, tot1, _nl = shown(edited, "calc1")
-        out.append(("処理時間: 計算し直すと、仮の値が基準の表のとおり（入力する×小 2・作成する×中 15・確認する×大 15・判断 2）。合計は、その行の足し算。ノード一覧にも同じ値と「仮」",
-                    (v0[("F01", "P-001")], v0[("F01", "P-002")], v0[("F03", "P-003")], v0[("F03", "D-001")]) == (2, 15, 15, 2) and tot0 == [18, 24, 64]
-                    and listed[("F01", "P-002")] == (15, "仮") and listed[("F03", "S-001")] == (0, "仮")))
-        out.append(("処理時間: 基準の表の「作成する × 中」を 30 に直すと、その種類の仮の値だけが変わる（合計も）",
-                    {k for k in v0 if v0[k] != v1[k]} == {("F01", "P-002"), ("F03", "P-005")} and v1[("F01", "P-002")] == 30 and tot1 == [33, 24, 79]))
+        out.append(("処理時間: 計算し直すと、仮の値が基準の表のとおり（入力する×小 2・入力する×中 4・確認する×大 15・判断 2）。合計は、その行の足し算。ノード一覧にも同じ値と「仮」",
+                    (v0[("F01", "P-001")], v0[("F01", "P-002")], v0[("F03", "P-003")], v0[("F03", "D-001")]) == (2, 4, 15, 2) and tot0 == [7, 24, 53]
+                    and listed[("F01", "P-002")] == (4, "仮") and listed[("F03", "S-001")] == (0, "仮")))
+        out.append(("処理時間: 基準の表の「入力する × 中」を 30 に直すと、その種類・量の仮の値だけが変わる（入力する × 小は変わらない。合計も）",
+                    {k for k in v0 if v0[k] != v1[k]} == {("F01", "P-002"), ("F03", "P-005"), ("F03", "P-008"), ("F03", "P-011")} and v1[("F01", "P-002")] == 30
+                    and v1[("F01", "P-001")] == 2 and tot1 == [33, 24, 131]))
     else:
         out.append(("処理時間: 計算し直しての確かめは、飛ばした（LibreOffice が無い）", True))
 
@@ -1153,6 +1154,13 @@ def time_tests(tmp, good):
     out.append(("処理時間: 動作の種類（action）の無い作業は、点検が WARN（止めない）。仮の値は「その他」の行を引く",
                 c1 == 0 and "動作の種類（action）の無い作業が 1 個（P-001）" in o1 and "0 FAIL / 1 WARN" in o1 and c2 == 0
                 and 'VLOOKUP("その他"' in str(tagged(load_workbook(w3 / "out" / BM.BOOK))[0][("F01", "P-001")].value)))
+    # システムの画面で作る箱（使うシステムの札あり）は「入力する」（決まり 3.22）。札が無ければ「作成する」のままでよい
+    edit(w3 / "flows/F01.flow.json", lambda f: (node(f, "P-001").update(action="入力する"), node(f, "P-002").update(action="作成する")))
+    edit(w3 / "flows/F02.flow.json", lambda f: node(f, "P-005").update(action="作成する"))
+    c1, o1 = run("check_flow.py", w3, "--stage", "flow")
+    out.append(("処理時間: 使うシステムの札が付いた作業の動作の種類が「作成する」なら、点検が WARN で「入力する」を案内する（札の無い箱は出さない）",
+                c1 == 0 and "「作成する」の箱が 1 個（P-002）" in o1 and "F01:" in o1 and "F02: 使うシステムの札" not in o1 and "0 FAIL / 1 WARN" in o1
+                and node(json.loads((w3 / "flows/F02.flow.json").read_text(encoding="utf-8")), "P-005").get("systems") in (None, [])))
     return out
 
 
@@ -4011,9 +4019,9 @@ def shown_tests(tmp, good):
     every = formulas(f)
     out.append(("計算の結果: 書き出したブックの式のセル（仮の値・合計・ノード一覧）のすべてに、値も保存してある（計算をしない表示でも、出る）",
                 len(every) == 28 + 3 + 2 * 28 and all(v[s][c].value is not None for s, c in every)))
-    out.append(("計算の結果: 仮の値は、基準の表のとおり（入力する×小 2・作成する×中 15・確認する×大 15）。判断は 2 分。システム処理・別のフローへは 0 分。合計は、その行の足し算",
-                (at(("F01", "P-001")), at(("F01", "P-002")), at(("F03", "P-003")), at(("F03", "D-001")), at(("F03", "S-001")), at(("F01", "SUB-001"))) == (2, 15, 15, 2, 0, 0)
-                and [v[M].cell(i, 9).value for i in (3, 5, 7)] == [18, 24, 64] and listed(v)[("F01", "P-002")] == (15, "仮") and listed(v)[("F03", "D-001")] == (2, "仮")))
+    out.append(("計算の結果: 仮の値は、基準の表のとおり（入力する×小 2・入力する×中 4・確認する×大 15）。判断は 2 分。システム処理・別のフローへは 0 分。合計は、その行の足し算",
+                (at(("F01", "P-001")), at(("F01", "P-002")), at(("F03", "P-003")), at(("F03", "D-001")), at(("F03", "S-001")), at(("F01", "SUB-001"))) == (2, 4, 15, 2, 0, 0)
+                and [v[M].cell(i, 9).value for i in (3, 5, 7)] == [7, 24, 53] and listed(v)[("F01", "P-002")] == (4, "仮") and listed(v)[("F03", "D-001")] == (2, "仮")))
     office = office_to_pdf.find_soffice()
     if office:
         d = tmp / "shown_calc"
@@ -4222,8 +4230,8 @@ def supply_tests(tmp, good):
                 and BM.TIME_SHEET in names and names.index(BM.TIME_SHEET) == names.index("読み方") - 1 and old.read_bytes() == before))
     out.append(("基準の表の無いテンプレート: 処理時間の欄（合計・件数・ノード一覧の 4 つ）も、右端に補う。合計・仮の値が、表のとおり（計算の結果も保存）。点検が通る",
                 total is not None and head[-2:] == ["件数（人が入れる）", "処理時間の合計（分・全作業）"] and head.index("①") < total - 2
-                and [v[M].cell(i, total).value for i in (3, 5, 7)] == [18, 24, 64] and v[M][tags[("F01", "P-002")]].value == 15
-                and listed.get(("F01", "P-002")) == ("作成する", 15, "仮") and c2 == 0 and "0 FAIL / 0 WARN" in o2))
+                and [v[M].cell(i, total).value for i in (3, 5, 7)] == [7, 24, 53] and v[M][tags[("F01", "P-002")]].value == 4
+                and listed.get(("F01", "P-002")) == ("入力する", 4, "仮") and c2 == 0 and "0 FAIL / 0 WARN" in o2))
     rules = [r for rng in f[M].conditional_formatting for r in rng.rules]
     t = f[M][tags[("F01", "P-002")]]
     out.append(("基準の表の無いテンプレート: 処理時間の行の書式（塗り・仮の値の条件付き書式）も、既定のテンプレートのものが付く",
@@ -4237,7 +4245,7 @@ def supply_tests(tmp, good):
     d = json.loads((w / "times.json").read_text(encoding="utf-8")) if (w / "times.json").exists() else {}
     out.append(("基準の表の無いテンプレート: 人が入れた時間・件数は、書き出し直しても残る（補った欄でも、同じ）",
                 c3 == 0 and v[M][tags[("F01", "P-002")]].value == 20 and v[M].cell(3, total).value == 23 and v[M].cell(3, total - 1).value == 120
-                and listed.get(("F01", "P-002")) == ("作成する", 20, "人") and [(x["flow"], x["value"]) for x in d.get("counts") or []] == [("F01", 120)]))
+                and listed.get(("F01", "P-002")) == ("入力する", 20, "人") and [(x["flow"], x["value"]) for x in d.get("counts") or []] == [("F01", 120)]))
     r1 = subprocess.run([sys.executable, str(S / "table_template.py"), "supply", str(old), "-o", str(new)], capture_output=True, text=True)
     r2 = subprocess.run([sys.executable, str(S / "table_template.py"), "check", str(new), "--book", "matrix"], capture_output=True, text=True)
     r3 = subprocess.run([sys.executable, str(S / "table_template.py"), "supply", str(BM.ASSETS / BM.TEMPLATE), "-o", str(tmp / "supply_none.xlsx")], capture_output=True, text=True)
@@ -4250,7 +4258,7 @@ def supply_tests(tmp, good):
     out.append(("table_template.py supply: 補ったテンプレートを、別の名前で保存する。それは、基準の表のあるテンプレートとして点検に通り、もう補わない。書き出した合計も同じ。基準の表のあるテンプレートには、何もしない",
                 r1.returncode == 0 and new.exists() and old.read_bytes() == before and r2.returncode == 0 and "0 FAIL" in r2.stdout and "補って" not in r2.stdout
                 and not tw.supplied and tw.time is not None and not tw.problems and c4 == 0 and "補って" not in o4 and c5 == 0 and "0 FAIL / 0 WARN" in o5
-                and [g[M].cell(i, total).value for i in (3, 5, 7)] == [18, 24, 64] and r3.returncode == 0 and "補うものは無い" in r3.stdout and not (tmp / "supply_none.xlsx").exists()))
+                and [g[M].cell(i, total).value for i in (3, 5, 7)] == [7, 24, 53] and r3.returncode == 0 and "補うものは無い" in r3.stdout and not (tmp / "supply_none.xlsx").exists()))
     part = tmp / "supply_part.xlsx"                                   # 基準の表はあって、件数の欄を消したテンプレート: 消したまま（補うのは、基準の表が無いときだけ）
     wb = load_workbook(BM.ASSETS / BM.TEMPLATE)
     wb[M].delete_cols(next(c.column for c in wb[M][2] if c.value == "{件数}"))
@@ -4284,8 +4292,8 @@ def big_tests(tmp, good):
         d = json.loads(path.read_text(encoding="utf-8"))
         fn(d)
         path.write_text(json.dumps(d, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    box = lambda d: next(n for n in d["nodes"] if n["id"] == "P-005")       # F03 P-005 は「作成する × 中」
-    edit(fp, lambda d: box(d).update(volume="特大", volume_reason="月に 1 回、全社の分をまとめて作る"))
+    box = lambda d: next(n for n in d["nodes"] if n["id"] == "P-005")       # F03 P-005 は「入力する × 中」（システムの画面で作る。決まり 3.22）
+    edit(fp, lambda d: box(d).update(volume="特大", volume_reason="月に 1 回、全社の分をまとめて入力する"))
     c1, o1 = run("build_matrix.py", w)
     c2, o2 = run("check_flow.py", w, "--stage", "matrix")
     wb, t = cells(book)
@@ -4294,8 +4302,8 @@ def big_tests(tmp, good):
     own = [r for where, r in rules if where == at]
     wide = [r for where, r in rules if ":" in where]
     out.append(("処理時間の量「特大」: 基準の表の 4 列目（特大）を引く式になる。ほかの箱は変わらない。理由が、時間のセルのコメントに出る",
-                c1 == 0 and re.fullmatch(r'=VLOOKUP\("作成する",.+,5,FALSE\)', t[("F03", "P-005")].value) is not None
-                and re.fullmatch(r'=VLOOKUP\("作成する",.+,3,FALSE\)', t[("F01", "P-002")].value) is not None and "月に 1 回、全社の分をまとめて作る" in t[("F03", "P-005")].comment.text))
+                c1 == 0 and re.fullmatch(r'=VLOOKUP\("入力する",.+,5,FALSE\)', t[("F03", "P-005")].value) is not None
+                and re.fullmatch(r'=VLOOKUP\("入力する",.+,3,FALSE\)', t[("F01", "P-002")].value) is not None and "月に 1 回、全社の分をまとめて入力する" in t[("F03", "P-005")].comment.text))
     out.append(("処理時間の量「特大」: まだ仮の値のセルに、そのセルだけの条件付き書式（塗りつき。先に効く）が付く。点検が、先に入れる所として知らせる",
                 len(own) == 1 and bool(own[0].stopIfTrue) and own[0].dxf.fill is not None and "ISFORMULA" in own[0].formula[0] and wide and own[0].priority < min(r.priority for r in wide)
                 and c2 == 0 and "量が「特大」" in o2 and "1 個" in o2 and "F03 P-005" in o2))
@@ -4305,7 +4313,7 @@ def big_tests(tmp, good):
         d.mkdir()
         subprocess.run([office, "--headless", "--convert-to", "xlsx:Calc MS Excel 2007 XML", "--outdir", str(d), str(book)], capture_output=True, timeout=300)
         ws = load_workbook(d / book.name, data_only=True)[M]
-        out.append(("処理時間の量「特大」: 計算し直すと、表の特大の値（作成する 240 分）。合計にも入る", (ws[at].value, ws.cell(7, 9).value) == (240, 289)))
+        out.append(("処理時間の量「特大」: 計算し直すと、表の特大の値（入力する 60 分）。合計にも入る", (ws[at].value, ws.cell(7, 9).value) == (60, 109)))
     else:
         out.append(("処理時間の量「特大」: 計算し直しての確かめは、飛ばした（LibreOffice が無い）", True))
     old = tmp / "old3.xlsx"                                           # 前の形のテンプレート: 表が 小・中・大 の 3 列。書式の見本に、特大の行が無い
@@ -4319,7 +4327,7 @@ def big_tests(tmp, good):
     c4, o4 = run("check_flow.py", w, "--stage", "matrix")
     wb3, t3 = cells(book)
     out.append(("処理時間の量「特大」: 前の形のテンプレート（表が 3 列・特大の書式が無い）でも止まらない。特大の作業は「大」の列を引き、そう知らせる",
-                c3 == 0 and "「特大」の列が無い" in o3 and re.fullmatch(r'=VLOOKUP\("作成する",.+,4,FALSE\)', t3[("F03", "P-005")].value) is not None and c4 == 0 and "FAIL  " not in o4))
+                c3 == 0 and "「特大」の列が無い" in o3 and re.fullmatch(r'=VLOOKUP\("入力する",.+,4,FALSE\)', t3[("F03", "P-005")].value) is not None and c4 == 0 and "FAIL  " not in o4))
     edit(fp, lambda d: box(d).pop("volume_reason"))
     c5, o5 = run("check_flow.py", w, "--stage", "flow")
     same = [{"type": "process", "sources": [{"doc_id": "M01", "page": 3, "item": f"s{k}", "quote": "x"} for k in range(1, 9)], "action": "作成する"}]

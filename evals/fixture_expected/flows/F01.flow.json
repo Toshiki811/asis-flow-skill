@@ -50,7 +50,7 @@
    "lane": "L1",
    "label": "経費申請書を作成し、領収書の画像を添付する",
    "detail": "",
-   "action": "作成する",
+   "action": "入力する",
    "sources": [
     {
      "doc_id": "M01",

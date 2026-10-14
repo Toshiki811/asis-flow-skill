@@ -197,7 +197,7 @@
    "lane": "L2",
    "label": "支払データを作成する",
    "detail": "支払登録の画面で登録",
-   "action": "作成する",
+   "action": "入力する",
    "sources": [
     {
      "doc_id": "M02",

@@ -1245,6 +1245,10 @@ class FlowChecks:
         if bare:
             self.rp.warn(f"{v.F}: 動作の種類（action）の無い作業が {len(bare)} 個（{'・'.join(bare[:6])}{' …' if len(bare) > 6 else ''}）。"
                          "業務マトリクス一覧の処理時間の仮の値が、「その他」の行になる。直しの一覧の op time で、動作の種類を選ぶ（flow-edits-guide.md）")
+        made = [n["id"] for n in v.nodes if n.get("type") == "process" and n.get("action") == "作成する" and n.get("systems")]
+        if made:
+            self.rp.warn(f"{v.F}: 使うシステムの札が付いた作業で、動作の種類が「作成する」の箱が {len(made)} 個（{'・'.join(made[:6])}{' …' if len(made) > 6 else ''}）。"
+                         "システムの画面で作る（入力して登録する）作業は「入力する」。紙・ファイルを一から作る作業なら、そのままでよい（flow-rules.md 3.22）")
         for n in v.nodes:
             if n.get("type") == "process" and n.get("volume") in VOLUME_SPARE and not str(n.get("volume_reason") or "").strip():
                 self.rp.fail(f"{v.F} {n.get('id')}: 量が「{n['volume']}」なのに、理由（volume_reason）が無い。資料から、時間・日の単位でかかると読めるときだけ、そう読める所を書いて付ける（flow-rules.md 3.22）")
