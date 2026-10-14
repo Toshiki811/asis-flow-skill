@@ -2405,6 +2405,8 @@ def check_matrix(cx, rp):
         table, bad = tt.time_table(back["book"], SPEC["time"])
         if table is None:
             rp.fail(f"{BOOK}: 処理時間の基準の表を読めない（{bad or '名前「' + SPEC['time']['name'] + '」の範囲が無い'}）。{again}")
+        elif not back["side"].get("table_version"):                 # 版の記録の前の道具で書き出したブック（納品の門が、現状の処理時間の写しに版を書けない）
+            rp.fail(f"{BOOK}: 基準の表の版の記録が無い（前の版の道具で書き出したブック）。{again}")
     questions = (try_load(cx.work / "questions.json")[0] or {}).get("questions") or []
     for k, F in enumerate(expect):
         fl, r = flows[F], rows[per * k]

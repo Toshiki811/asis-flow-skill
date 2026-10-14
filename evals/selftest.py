@@ -1150,6 +1150,8 @@ CASES += [
     ("納品物: 業務マトリクス一覧（xlsx）が壊れている", "check_flow.py", ["--stage", "deliverables"], lambda w: (w / "out/業務マトリクス一覧.xlsx").write_bytes(b"not a book"),
      "業務マトリクス一覧.xlsx: 読めない（"),
     ("マトリクス: 処理時間の基準の表に、数でない値", "check_flow.py", ["--stage", "matrix"], lambda w: edit_book(w, _bad_table), "処理時間の基準の表を読めない"),
+    ("マトリクス: 基準の表の版の記録が無い（前の版の道具で書き出したブック）", "check_flow.py", ["--stage", "matrix"],
+     lambda w: edit(w / "out/業務マトリクス一覧.columns.json", lambda s: s.pop("table_version")), "基準の表の版の記録が無い"),
 ]
 
 
