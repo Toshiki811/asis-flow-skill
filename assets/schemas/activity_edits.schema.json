@@ -1,0 +1,44 @@
+{
+ "title": "アクティビティ図の直しの一覧",
+ "file": "activities/<番号>.edits.json",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["activity", "name", "ops", "questions"],
+ "properties": {
+  "activity": {"type": "string", "pattern": "^A-[0-9]{2,}-[0-9]+$", "description": "アクティビティ図の番号"},
+  "name": {"type": "string", "minLength": 1, "description": "この処理の名前（「目的語＋動詞」。業務の言葉で。例「月次の請求を集計する」）"},
+  "summary": {"type": "string", "description": "何をする処理か（1〜2文。as-is だけ）"},
+  "operator": {"type": "string", "description": "操作者のレーンの名前（業務フローの担当の名前）。書かなければ、紐付けた手順の担当。それも無ければ「操作者」"},
+  "ops": {"type": "array", "items": {"$ref": "#/$defs/op"}, "description": "下書きへの直し"},
+  "questions": {"type": "array", "items": {"$ref": "common#/$defs/question_draft"}, "description": "機械が作らない確認事項（コメントと処理の食い違い・マニュアルとの食い違い など）。無ければ空"}
+ },
+ "$defs": {
+  "op": {
+   "title": "ops[]（直し）",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["op"],
+   "properties": {
+    "op": {
+     "enum": ["name", "merge", "split", "fold", "exclude", "include"],
+     "description": "`name` 名付ける／`merge` 隣り合うまとまりをまとめる／`split` まとまりを行で分ける／`fold` 技術的な分岐・繰り返しを1つの箱に畳む／`exclude` 対象外にする／`include` 機械が対象外にした文を図に戻す"
+    },
+    "item": {"type": "string", "description": "対象の項目のキー（`Main.23`。下書きに出ているもの）"},
+    "items": {"type": "array", "items": {"type": "string"}, "minItems": 2, "description": "merge: まとめる項目のキー（並んでいる順に）。まとめたあとのキーは、先頭の項目のキー"},
+    "at": {
+     "type": "array",
+     "items": {"type": "integer", "minimum": 1},
+     "minItems": 1,
+     "description": "split: 分ける行（モジュールの行の番号。その行から新しい項目になる。新しい項目のキーは「手続き.その行」）"
+    },
+    "label": {"type": "string", "description": "name: 箱・判断の名前（「目的語＋動詞」。動詞で終える。判断は「〜か」。最後に置く相手・物の名前は、かっこ書き。名前の中のかぎかっこには、ソースにある文字だけを書く）"},
+    "detail": {"type": "string", "description": "name: 補足（条件・しきい値など。ソースに書かれた数字は、そのまま書く。図には、機械がかっこで包んで出す）"},
+    "branches": {"type": "array", "items": {"type": "string"}, "description": "name: 判断の出口のラベル（下書きの出口の順。else の無い分岐は、最後に「どれにも当たらない側」を足す。繰り返しは [繰り返す側, 終わる側]）"},
+    "reason": {
+     "enum": ["保存先・ファイルの有無の確認", "型や空の確認", "エラー番号の振り分け", "書式・表示の調整", "再試行・待ち合わせ", "配列・文字の加工", "画面の更新の制御", "変数の準備", "ログ", "後片付け", "エラーの扱いの設定", "開発・試験用"],
+     "description": "fold・exclude: 理由（fold は「保存先・ファイルの有無の確認／型や空の確認／エラー番号の振り分け／書式・表示の調整／再試行・待ち合わせ／配列・文字の加工」、exclude は「画面の更新の制御／変数の準備／ログ／後片付け／エラーの扱いの設定／書式・表示の調整／開発・試験用」から選ぶ。references/code-guide.md）"
+    }
+   }
+  }
+ }
+}

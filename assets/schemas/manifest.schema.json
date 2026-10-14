@@ -1,0 +1,97 @@
+{
+ "title": "入力の棚卸し",
+ "file": "manifest.json（スクリプトが書く）",
+ "type": "object",
+ "required": ["version", "inputs", "docs"],
+ "properties": {
+  "version": {"type": "integer", "minimum": 1, "description": "形の版"},
+  "created": {"type": "string", "description": "初めて棚卸しした日時"},
+  "updated": {"type": "string", "description": "最後に棚卸しした日時"},
+  "inputs": {"type": "array", "items": {"type": "string"}, "description": "入力のフォルダ・ファイル（絶対パス）"},
+  "docs": {"type": "array", "items": {"$ref": "#/$defs/doc"}, "description": "資料の一覧"},
+  "retired": {"type": "array", "items": {"$ref": "common#/$defs/doc_id"}, "description": "入力から無くなった資料の ID（番号を使い回さない）"}
+ },
+ "additionalProperties": false,
+ "$defs": {
+  "doc": {
+   "title": "docs[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["doc_id", "rel_path", "abs_path", "name", "ext", "kind", "folder", "pages", "has_macro", "duplicate_of", "note"],
+   "properties": {
+    "doc_id": {"$ref": "common#/$defs/doc_id"},
+    "name": {"type": "string", "description": "ファイル名"},
+    "abs_path": {"type": "string", "description": "ファイルの場所（絶対パス）"},
+    "rel_path": {"type": "string", "description": "入力のフォルダからの相対パス"},
+    "folder": {"type": "array", "items": {"type": "string"}, "description": "入力のフォルダからの、フォルダの並び"},
+    "kind": {"enum": ["pptx", "pdf", "xlsx", "docx", "image", "text", "code", "macrobook", "access", "legacy", "unsupported"]},
+    "ext": {"type": "string", "description": "拡張子（小文字）"},
+    "size": {"type": "integer", "minimum": 0, "description": "バイト数"},
+    "sha1": {"type": "string", "pattern": "^[0-9a-f]{40}$", "description": "中身のハッシュ（変わったかを見る）"},
+    "version_key": {"type": "string", "description": "版の表記を除いた名前（版違いの組を見つける）"},
+    "pages": {"type": ["integer", "null"]},
+    "has_macro": {"type": "boolean"},
+    "pdf_text_layer": {"type": ["boolean", "null"], "description": "PDF に文字の層があるか（PDF 以外は null）"},
+    "duplicate_of": {"type": ["string", "null"], "pattern": "^M[0-9]+$", "description": "同じ中身の資料（その資料だけを読む）"},
+    "note": {"type": "string", "description": "棚卸しの注記"},
+    "tool": {"type": "boolean", "description": "業務で使うツール（ブック・ソース）。入力の中のツールのフォルダにある"},
+    "rendered": {"type": "boolean", "description": "描画したか（render_pages.py）"},
+    "render_note": {"type": "string", "description": "描画の注記・読めなかった理由"},
+    "page_list": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "required": ["page", "label", "kind", "json"],
+      "properties": {
+       "page": {"type": "integer", "minimum": 1},
+       "label": {"type": "string"},
+       "kind": {"enum": ["page", "slide", "sheet", "vba", "code", "image", "text"]},
+       "png": {"type": ["string", "null"]},
+       "json": {"type": "string"},
+       "sheet": {"type": "string"},
+       "code": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["language", "module", "line_from"],
+        "properties": {"language": {"type": "string"}, "module": {"type": "string"}, "line_from": {"type": "integer", "minimum": 1}},
+        "description": "プログラムのソースのページ: 言語・モジュール・先頭の行の番号"
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "outline": {"type": "array", "items": {"type": "object"}, "description": "PDF のしおり {level, title, page}"},
+    "sections": {"type": "array", "items": {"type": "object"}, "description": "スライドのセクション {name, slides}"},
+    "sheets": {"type": "array", "items": {"type": "string"}, "description": "シートの名前（ブックの順）"},
+    "hidden_sheets": {"type": "array", "items": {"type": "string"}, "description": "非表示のシート"},
+    "hidden_slides": {"type": "array", "items": {"type": "integer"}, "description": "非表示のスライドの番号"},
+    "vba_modules": {"type": "array", "items": {"type": "object"}, "description": "VBA のモジュール {name, type, procedures, touches}"},
+    "vba_buttons": {"type": "array", "items": {"type": "object"}, "description": "マクロを割り当てたボタン {sheet, shape, macro}"},
+    "vba_sheets": {"type": "object", "description": "シートのコード名 → シートの名前"},
+    "vba_shortcuts": {"type": "array", "items": {"type": "object"}, "description": "マクロのショートカット {key, module, procedure}"},
+    "vba_locked": {"type": "boolean", "description": "VBA プロジェクトに閲覧のロックが掛かっている"},
+    "vba_ribbon": {"type": "array", "items": {"type": "object"}, "description": "リボンのボタン"},
+    "vba_book": {"type": "string", "description": "ブックのコード名"},
+    "vba_unread": {"type": "array", "items": {"type": "string"}, "description": "読めなかったモジュール"},
+    "code": {"type": "object", "description": "プログラムのソースの要約（言語・行数・手続きの数・伏せた認証情報の数）"},
+    "access": {
+     "type": "object",
+     "description": "Access を書き出したテキストの素性（render_pages.py が書く）",
+     "required": ["object", "name"],
+     "properties": {
+      "object": {
+       "enum": ["form", "report", "module", "macro", "queries", "tables", "log", "query", "tabledef", "props"],
+       "description": "書き出しの種類（extract_access.LANGUAGE の項目と同じ）"
+      },
+      "name": {"type": "string"},
+      "root": {"type": "string", "description": "版管理アドインの書き出しの根のフォルダ（入力からの相対）"},
+      "part": {"enum": ["code"], "description": "コードだけのファイル"}
+     }
+    },
+    "read_via": {"type": "string", "description": "Access のファイル: 代わりに読んだ、書き出したテキストのフォルダ（render_pages.py が書く）"},
+    "read_direct": {"type": "boolean", "description": "Access のファイルを直接読んで作ったテキストを読む"},
+    "version_group": {"type": "array", "items": {"$ref": "common#/$defs/doc_id"}, "description": "版違いらしい組（同じフォルダで、版の表記を除くと同じ名前になる資料）"}
+   }
+  }
+ }
+}

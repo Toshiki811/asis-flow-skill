@@ -1,0 +1,56 @@
+{
+ "doc_id": "M04",
+ "page": 3,
+ "printed_page": "2",
+ "page_type": "reference",
+ "title": "第2章 支払",
+ "section_path": [
+  "第2章 支払"
+ ],
+ "summary": "支払日（第7条）と、細則の委任（第8条）。",
+ "actors": [
+  "経理部"
+ ],
+ "systems": [],
+ "documents": [],
+ "steps": [
+  {
+   "id": "s1",
+   "no": "第7条",
+   "actor": "経理部",
+   "action": "承認済みの経費を支払う",
+   "system": "",
+   "inputs": [],
+   "outputs": [],
+   "condition": "毎月25日",
+   "section": "",
+   "quote": "経理部は、承認済みの経費を毎月25日に支払う。",
+   "from_image": false,
+   "origin": "body"
+  }
+ ],
+ "decisions": [],
+ "diagram": {
+  "nodes": [],
+  "edges": []
+ },
+ "figures": [],
+ "notes": [
+  {
+   "id": "n1",
+   "about": "細則",
+   "text": "細則は経費精算業務マニュアルに定める。",
+   "quote": "この規程の細則は、経費精算業務マニュアルに定める。",
+   "from_image": false
+  }
+ ],
+ "toc_entries": [],
+ "cross_refs": [
+  {
+   "text": "この規程の細則は、経費精算業務マニュアルに定める。",
+   "target": "経費精算業務マニュアル"
+  }
+ ],
+ "unreadable": [],
+ "uncertain": []
+}

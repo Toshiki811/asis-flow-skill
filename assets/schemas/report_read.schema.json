@@ -1,0 +1,16 @@
+{
+ "title": "読取の束の報告",
+ "file": "reports/read_<資料ID>_<先頭ページ>.json",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["doc_id", "pages_done", "pages_left", "stopped_because", "unreadable", "uncertain", "hints"],
+ "properties": {
+  "doc_id": {"$ref": "common#/$defs/doc_id", "description": "資料 ID"},
+  "pages_done": {"type": "array", "items": {"type": "integer", "minimum": 1}, "description": "カードを書いて保存したページ（ファイル名の番号）"},
+  "pages_left": {"type": "array", "items": {"type": "integer", "minimum": 1}, "description": "渡されたのに読めていないページ。全部済んだら空"},
+  "stopped_because": {"type": "string", "description": "残りがあるとき、止めた理由（文脈の残りが少ない など）。無ければ空"},
+  "unreadable": {"type": "integer", "minimum": 0, "description": "読めなかった箇所の数"},
+  "uncertain": {"type": "integer", "minimum": 0, "description": "決められなかった点の数"},
+  "hints": {"type": "array", "items": {"type": "string"}, "description": "階層の判定に使える気づき（目次らしいページ・他資料への参照・版の表記）。1件1行。カードの中身は書かない"}
+ }
+}

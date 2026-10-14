@@ -1,0 +1,41 @@
+{
+ "flow_id": "F01",
+ "summary": "月次の請求を集計し、承認を受けて、入金を消し込む。",
+ "start_condition": "月末",
+ "end_condition": "",
+ "ops": [
+  {
+   "op": "time",
+   "item": "M03.1.s1",
+   "action": "保管する"
+  },
+  {
+   "op": "time",
+   "item": "M03.1.s2",
+   "action": "確認する"
+  },
+  {
+   "op": "time",
+   "item": "M03.1.s3",
+   "action": "入力する",
+   "volume": "小",
+   "reason": "ボタンを押すだけ"
+  },
+  {
+   "op": "time",
+   "item": "M03.1.s4",
+   "action": "確認する"
+  },
+  {
+   "op": "time",
+   "item": "M03.1.s5",
+   "action": "承認する"
+  },
+  {
+   "op": "time",
+   "item": "M03.1.s6",
+   "action": "入力する"
+  }
+ ],
+ "questions": []
+}

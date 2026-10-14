@@ -1,0 +1,91 @@
+{
+ "doc_id": "M03",
+ "page": 2,
+ "page_type": "flow_diagram",
+ "title": "領収書チェックの流れ",
+ "section_path": [],
+ "summary": "領収書を確認→不備あり？→申請者に差し戻す の図と、チェック結果の入力画面の画像。",
+ "actors": [],
+ "systems": [],
+ "documents": [],
+ "steps": [],
+ "decisions": [
+  {
+   "question": "不備あり？",
+   "branches": [
+    {
+     "label": "",
+     "to": "申請者に差し戻す"
+    }
+   ],
+   "quote": "不備あり？",
+   "from_image": false,
+   "id": "d1",
+   "section": "",
+   "origin": "body"
+  }
+ ],
+ "diagram": {
+  "nodes": [
+   {
+    "id": "g1",
+    "label": "領収書を確認",
+    "lane": "",
+    "shape": "process"
+   },
+   {
+    "id": "g2",
+    "label": "不備あり？",
+    "lane": "",
+    "shape": "decision"
+   },
+   {
+    "id": "g3",
+    "label": "申請者に差し戻す",
+    "lane": "",
+    "shape": "process"
+   }
+  ],
+  "edges": [
+   {
+    "from": "g1",
+    "to": "g2",
+    "label": ""
+   },
+   {
+    "from": "g2",
+    "to": "g3",
+    "label": ""
+   }
+  ]
+ },
+ "figures": [
+  {
+   "kind": "flowchart",
+   "description": "左から 領収書を確認 → 不備あり？（ひし形）→ 申請者に差し戻す。",
+   "texts": []
+  },
+  {
+   "kind": "screenshot",
+   "description": "「チェック結果の入力」画面。右端が切れている。",
+   "texts": [
+    "チェック結果の入力",
+    "領収書番号",
+    "R-0456",
+    "照合結果",
+    "一致"
+   ]
+  }
+ ],
+ "toc_entries": [],
+ "cross_refs": [],
+ "unreadable": [],
+ "uncertain": [
+  {
+   "what": "不備が無い場合の行き先",
+   "why": "判断から出る線が1本（差し戻し）しか描かれていない"
+  }
+ ],
+ "printed_page": null,
+ "notes": []
+}

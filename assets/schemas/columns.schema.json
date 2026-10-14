@@ -1,0 +1,41 @@
+{
+ "title": "列の対応（書き出したブックの読み戻しに使う）",
+ "file": "out/業務マトリクス一覧.columns.json・out/確認事項一覧.columns.json",
+ "description": "機械が書く（書き出しのたびに、ブックと一緒に）。人が入れた値を読み戻すときの、列と札の対応。壊れていれば、読み戻しは止まる",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["template", "sheets"],
+ "properties": {
+  "template": {"type": "string", "minLength": 1, "description": "使ったテンプレートのファイル名"},
+  "template_path": {"type": "string", "minLength": 1, "description": "使ったテンプレートの場所。次の書き出しで --template を省くと、これを使う（門の書き出し直しで、お客様の様式が既定に戻らない）"},
+  "sheets": {"type": "object", "additionalProperties": {"$ref": "#/$defs/sheet"}, "description": "シートの名前 → 列の対応"},
+  "static": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": {"type": "string"}}, "description": "シート → セル → 書いた文"},
+  "timed": {"type": "boolean", "description": "処理時間の行を出したか"},
+  "empty": {"type": "array", "items": {"type": "string"}, "description": "中身が無いので入れなかった一覧"},
+  "table": {"type": "array", "items": {"type": "array", "minItems": 3, "maxItems": 3}, "description": "書き出したときの「処理時間の基準」（動作・量・分）"}
+ },
+ "$defs": {
+  "sheet": {
+   "title": "sheets{}",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["canon", "header_rows", "columns"],
+   "properties": {
+    "canon": {"type": "string", "description": "どの一覧か（既定の名前）"},
+    "header_rows": {"type": "integer", "minimum": 0},
+    "tags": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}, "description": "セル → 札（時間・件数の札）"},
+    "columns": {"type": "array", "items": {"type": ["string", "null"]}, "description": "列ごとの欄の名前（null は人が埋める欄。回答・回答者・回答日など）"},
+    "manual": {
+     "type": "array",
+     "items": {"type": "array", "minItems": 3, "maxItems": 3},
+     "description": "人が埋める欄（テンプレートの、印の無い列）: [列（1 から）, 見出し, 見本の行の値]。書き出し直す前に、この列を読んで answers.json に取り込む"
+    },
+    "keys": {
+     "type": "array",
+     "items": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}},
+     "description": "行ごとの [鍵, 行の名前]（欄で行が決まらない一覧だけ。業務マトリクスはフロー）。読み戻すとき、行の名前で、行を動かしていないかを確かめる"
+    }
+   }
+  }
+ }
+}

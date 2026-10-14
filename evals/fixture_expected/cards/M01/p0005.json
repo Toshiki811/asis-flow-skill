@@ -1,0 +1,141 @@
+{
+ "doc_id": "M01",
+ "page": 5,
+ "page_type": "procedure",
+ "title": "2. 承認",
+ "section_path": [
+  "2. 承認"
+ ],
+ "summary": "上長が照合し、金額で承認者が分かれる。不備は差し戻す。5万円以上は承認の前に見積書の添付を確認する（注記）。",
+ "actors": [
+  "上長",
+  "課長",
+  "部長",
+  "申請者"
+ ],
+ "systems": [],
+ "documents": [
+  "領収書",
+  "見積書"
+ ],
+ "steps": [
+  {
+   "no": 1,
+   "actor": "上長",
+   "action": "申請内容と領収書を照合する",
+   "system": "",
+   "inputs": [
+    "領収書"
+   ],
+   "outputs": [],
+   "condition": "",
+   "quote": "上長は、申請内容と領収書を照合する。",
+   "from_image": false,
+   "id": "s1",
+   "section": "",
+   "origin": "body"
+  },
+  {
+   "no": 2,
+   "actor": "課長",
+   "action": "承認する",
+   "system": "",
+   "inputs": [],
+   "outputs": [],
+   "condition": "申請金額が5万円未満の場合",
+   "quote": "申請金額が5万円未満の場合は課長が承認する。",
+   "from_image": false,
+   "id": "s2",
+   "section": "",
+   "origin": "body"
+  },
+  {
+   "no": 3,
+   "actor": "部長",
+   "action": "承認する",
+   "system": "",
+   "inputs": [],
+   "outputs": [],
+   "condition": "5万円以上の場合",
+   "quote": "5万円以上の場合は部長が承認する。",
+   "from_image": false,
+   "id": "s3",
+   "section": "",
+   "origin": "body"
+  },
+  {
+   "no": 4,
+   "actor": "上長",
+   "action": "申請者に差し戻す",
+   "system": "",
+   "inputs": [],
+   "outputs": [],
+   "condition": "不備がある場合",
+   "quote": "不備がある場合は、申請者に差し戻す。",
+   "from_image": false,
+   "id": "s4",
+   "section": "",
+   "origin": "body"
+  },
+  {
+   "id": "s5",
+   "actor": "",
+   "action": "見積書の添付を確認する",
+   "system": "",
+   "inputs": [
+    "見積書"
+   ],
+   "outputs": [],
+   "condition": "5万円以上の申請。承認の前",
+   "section": "",
+   "quote": "5万円以上の申請は、承認の前に見積書の添付を確認すること。",
+   "from_image": false,
+   "origin": "note",
+   "applies_to": "s3"
+  }
+ ],
+ "decisions": [
+  {
+   "question": "申請金額が5万円以上か",
+   "branches": [
+    {
+     "label": "5万円未満",
+     "to": "課長が承認"
+    },
+    {
+     "label": "5万円以上",
+     "to": "部長が承認"
+    }
+   ],
+   "quote": "申請金額が5万円未満の場合は課長が承認する。5万円以上の場合は部長が承認する。",
+   "from_image": false,
+   "id": "d1",
+   "section": "",
+   "origin": "body"
+  }
+ ],
+ "diagram": {
+  "nodes": [],
+  "edges": []
+ },
+ "figures": [],
+ "toc_entries": [],
+ "cross_refs": [],
+ "unreadable": [],
+ "uncertain": [
+  {
+   "what": "「上長」が誰か",
+   "why": "(1)(3) は「上長」、(2) は課長・部長と書かれ、照合と差し戻しを誰が行うかが決まらない"
+  },
+  {
+   "what": "差し戻し後の流れ",
+   "why": "差し戻された申請者が何をするかが書かれていない"
+  },
+  {
+   "what": "見積書の添付を確認する担当",
+   "why": "注記（※）に主語が無い"
+  }
+ ],
+ "printed_page": null,
+ "notes": []
+}

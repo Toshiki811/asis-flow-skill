@@ -1,0 +1,66 @@
+{
+ "doc_id": "M01",
+ "page": 6,
+ "page_type": "screen",
+ "title": "3. 支払処理",
+ "section_path": [
+  "3. 支払処理"
+ ],
+ "summary": "経理部が支払登録の画面で確認し、支払データを登録する。",
+ "actors": [
+  "経理部"
+ ],
+ "systems": [
+  "経費精算システム"
+ ],
+ "documents": [],
+ "steps": [
+  {
+   "no": 1,
+   "actor": "経理部",
+   "action": "承認済みの申請を画面で確認し、支払データを登録する",
+   "system": "経費精算システム",
+   "inputs": [],
+   "outputs": [
+    "支払データ"
+   ],
+   "condition": "",
+   "quote": "経理部は、承認済みの申請を下の画面で確認し、支払データを登録する。",
+   "from_image": false,
+   "id": "s1",
+   "section": "",
+   "origin": "body"
+  }
+ ],
+ "decisions": [],
+ "diagram": {
+  "nodes": [],
+  "edges": []
+ },
+ "figures": [
+  {
+   "kind": "screenshot",
+   "description": "「経費精算システム｜支払登録」の画面。項目と入力例が並び、右下に緑の「登録」ボタン。",
+   "texts": [
+    "経費精算システム ｜ 支払登録",
+    "申請番号",
+    "EX-2026-00123",
+    "申請者",
+    "山田 太郎",
+    "金額",
+    "48,600 円",
+    "支払予定日",
+    "翌月10日",
+    "振込先",
+    "給与口座",
+    "登録"
+   ]
+  }
+ ],
+ "toc_entries": [],
+ "cross_refs": [],
+ "unreadable": [],
+ "uncertain": [],
+ "printed_page": null,
+ "notes": []
+}

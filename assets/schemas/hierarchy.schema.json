@@ -1,0 +1,154 @@
+{
+ "title": "階層の判定",
+ "file": "structure/hierarchy.json",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["is_hierarchical", "basis", "rationale", "tree", "docs", "doc_relations", "sequence", "toc_flow_list", "questions"],
+ "properties": {
+  "is_hierarchical": {"enum": ["yes", "partial", "no"], "description": "階層構造か"},
+  "basis": {
+   "type": "array",
+   "items": {"enum": ["folder", "filename", "toc", "numbering", "outline", "sections", "sheets", "cross_ref", "inferred"]},
+   "description": "根拠にしたもの: `folder`・`filename`・`toc`・`numbering`（見出し番号）・`outline`（PDF のしおり）・`sections`（PowerPoint）・`sheets`・`cross_ref`・`inferred`"
+  },
+  "rationale": {"type": "string", "minLength": 1, "description": "判定の理由。根拠どうしが食い違ったら、どちらを採ったか"},
+  "tree": {"type": "array", "items": {"$ref": "#/$defs/node"}, "description": "業務の木（業務領域 > 業務 > 手順 > 操作）。資料の節をここに結び付ける"},
+  "docs": {"type": "array", "items": {"$ref": "#/$defs/doc"}, "description": "資料ごとの役割。読む対象の資料をすべて載せる"},
+  "doc_relations": {"type": "array", "items": {"$ref": "#/$defs/relation"}, "description": "資料と資料の関係（決まった種類だけ。根拠必須）"},
+  "sequence": {"type": "array", "items": {"$ref": "#/$defs/sequence"}, "description": "業務から業務への「続く」（資料をまたぐ受け渡し）。無ければ空"},
+  "toc_flow_list": {"$ref": "#/$defs/toc_flow_list", "description": "目次に業務（業務フロー）の一覧があるか。`found: true` なら業務分類は目次に準拠する"},
+  "questions": {"type": "array", "items": {"$ref": "common#/$defs/question"}, "description": "階層についての確認事項"}
+ },
+ "$defs": {
+  "node": {
+   "title": "tree[]（業務の木）",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["id", "level", "title", "kind", "source", "refs", "children"],
+   "properties": {
+    "id": {"type": "string", "pattern": "^H[0-9]+(\\.[0-9]+)*$", "description": "H1、H1.2 …"},
+    "level": {"type": "integer", "minimum": 1, "description": "段"},
+    "number": {"type": "string", "description": "原典の番号（「第3章」「2.1」「（1）」。無ければ省く）"},
+    "title": {"type": "string", "minLength": 1, "description": "名前（目次・見出しのまま）"},
+    "kind": {
+     "enum": ["domain", "category", "process", "procedure", "operation", "document"],
+     "description": "`domain` 業務領域／`category`／`process` 業務／`procedure` 手順／`operation` 操作／`document`"
+    },
+    "source": {"enum": ["toc", "folder", "heading", "inferred"], "description": "何から決めたか"},
+    "refs": {"type": "array", "items": {"$ref": "#/$defs/ref"}, "description": "この業務を書いている資料の節"},
+    "children": {"type": "array", "items": {"$ref": "#/$defs/node"}, "description": "下位の節"}
+   }
+  },
+  "ref": {
+   "title": "tree[].refs[]（資料の節 → 業務）",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["doc_id", "pages", "rel"],
+   "properties": {
+    "doc_id": {"$ref": "common#/$defs/doc_id", "description": "資料 ID"},
+    "pages": {"type": "array", "items": {"type": "integer", "minimum": 1}, "description": "ページ（ファイル名 pNNNN の番号）。まだ分からなければ空"},
+    "rel": {"enum": ["describes", "details"], "description": "`describes` この業務を書いている／`details` 上位資料が書いた業務を、この資料が詳しくしている"},
+    "evidence": {"type": "string", "description": "根拠の文（原文のまま。`details` は必須）。ページは `sources` に書く"},
+    "sources": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["doc_id", "page"],
+      "properties": {"doc_id": {"$ref": "common#/$defs/doc_id"}, "page": {"type": "integer", "minimum": 1}}
+     },
+     "description": "根拠のページ `{\"doc_id\", \"page\"}`（page はファイル名 pNNNN の番号。一覧に出すページ番号は機械が引く）"
+    }
+   }
+  },
+  "doc": {
+   "title": "docs[]（資料の役割と題名）",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["doc_id", "role"],
+   "properties": {
+    "doc_id": {"$ref": "common#/$defs/doc_id", "description": "資料 ID"},
+    "title": {
+     "type": "string",
+     "description": "資料の題名。表紙（スライドなら 1 枚目）に刷られた題名を、原文のまま写す（副題・版・日付・発行元は入れない。作らない）。表紙の無い資料（Excel・プログラムのソース）は書かなくてよい（ファイル名から拡張子を外したものになる）。納品物では、資料を ID でなく、この題名で書く（書かなければ、表紙のカードの見出し → ファイル名）"
+    },
+    "role": {
+     "enum": ["regulation", "manual", "procedure", "appendix", "tool", "other"],
+     "description": "`regulation` 規程／`manual` 全体マニュアル／`procedure` 手順書／`appendix` 別紙・様式／`tool` ツール・マクロ／`other`"
+    },
+    "out_of_scope": {"type": "string", "description": "どの業務にも結び付けない資料は、その理由"}
+   }
+  },
+  "relation": {
+   "title": "doc_relations[]（資料 → 資料）",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["from", "to", "type", "evidence"],
+   "properties": {
+    "from": {"$ref": "common#/$defs/doc_id", "description": "資料 ID"},
+    "to": {"$ref": "common#/$defs/doc_id", "description": "資料 ID"},
+    "type": {
+     "enum": ["parent_of", "appendix_of", "basis_of", "refers_to", "version_of", "duplicate_of"],
+     "description": "`parent_of` from が上位（どの節に当たるかを tree の `details` で示す）／`appendix_of` to が from の別紙／`basis_of` from が to の根拠（規程）／`refers_to` from が to を参照／`version_of` 版違い／`duplicate_of` 同一"
+    },
+    "evidence": {"type": "string", "minLength": 1, "description": "根拠にした文（原文のまま）。無ければ関係を書かない。ページは `sources` に書く"},
+    "sources": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["doc_id", "page"],
+      "properties": {"doc_id": {"$ref": "common#/$defs/doc_id"}, "page": {"type": "integer", "minimum": 1}}
+     },
+     "description": "根拠のページ `{\"doc_id\", \"page\"}`（page はファイル名 pNNNN の番号。一覧に出すページ番号は機械が引く）"
+    }
+   }
+  },
+  "sequence": {
+   "title": "sequence[]（業務 → 業務）",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["from", "to", "evidence"],
+   "properties": {
+    "from": {"$ref": "common#/$defs/hier_id", "description": "前の業務（tree の id）"},
+    "to": {"$ref": "common#/$defs/hier_id", "description": "続く業務（tree の id）"},
+    "evidence": {"type": "string", "minLength": 1, "description": "根拠の文（原文のまま）。ページは `sources` に書く"},
+    "sources": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["doc_id", "page"],
+      "properties": {"doc_id": {"$ref": "common#/$defs/doc_id"}, "page": {"type": "integer", "minimum": 1}}
+     },
+     "description": "根拠のページ `{\"doc_id\", \"page\"}`（page はファイル名 pNNNN の番号。一覧に出すページ番号は機械が引く）"
+    }
+   }
+  },
+  "toc_flow_list": {
+   "title": "toc_flow_list",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["found", "source", "entries"],
+   "properties": {
+    "found": {"type": "boolean"},
+    "source": {"type": "array", "items": {"$ref": "common#/$defs/page_set"}},
+    "entries": {
+     "type": "array",
+     "description": "目次のまま写す。`page` は目次に刷られた番号",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["number", "title", "level", "page"],
+      "properties": {
+       "number": {"type": "string"},
+       "title": {"type": "string", "minLength": 1},
+       "level": {"type": "integer", "minimum": 1},
+       "page": {"type": ["integer", "string", "null"]}
+      }
+     }
+    }
+   }
+  }
+ }
+}

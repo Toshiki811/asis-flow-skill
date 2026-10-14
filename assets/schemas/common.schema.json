@@ -1,0 +1,98 @@
+{
+ "title": "共通の部品",
+ "$defs": {
+  "doc_id": {"type": "string", "pattern": "^M[0-9]+$", "description": "資料 ID（M01。棚卸しが振る。ページ・カードの置き場所と同じ）"},
+  "flow_id": {"type": "string", "pattern": "^F[0-9]+(-[0-9]+)*$", "description": "フロー（業務分類）の id（F03・F03-1）"},
+  "activity_id": {"type": "string", "pattern": "^A-[0-9]{2,}-[0-9]+$", "description": "アクティビティ図の番号（A-01-2）"},
+  "figure_id": {"type": "string", "pattern": "^(F[0-9]+(-[0-9]+)*|A-[0-9]{2,}-[0-9]+)$", "description": "フローの id か、アクティビティ図の番号"},
+  "node_id": {"type": "string", "pattern": "^(start|end)[0-9]*(-[0-9]+)?$|^(P|D|S|F|SUB)-[0-9]{3}$", "description": "ノード番号（P-003・D-001・start・end）"},
+  "hier_id": {"type": "string", "pattern": "^H[0-9]+(\\.[0-9]+)*$", "description": "業務の木の項目の id（H1.3）"},
+  "q_id": {"type": "string", "pattern": "^Q-[0-9]{3,}$", "description": "確認事項の通し番号（Q-001）"},
+  "question": {
+   "title": "questions[]（確認事項）",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["id", "category", "effect", "question", "assumption", "sources", "ask"],
+   "properties": {
+    "id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*$", "description": "そのファイルの中で重ならない名前（q1、q2…）。あとから変えない（通し番号 Q-001… の引き継ぎに使う）"},
+    "severity": {
+     "enum": ["high", "mid", "low"],
+     "description": "重要度。機械が決まり 5.4 で決める（LLM は書かなくてよい。書いても使わない）: `high` フローの範囲、複数の箱が変わる／`mid` 担当、箱 1 つ・線 1 本が変わる／`low` システム・帳票の札、開始条件・終了条件が変わる。flow.json・activity.json には、機械が書く"
+    },
+    "category": {
+     "enum": ["読取不能", "記載なし", "資料間の矛盾", "資料間の順序", "分類", "階層", "用語", "システム", "プログラム", "資料の版"],
+     "description": "種別（この10 個から選ぶ）。`システム` どの作業でどのシステム・プログラムを使うか／`プログラム` プログラムの中身（マニュアルとの食い違い・実行時に決まる名前 など）"
+    },
+    "effect": {
+     "enum": ["箱", "順序", "分岐", "担当", "システム・帳票", "フローの範囲"],
+     "description": "答えで、図のどこが変わるか（この 6 つから 1 つ）。`箱` 作業の有無／`順序` 線・順／`分岐` 条件の有無・行き先／`担当` レーン／`システム・帳票` 使うシステムの札・紙・プログラムとの紐付け／`フローの範囲` 分け方・階層・開始条件・終了条件・図にする範囲。どれにも当たらない問い（値だけを聞く・書かれていることが、いまも同じかを確かめる・名前や呼び方だけが変わる）は、確認事項にしない"
+    },
+    "node": {"$ref": "#/$defs/node_id", "description": "対象のノード id（フローの確認事項だけ。対象が1つのとき）"},
+    "nodes": {"type": "array", "items": {"$ref": "#/$defs/node_id"}, "minItems": 2, "description": "対象のノード id の並び（同じ問いが2つ以上のノードに掛かるとき。`node` の代わりに書く）"},
+    "edge": {"type": "array", "items": {"$ref": "#/$defs/node_id"}, "minItems": 2, "maxItems": 2, "description": "対象の線 `[\"P-003\", \"D-001\"]`（フローの確認事項だけ）"},
+    "flow": {"$ref": "#/$defs/flow_id", "description": "対象の業務分類の id（taxonomy.json の確認事項だけ。目次に無く足した分類・LLM が名付けた分類を、1件ずつ指す）"},
+    "question": {"type": "string", "minLength": 1, "description": "問い。「A ですか、B ですか」の形に"},
+    "assumption": {"type": "string", "description": "何を仮置きしたか"},
+    "sources": {
+     "type": "array",
+     "description": "根拠にしたページ `{\"doc_id\", \"page\"}`（page はファイル名 pNNNN の番号）",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["doc_id"],
+      "properties": {"doc_id": {"$ref": "#/$defs/doc_id"}, "page": {"type": "integer", "minimum": 1}}
+     }
+    },
+    "ask": {"type": "string", "description": "聞く相手（原典から分かる範囲で）"}
+   }
+  },
+  "page_set": {
+   "title": "ページの集まり",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["doc_id", "pages"],
+   "properties": {"doc_id": {"$ref": "#/$defs/doc_id"}, "pages": {"type": "array", "items": {"type": "integer", "minimum": 1}}}
+  },
+  "page_reason": {
+   "title": "ページと理由",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["doc_id", "page", "reason"],
+   "properties": {"doc_id": {"$ref": "#/$defs/doc_id"}, "page": {"type": "integer", "minimum": 1}, "reason": {"type": "string", "minLength": 1}}
+  },
+  "question_draft": {
+   "title": "questions[]（直しの一覧の中）",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["id", "category", "effect", "question", "assumption"],
+   "description": "直しの一覧（edits・activity_edits）に書く確認事項。対象は項目の id（items・edge）で指し、機械がノード番号に置き換える",
+   "properties": {
+    "id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*$", "description": "そのファイルの中で重ならない名前（q1、q2…）。あとから変えない（通し番号 Q-001… の引き継ぎに使う）"},
+    "severity": {"enum": ["high", "mid", "low"], "description": "書かなくてよい（機械が、effect と指す項目の数から、決まり 5.4 で決める。書いても使わない）"},
+    "category": {
+     "enum": ["読取不能", "記載なし", "資料間の矛盾", "資料間の順序", "分類", "階層", "用語", "システム", "プログラム", "資料の版"],
+     "description": "種別（この10 個から選ぶ）。`システム` どの作業でどのシステム・プログラムを使うか／`プログラム` プログラムの中身（マニュアルとの食い違い・実行時に決まる名前 など）"
+    },
+    "effect": {
+     "enum": ["箱", "順序", "分岐", "担当", "システム・帳票", "フローの範囲"],
+     "description": "答えで、図のどこが変わるか（この 6 つから 1 つ）。`箱` 作業の有無／`順序` 線・順／`分岐` 条件の有無・行き先／`担当` レーン／`システム・帳票` 使うシステムの札・紙・プログラムとの紐付け／`フローの範囲` 分け方・階層・開始条件・終了条件・図にする範囲。どれにも当たらない問い（値だけを聞く・書かれていることが、いまも同じかを確かめる・名前や呼び方だけが変わる）は、確認事項にしない"
+    },
+    "items": {"type": "array", "items": {"type": "string"}, "description": "対象の項目（カードの項目の id か、足した箱の id）"},
+    "edge": {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 2, "description": "対象の線（項目の id 2 つ）"},
+    "question": {"type": "string", "minLength": 1, "description": "問い。「A ですか、B ですか」の形に"},
+    "assumption": {"type": "string", "description": "何を仮置きしたか"},
+    "sources": {
+     "type": "array",
+     "description": "根拠にしたページ `{\"doc_id\", \"page\"}`（page はファイル名 pNNNN の番号）",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["doc_id"],
+      "properties": {"doc_id": {"$ref": "#/$defs/doc_id"}, "page": {"type": "integer", "minimum": 1}}
+     }
+    },
+    "ask": {"type": "string", "description": "聞く相手（原典から分かる範囲で）"}
+   }
+  }
+ }
+}

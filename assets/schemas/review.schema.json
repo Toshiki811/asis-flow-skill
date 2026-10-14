@@ -1,0 +1,42 @@
+{
+ "title": "原典照合レビューの採否表",
+ "file": "review/<フローID>.review.json",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["flow_id", "verdicts", "findings"],
+ "properties": {
+  "flow_id": {"$ref": "common#/$defs/figure_id", "description": "フローの id か、アクティビティ図の番号"},
+  "verdicts": {"type": "array", "items": {"$ref": "#/$defs/verdict"}, "description": "ノードごとの判定（開始・終了を除く全ノード）"},
+  "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}, "description": "指摘と採否。指摘が無ければ空"}
+ },
+ "$defs": {
+  "verdict": {
+   "title": "verdicts[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["node", "verdict", "evidence"],
+   "properties": {
+    "node": {"$ref": "common#/$defs/node_id", "description": "ノード番号"},
+    "verdict": {"enum": ["支持", "一部支持", "不支持"], "description": "レビュー担当の判定"},
+    "evidence": {"type": "string", "description": "原典の該当箇所の引用と、違う点"}
+   }
+  },
+  "finding": {
+   "title": "findings[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["id", "kind", "target", "text", "decision", "action"],
+   "properties": {
+    "id": {"type": "string", "pattern": "^r[0-9]+$", "description": "r1、r2…"},
+    "kind": {
+     "enum": ["一部支持", "不支持", "抜け", "つなぎ", "表記", "名前が違う", "していないことを書いている", "条件・出口が逆", "流れが違う", "読む・書くが違う", "落ちている処理", "図にしない理由が違う", "as-is でない"],
+     "description": "業務フロー: `抜け` ページにあるのにフローに無い／`つなぎ` 順序・分岐・担当の誤り。アクティビティ図: 照合の報告の種類（名前が違う／していないことを書いている／条件・出口が逆／流れが違う／読む・書くが違う／落ちている処理／図にしない理由が違う／as-is でない）"
+    },
+    "target": {"type": "string", "description": "ノード・線・ページ（照合シートの見出しの書き方で）"},
+    "text": {"type": "string", "minLength": 1, "description": "指摘（レビュー担当の原文のまま）"},
+    "decision": {"enum": ["採用", "不採用", "保留"], "description": "採否"},
+    "action": {"type": "string", "minLength": 1, "description": "採用なら何を直したか。不採用・保留なら理由"}
+   }
+  }
+ }
+}

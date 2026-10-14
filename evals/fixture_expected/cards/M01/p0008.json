@@ -1,0 +1,34 @@
+{
+ "doc_id": "M01",
+ "page": 8,
+ "printed_page": null,
+ "page_type": "reference",
+ "title": "改訂履歴",
+ "section_path": [
+  "改訂履歴"
+ ],
+ "summary": "版ごとの改訂の記録（第1版〜第3版）。手順は無い。",
+ "actors": [],
+ "systems": [],
+ "documents": [],
+ "steps": [],
+ "decisions": [],
+ "diagram": {
+  "nodes": [],
+  "edges": []
+ },
+ "figures": [],
+ "notes": [
+  {
+   "id": "n1",
+   "about": "第2版の改訂",
+   "text": "2025年4月に承認の金額基準を改定した。",
+   "quote": "第2版 2025年4月 承認の金額基準を改定",
+   "from_image": false
+  }
+ ],
+ "toc_entries": [],
+ "cross_refs": [],
+ "unreadable": [],
+ "uncertain": []
+}

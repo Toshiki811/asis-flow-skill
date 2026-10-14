@@ -1,0 +1,13 @@
+{
+ "activity": "A-01-5",
+ "questions": [],
+ "name": "Access を終了する",
+ "summary": "メニューの終了のボタンで、Access を終える。",
+ "ops": [
+  {
+   "op": "name",
+   "item": "cmd終了_Click（埋め込みマクロ）.95",
+   "label": "Access を終了する"
+  }
+ ]
+}

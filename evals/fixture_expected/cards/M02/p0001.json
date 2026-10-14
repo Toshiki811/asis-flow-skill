@@ -1,0 +1,109 @@
+{
+ "doc_id": "M02",
+ "page": 1,
+ "page_type": "procedure",
+ "title": "支払処理手順",
+ "section_path": [],
+ "summary": "経理部の月次の支払手順。振込結果は会計システムへ自動連携。",
+ "actors": [
+  "経理部",
+  "経理課長"
+ ],
+ "systems": [
+  "ファームバンキング",
+  "会計システム"
+ ],
+ "documents": [
+  "支払データ"
+ ],
+ "steps": [
+  {
+   "no": 1,
+   "actor": "経理部",
+   "action": "承認済みの経費申請を一覧で出力する",
+   "system": "",
+   "inputs": [],
+   "outputs": [
+    "一覧"
+   ],
+   "condition": "毎月末",
+   "quote": "経理部は、毎月末に承認済みの経費申請を一覧で出力する。",
+   "from_image": false,
+   "id": "s1",
+   "section": "",
+   "origin": "body"
+  },
+  {
+   "no": 2,
+   "actor": "経理部",
+   "action": "支払データを作成し、経理課長の確認を受ける",
+   "system": "",
+   "inputs": [],
+   "outputs": [
+    "支払データ"
+   ],
+   "condition": "",
+   "quote": "経理部は、支払データを作成し、経理課長の確認を受ける。",
+   "from_image": false,
+   "id": "s2",
+   "section": "",
+   "origin": "body"
+  },
+  {
+   "no": 3,
+   "actor": "経理部",
+   "action": "銀行のファームバンキングで振込を実行する",
+   "system": "ファームバンキング",
+   "inputs": [
+    "支払データ"
+   ],
+   "outputs": [],
+   "condition": "翌月10日",
+   "quote": "経理部は、翌月10日に銀行のファームバンキングで振込を実行する。",
+   "from_image": false,
+   "id": "s3",
+   "section": "",
+   "origin": "body"
+  },
+  {
+   "no": 4,
+   "actor": "",
+   "action": "振込結果が会計システムに自動で連携される",
+   "system": "会計システム",
+   "inputs": [],
+   "outputs": [],
+   "condition": "",
+   "quote": "振込結果は会計システムに自動で連携される。",
+   "from_image": false,
+   "id": "s4",
+   "section": "",
+   "origin": "body"
+  }
+ ],
+ "decisions": [],
+ "diagram": {
+  "nodes": [],
+  "edges": []
+ },
+ "figures": [],
+ "toc_entries": [],
+ "cross_refs": [
+  {
+   "text": "詳細は別紙「経費精算チェックシート」を参照。",
+   "target": "経費精算チェックシート"
+  }
+ ],
+ "unreadable": [],
+ "uncertain": [],
+ "printed_page": null,
+ "notes": [
+  {
+   "id": "n1",
+   "about": "振込手数料",
+   "text": "振込手数料は会社が負担する。",
+   "quote": "なお、振込手数料は会社が負担します。",
+   "from_image": false,
+   "why_not_action": "費用の負担先の定めで、担当が行う作業ではない"
+  }
+ ]
+}

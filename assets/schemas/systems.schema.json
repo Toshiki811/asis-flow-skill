@@ -1,0 +1,62 @@
+{
+ "title": "システム台帳",
+ "file": "structure/systems.json",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["systems", "links", "excluded_entries", "questions"],
+ "properties": {
+  "systems": {"type": "array", "items": {"$ref": "#/$defs/system"}, "description": "システム。用語の正本（glossary.json）のシステムを、すべて載せる。並びが、図と一覧での順になる"},
+  "links": {"type": "array", "items": {"$ref": "#/$defs/link"}, "description": "紐付け: プログラムの起動点 ⇔ マニュアルの手順。紐付けた手順を引く作業のすぐあとに、機械がシステム処理の箱（S-）を置く"},
+  "excluded_entries": {"type": "array", "items": {"$ref": "#/$defs/excluded"}, "description": "アクティビティ図にしない起動点と理由"},
+  "folded_procedures": {"type": "array", "items": {"$ref": "#/$defs/folded"}, "description": "アクティビティ図にしない手続き（補助）と理由。機械が出す候補（python3 scripts/systems.py entries の ★。入出力・操作者とのやり取り・プログラムの終了が無い、共通の処理）から選ぶ。呼び出しは、呼ぶ側の図の、ふつうの箱になる。書かなければ、図のまま"},
+  "questions": {"type": "array", "items": {"$ref": "common#/$defs/question"}, "description": "システムについての確認事項（機械が作るもののほかに、聞きたいこと）"}
+ },
+ "$defs": {
+  "system": {
+   "title": "systems[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["id", "name", "kind", "docs"],
+   "properties": {
+    "id": {"type": "string", "pattern": "^SYS-[0-9]{2,}$", "description": "SYS-01、SYS-02…。一度付けたら変えない（アクティビティ図の番号 A-02-1 の「02」になる）"},
+    "name": {"type": "string", "minLength": 1, "description": "用語の正本（glossary.json）の `kind: system` の名前"},
+    "kind": {"enum": ["core", "euc_excel", "euc_access", "script", "external", "other"], "description": "`core` 基幹・パッケージ／`euc_excel` EUC（Excel）／`euc_access` EUC（Access）／`script` スクリプト・バッチ／`external` 外部サービス／`other` その他"},
+    "docs": {"type": "array", "items": {"type": "string"}, "description": "プログラムの資料の ID（マクロ付きのブック・ソースのファイル）。プログラムが手元に無いシステムは空"},
+    "note": {"type": "string", "description": "補足（何に使うシステムか。原典に書かれている範囲で）"}
+   }
+  },
+  "link": {
+   "title": "links[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["entry", "step", "basis"],
+   "properties": {
+    "entry": {"type": "string", "pattern": "^[^.]+\\.e[0-9]+$", "description": "起動点（`M05.e2`。`python3 scripts/systems.py entries` の一覧にある書き方）"},
+    "step": {"type": "string", "pattern": "^[^.]+\\.[0-9]+\\.s[0-9]+$", "description": "マニュアルの手順（`M02.3.s4`＝資料.ページ.カードの手順の id。フローの下書きのキーと同じ書き方）"},
+    "basis": {"enum": ["named", "io", "inferred"], "description": "根拠。`named` 名指し／`io` 入出力の一致／`inferred` 推定（根拠の文が無い。確認事項は機械が作る）"},
+    "evidence": {"type": "string", "description": "両方に出てくる文字（ボタン名・マクロ名・ファイル名・メッセージの文、帳票名）。`named`・`io` では必須。機械が、手順の文とプログラムの側の両方にあることを確かめる"}
+   }
+  },
+  "excluded": {
+   "title": "excluded_entries[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["entry", "reason"],
+   "properties": {
+    "entry": {"type": "string", "pattern": "^[^.]+\\.e[0-9]+$", "description": "起動点"},
+    "reason": {"enum": ["中身が空", "画面の表示の制御だけ", "開発・試験用", "ほかの起動点と同じ処理を呼ぶだけ"], "description": "図にしない理由（この4つから選ぶ。当てはまらなければ、図にする）"}
+   }
+  },
+  "folded": {
+   "title": "folded_procedures[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["procedure", "reason"],
+   "properties": {
+    "procedure": {"type": "string", "pattern": "^[^.]+\\..+$", "description": "手続き（まとまり.モジュール.手続き。例 M01.modUtil.TrimName）"},
+    "reason": {"enum": ["探す・取り出す", "寸法・位置・単位の計算", "文字・日付の整形", "保存先・名前の組み立て", "ログの表示", "型・空・エラーの種類の確かめ"], "description": "図にしない理由（この6つから選ぶ。当てはまらなければ、図にする。業務の計算・判定をする手続きと、画面に見える動きをする手続きは、図にする）"},
+    "note": {"type": "string", "description": "補足（任意）"}
+   }
+  }
+ }
+}

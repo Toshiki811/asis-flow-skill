@@ -1,0 +1,36 @@
+{
+ "title": "原典照合の報告（レビュー担当が書く）",
+ "file": "reports/review_<フローID>[_<分冊>].json",
+ "description": "作り方を知らない別のエージェントが書く。親は、これを機械で採否表（review/<フローID>.review.json）の下書きに写し、採否と対応だけを書く",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["verdicts", "findings"],
+ "properties": {
+  "verdicts": {"type": "array", "items": {"$ref": "#/$defs/verdict"}, "description": "開始・終了を除く全ノードの判定"},
+  "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}, "description": "指摘。無ければ空"}
+ },
+ "$defs": {
+  "verdict": {
+   "title": "verdicts[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["node", "verdict", "evidence"],
+   "properties": {
+    "node": {"$ref": "common#/$defs/node_id"},
+    "verdict": {"enum": ["支持", "一部支持", "不支持"]},
+    "evidence": {"type": "string", "description": "原典の該当箇所の引用（不支持・一部支持は、何が違うかを1文で添える）"}
+   }
+  },
+  "finding": {
+   "title": "findings[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["kind", "target", "text"],
+   "properties": {
+    "kind": {"enum": ["一部支持", "不支持", "抜け", "つなぎ", "表記"]},
+    "target": {"type": "string", "minLength": 1, "description": "ノード・線・ページ（ページは照合シートの見出しの書き方で）"},
+    "text": {"type": "string", "minLength": 1, "description": "何が違うかと、どう直すか"}
+   }
+  }
+ }
+}

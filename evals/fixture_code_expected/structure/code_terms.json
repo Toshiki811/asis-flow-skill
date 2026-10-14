@@ -1,0 +1,20 @@
+{
+ "terms": [
+  {
+   "project": "M01",
+   "name": "売上フォルダ",
+   "word": "売上データの置き場所",
+   "basis": "definition",
+   "source": {
+    "module": "月次集計",
+    "line": 4
+   }
+  },
+  {
+   "project": "M01",
+   "name": "最終行",
+   "word": "請求一覧の最後の行",
+   "basis": "spelling"
+  }
+ ]
+}

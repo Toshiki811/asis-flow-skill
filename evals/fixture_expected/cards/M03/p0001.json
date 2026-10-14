@@ -1,0 +1,96 @@
+{
+ "doc_id": "M03",
+ "page": 1,
+ "page_type": "table",
+ "title": "手順",
+ "section_path": [],
+ "summary": "領収書チェックの手順の表（No・担当・作業・使う帳票）。",
+ "actors": [
+  "経理部",
+  "経理課長",
+  "申請者"
+ ],
+ "systems": [],
+ "documents": [
+  "領収書",
+  "経費申請書",
+  "支払一覧表"
+ ],
+ "steps": [
+  {
+   "no": 1,
+   "actor": "経理部",
+   "action": "承認済み申請の領収書原本を回収する",
+   "system": "",
+   "inputs": [
+    "領収書"
+   ],
+   "outputs": [],
+   "condition": "",
+   "quote": "承認済み申請の領収書原本を回収する",
+   "from_image": false,
+   "id": "s1",
+   "section": "",
+   "origin": "body"
+  },
+  {
+   "no": 2,
+   "actor": "経理部",
+   "action": "領収書の金額と申請金額を照合する",
+   "system": "",
+   "inputs": [
+    "領収書",
+    "経費申請書"
+   ],
+   "outputs": [],
+   "condition": "",
+   "quote": "領収書の金額と申請金額を照合する",
+   "from_image": false,
+   "id": "s2",
+   "section": "",
+   "origin": "body"
+  },
+  {
+   "no": 3,
+   "actor": "経理部",
+   "action": "申請者に差し戻す",
+   "system": "",
+   "inputs": [],
+   "outputs": [],
+   "condition": "不備があれば",
+   "quote": "不備があれば申請者に差し戻す",
+   "from_image": false,
+   "id": "s3",
+   "section": "",
+   "origin": "body"
+  },
+  {
+   "no": 4,
+   "actor": "経理課長",
+   "action": "支払データを確認する",
+   "system": "",
+   "inputs": [
+    "支払一覧表"
+   ],
+   "outputs": [],
+   "condition": "",
+   "quote": "支払データを確認する",
+   "from_image": false,
+   "id": "s4",
+   "section": "",
+   "origin": "body"
+  }
+ ],
+ "decisions": [],
+ "diagram": {
+  "nodes": [],
+  "edges": []
+ },
+ "figures": [],
+ "toc_entries": [],
+ "cross_refs": [],
+ "unreadable": [],
+ "uncertain": [],
+ "printed_page": null,
+ "notes": []
+}

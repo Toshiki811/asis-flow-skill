@@ -1,0 +1,25 @@
+{
+ "title": "用語の正本",
+ "file": "glossary.json",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["terms", "questions"],
+ "properties": {
+  "terms": {"type": "array", "items": {"$ref": "#/$defs/term"}, "description": "担当・システム・帳票の名前。フローのレーン名はここから選ぶ"},
+  "questions": {"type": "array", "items": {"$ref": "common#/$defs/question"}, "description": "用語についての確認事項（同じものか確かめられない呼び方 など）"}
+ },
+ "$defs": {
+  "term": {
+   "title": "terms[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["kind", "name", "aliases"],
+   "properties": {
+    "kind": {"enum": ["actor", "system", "document"], "description": "`actor` 担当／`system` システム／`document` 帳票・ファイル"},
+    "name": {"type": "string", "minLength": 1, "description": "正本の名前（原典の表記のどれか）"},
+    "aliases": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "同じものを指す別の表記。同じと確かめられたものだけ"},
+    "evidence": {"type": "string", "description": "同じものとした根拠の文とページ（`aliases` があれば必須）"}
+   }
+  }
+ }
+}

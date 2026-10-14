@@ -1,0 +1,34 @@
+{
+ "systems": [
+  {
+   "id": "SYS-01",
+   "name": "月次集計",
+   "kind": "euc_excel",
+   "docs": [
+    "M01",
+    "M02"
+   ]
+  },
+  {
+   "id": "SYS-02",
+   "name": "販売管理システム",
+   "kind": "core",
+   "docs": []
+  }
+ ],
+ "links": [
+  {
+   "entry": "M01.e2",
+   "step": "M03.1.s3",
+   "basis": "named",
+   "evidence": "Main"
+  },
+  {
+   "entry": "M01.e3",
+   "step": "M03.1.s6",
+   "basis": "inferred"
+  }
+ ],
+ "excluded_entries": [],
+ "questions": []
+}

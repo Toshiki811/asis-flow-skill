@@ -1,0 +1,616 @@
+{
+ "flow_id": "F03",
+ "name": "支払処理",
+ "number": "3.",
+ "parent": "F00",
+ "level": 2,
+ "basis": "toc",
+ "summary": "経理部が領収書を照合し、支払データを作って経理課長の確認を受け、翌月10日に振込む。エラー時は再振込。",
+ "start_condition": "毎月末（承認済みの経費申請があるとき）",
+ "end_condition": "振込結果が会計システムに連携されたとき",
+ "lanes": [
+  {
+   "id": "L1",
+   "name": "申請者",
+   "kind": "role"
+  },
+  {
+   "id": "L2",
+   "name": "経理部",
+   "kind": "dept"
+  },
+  {
+   "id": "L3",
+   "name": "経理課長",
+   "kind": "role"
+  },
+  {
+   "id": "L4",
+   "name": "会計システム",
+   "kind": "system"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "start",
+   "type": "start",
+   "lane": "L2",
+   "label": "開始"
+  },
+  {
+   "id": "P-001",
+   "type": "process",
+   "lane": "L2",
+   "label": "承認済みの経費申請を一覧で出力する",
+   "detail": "毎月末",
+   "action": "出力する",
+   "sources": [
+    {
+     "doc_id": "M02",
+     "page": 1,
+     "quote": "経理部は、毎月末に承認済みの経費申請を一覧で出力する。",
+     "from_image": false,
+     "item": "s1"
+    }
+   ]
+  },
+  {
+   "id": "P-002",
+   "type": "process",
+   "lane": "L2",
+   "label": "承認済み申請の領収書原本を回収する",
+   "detail": "",
+   "action": "受け取る",
+   "sources": [
+    {
+     "doc_id": "M03",
+     "page": 1,
+     "quote": "承認済み申請の領収書原本を回収する",
+     "from_image": false,
+     "item": "s1"
+    }
+   ]
+  },
+  {
+   "id": "P-003",
+   "type": "process",
+   "lane": "L2",
+   "label": "領収書の金額と申請金額を照合する",
+   "detail": "",
+   "action": "確認する",
+   "sources": [
+    {
+     "doc_id": "M03",
+     "page": 1,
+     "quote": "領収書の金額と申請金額を照合する",
+     "from_image": false,
+     "item": "s2"
+    },
+    {
+     "doc_id": "M03",
+     "page": 2,
+     "quote": "領収書を確認",
+     "from_image": false,
+     "item": "g1"
+    }
+   ]
+  },
+  {
+   "id": "F-001",
+   "type": "file",
+   "lane": "L2",
+   "label": "領収書",
+   "attach_to": "P-003",
+   "direction": "in",
+   "sources": [
+    {
+     "doc_id": "M03",
+     "page": 1,
+     "quote": "領収書",
+     "from_image": false,
+     "item": "s1"
+    }
+   ]
+  },
+  {
+   "id": "F-002",
+   "type": "file",
+   "lane": "L2",
+   "label": "経費申請書",
+   "attach_to": "P-003",
+   "direction": "in",
+   "sources": [
+    {
+     "doc_id": "M03",
+     "page": 1,
+     "quote": "経費申請書",
+     "from_image": false
+    }
+   ]
+  },
+  {
+   "id": "D-001",
+   "type": "decision",
+   "lane": "L2",
+   "label": "不備があるか",
+   "sources": [
+    {
+     "doc_id": "M03",
+     "page": 2,
+     "quote": "不備あり？",
+     "from_image": false,
+     "item": "d1"
+    },
+    {
+     "doc_id": "M03",
+     "page": 1,
+     "quote": "不備があれば申請者に差し戻す",
+     "from_image": false,
+     "item": "s3"
+    }
+   ]
+  },
+  {
+   "id": "P-004",
+   "type": "process",
+   "lane": "L2",
+   "label": "申請者に差し戻す",
+   "detail": "",
+   "action": "提出・回付する",
+   "sources": [
+    {
+     "doc_id": "M03",
+     "page": 1,
+     "quote": "不備があれば申請者に差し戻す",
+     "from_image": false,
+     "item": "s3"
+    },
+    {
+     "doc_id": "M03",
+     "page": 2,
+     "quote": "申請者に差し戻す",
+     "from_image": false,
+     "item": "g3"
+    }
+   ]
+  },
+  {
+   "id": "P-006",
+   "type": "process",
+   "lane": "L1",
+   "label": "差し戻しを受け取る",
+   "detail": "この後の対応は原典に記載なし",
+   "action": "受け取る",
+   "inferred": true,
+   "sources": [
+    {
+     "doc_id": "M03",
+     "page": 2,
+     "quote": "申請者に差し戻す",
+     "from_image": false
+    }
+   ]
+  },
+  {
+   "id": "P-005",
+   "type": "process",
+   "lane": "L2",
+   "label": "支払データを作成する",
+   "detail": "支払登録の画面で登録",
+   "action": "作成する",
+   "sources": [
+    {
+     "doc_id": "M02",
+     "page": 1,
+     "quote": "経理部は、支払データを作成し、経理課長の確認を受ける。",
+     "from_image": false,
+     "item": "s2"
+    },
+    {
+     "doc_id": "M01",
+     "page": 6,
+     "quote": "経理部は、承認済みの申請を下の画面で確認し、支払データを登録する。",
+     "from_image": false,
+     "item": "s1"
+    }
+   ],
+   "systems": [
+    "経費精算システム"
+   ]
+  },
+  {
+   "id": "P-007",
+   "type": "process",
+   "lane": "L3",
+   "label": "支払データを確認する",
+   "detail": "",
+   "action": "確認する",
+   "sources": [
+    {
+     "doc_id": "M03",
+     "page": 1,
+     "quote": "支払データを確認する",
+     "from_image": false,
+     "item": "s4"
+    },
+    {
+     "doc_id": "M02",
+     "page": 1,
+     "quote": "経理課長の確認を受ける",
+     "from_image": false,
+     "item": "s2"
+    }
+   ]
+  },
+  {
+   "id": "F-003",
+   "type": "file",
+   "lane": "L3",
+   "label": "支払一覧表",
+   "attach_to": "P-007",
+   "direction": "in",
+   "sources": [
+    {
+     "doc_id": "M03",
+     "page": 1,
+     "quote": "支払一覧表",
+     "from_image": false
+    }
+   ]
+  },
+  {
+   "id": "P-008",
+   "type": "process",
+   "lane": "L2",
+   "label": "ファームバンキングで振込を実行する",
+   "detail": "翌月10日。規程では、毎月25日",
+   "action": "入力する",
+   "sources": [
+    {
+     "doc_id": "M02",
+     "page": 1,
+     "quote": "経理部は、翌月10日に銀行のファームバンキングで振込を実行する。",
+     "from_image": false,
+     "item": "s3"
+    }
+   ],
+   "systems": [
+    "ファームバンキング"
+   ]
+  },
+  {
+   "id": "D-002",
+   "type": "decision",
+   "lane": "L2",
+   "label": "振込エラーがあるか",
+   "inferred": true,
+   "sources": [
+    {
+     "doc_id": "M02",
+     "page": 2,
+     "quote": "振込エラー時の対応",
+     "from_image": true
+    }
+   ]
+  },
+  {
+   "id": "P-009",
+   "type": "process",
+   "lane": "L2",
+   "label": "エラー一覧を印刷する",
+   "detail": "",
+   "action": "出力する",
+   "sources": [
+    {
+     "doc_id": "M02",
+     "page": 2,
+     "quote": "① 経理部は、エラー一覧を印刷する。",
+     "from_image": true,
+     "item": "s1"
+    }
+   ]
+  },
+  {
+   "id": "P-010",
+   "type": "process",
+   "lane": "L2",
+   "label": "口座情報の誤りを申請者に電話で確認する",
+   "detail": "",
+   "action": "連絡する",
+   "sources": [
+    {
+     "doc_id": "M02",
+     "page": 2,
+     "quote": "② 口座情報の誤りは、申請者に電話で確認する。",
+     "from_image": true,
+     "item": "s2"
+    }
+   ]
+  },
+  {
+   "id": "P-011",
+   "type": "process",
+   "lane": "L2",
+   "label": "再振込を行う",
+   "detail": "修正後、翌営業日",
+   "action": "入力する",
+   "sources": [
+    {
+     "doc_id": "M02",
+     "page": 2,
+     "quote": "③ 修正後、翌営業日に再振込を行う。",
+     "from_image": true,
+     "item": "s3"
+    }
+   ]
+  },
+  {
+   "id": "P-012",
+   "type": "process",
+   "lane": "L2",
+   "label": "再振込の記録を支払台帳に記入する",
+   "detail": "",
+   "action": "入力する",
+   "volume": "小",
+   "volume_reason": "台帳に 1 行、書くだけ",
+   "sources": [
+    {
+     "doc_id": "M02",
+     "page": 2,
+     "quote": "④ 再振込の記録を支払台帳に記入する。",
+     "from_image": true,
+     "item": "s4"
+    }
+   ]
+  },
+  {
+   "id": "S-001",
+   "type": "system",
+   "lane": "L4",
+   "label": "振込結果を会計システムに連携する",
+   "detail": "自動",
+   "sources": [
+    {
+     "doc_id": "M02",
+     "page": 1,
+     "quote": "振込結果は会計システムに自動で連携される。",
+     "from_image": false,
+     "item": "s4"
+    }
+   ]
+  },
+  {
+   "id": "end",
+   "type": "end",
+   "lane": "L4",
+   "label": "終了"
+  },
+  {
+   "id": "end2",
+   "type": "end",
+   "lane": "L1",
+   "label": "終了（差し戻し）"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "P-001"
+  },
+  {
+   "from": "P-001",
+   "to": "P-002",
+   "inferred": true
+  },
+  {
+   "from": "P-002",
+   "to": "P-003"
+  },
+  {
+   "from": "P-003",
+   "to": "D-001"
+  },
+  {
+   "from": "D-001",
+   "to": "P-005",
+   "label": "なし",
+   "inferred": true
+  },
+  {
+   "from": "D-001",
+   "to": "P-004",
+   "label": "あり"
+  },
+  {
+   "from": "P-004",
+   "to": "P-006"
+  },
+  {
+   "from": "P-006",
+   "to": "end2",
+   "inferred": true
+  },
+  {
+   "from": "P-005",
+   "to": "P-007"
+  },
+  {
+   "from": "P-007",
+   "to": "P-008"
+  },
+  {
+   "from": "P-008",
+   "to": "D-002"
+  },
+  {
+   "from": "D-002",
+   "to": "S-001",
+   "label": "なし"
+  },
+  {
+   "from": "D-002",
+   "to": "P-009",
+   "label": "あり"
+  },
+  {
+   "from": "P-009",
+   "to": "P-010"
+  },
+  {
+   "from": "P-010",
+   "to": "P-011"
+  },
+  {
+   "from": "P-011",
+   "to": "P-012"
+  },
+  {
+   "from": "P-012",
+   "to": "D-002",
+   "inferred": true
+  },
+  {
+   "from": "S-001",
+   "to": "end"
+  }
+ ],
+ "unused_pages": [],
+ "questions": [
+  {
+   "id": "q1",
+   "severity": "mid",
+   "category": "資料間の順序",
+   "effect": "順序",
+   "edge": [
+    "P-001",
+    "P-002"
+   ],
+   "question": "一覧の出力（支払処理手順）と領収書原本の回収・照合（経費精算チェックシート）は、どちらが先か。",
+   "assumption": "一覧の出力 → 領収書の回収・照合 の順に置いた",
+   "sources": [
+    {
+     "doc_id": "M02",
+     "page": 1
+    },
+    {
+     "doc_id": "M03",
+     "page": 1
+    }
+   ],
+   "ask": "経理部"
+  },
+  {
+   "id": "q2",
+   "severity": "mid",
+   "category": "記載なし",
+   "effect": "分岐",
+   "edge": [
+    "D-001",
+    "P-005"
+   ],
+   "question": "領収書に不備が無い場合の次の作業は、支払データの作成でよいか（図には「不備あり」の線しか無い）。",
+   "assumption": "支払データの作成に進むとした",
+   "sources": [
+    {
+     "doc_id": "M03",
+     "page": 2
+    }
+   ],
+   "ask": "経理部"
+  },
+  {
+   "id": "q3",
+   "severity": "mid",
+   "category": "記載なし",
+   "effect": "箱",
+   "node": "P-006",
+   "question": "経理部から差し戻された申請者は何をするか。",
+   "assumption": "差し戻しを受け取って終了とした",
+   "sources": [
+    {
+     "doc_id": "M03",
+     "page": 1
+    }
+   ],
+   "ask": "経理部"
+  },
+  {
+   "id": "q3b",
+   "severity": "high",
+   "category": "記載なし",
+   "effect": "フローの範囲",
+   "edge": [
+    "P-006",
+    "end2"
+   ],
+   "question": "差し戻し後にフローが終わるのか、再提出を待つのか。",
+   "assumption": "終了とした",
+   "sources": [
+    {
+     "doc_id": "M03",
+     "page": 1
+    }
+   ],
+   "ask": "経理部"
+  },
+  {
+   "id": "q4",
+   "severity": "mid",
+   "category": "記載なし",
+   "effect": "担当",
+   "node": "D-002",
+   "question": "振込エラーの有無は、誰がいつ・何で確認するか。",
+   "assumption": "振込の実行後に経理部が確認するとした",
+   "sources": [
+    {
+     "doc_id": "M02",
+     "page": 2
+    }
+   ],
+   "ask": "経理部"
+  },
+  {
+   "id": "q5",
+   "severity": "mid",
+   "category": "記載なし",
+   "effect": "分岐",
+   "edge": [
+    "P-012",
+    "D-002"
+   ],
+   "question": "再振込でもエラーになった場合は、同じ対応を繰り返すのか。",
+   "assumption": "エラーの確認に戻るとした",
+   "sources": [
+    {
+     "doc_id": "M02",
+     "page": 2
+    }
+   ],
+   "ask": "経理部"
+  },
+  {
+   "id": "q6",
+   "severity": "mid",
+   "category": "記載なし",
+   "effect": "分岐",
+   "node": "P-010",
+   "question": "口座情報の誤り以外のエラー（残高不足など）はどう対応するか。",
+   "assumption": "口座情報の誤りの場合だけを載せた",
+   "sources": [
+    {
+     "doc_id": "M02",
+     "page": 2
+    }
+   ],
+   "ask": "経理部"
+  }
+ ],
+ "excluded_items": [
+  {
+   "doc_id": "M04",
+   "page": 3,
+   "item": "s1",
+   "reason": "支払日が手順書（支払処理手順の翌月10日）と食い違う。同じ作業なので箱は足さず、日付は、箱の補足に両方を書いた"
+  }
+ ]
+}

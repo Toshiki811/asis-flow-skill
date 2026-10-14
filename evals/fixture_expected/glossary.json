@@ -1,0 +1,90 @@
+{
+ "terms": [
+  {
+   "kind": "actor",
+   "name": "申請者",
+   "aliases": []
+  },
+  {
+   "kind": "actor",
+   "name": "上長",
+   "aliases": []
+  },
+  {
+   "kind": "actor",
+   "name": "課長",
+   "aliases": []
+  },
+  {
+   "kind": "actor",
+   "name": "部長",
+   "aliases": []
+  },
+  {
+   "kind": "actor",
+   "name": "経理部",
+   "aliases": []
+  },
+  {
+   "kind": "actor",
+   "name": "経理課長",
+   "aliases": []
+  },
+  {
+   "kind": "actor",
+   "name": "管理部",
+   "aliases": []
+  },
+  {
+   "kind": "system",
+   "name": "経費精算システム",
+   "aliases": []
+  },
+  {
+   "kind": "system",
+   "name": "会計システム",
+   "aliases": []
+  },
+  {
+   "kind": "system",
+   "name": "ファームバンキング",
+   "aliases": []
+  },
+  {
+   "kind": "document",
+   "name": "領収書",
+   "aliases": []
+  },
+  {
+   "kind": "document",
+   "name": "経費申請書",
+   "aliases": []
+  },
+  {
+   "kind": "document",
+   "name": "見積書",
+   "aliases": []
+  },
+  {
+   "kind": "document",
+   "name": "支払データ",
+   "aliases": []
+  },
+  {
+   "kind": "document",
+   "name": "支払一覧表",
+   "aliases": []
+  },
+  {
+   "kind": "document",
+   "name": "支払台帳",
+   "aliases": []
+  },
+  {
+   "kind": "document",
+   "name": "エラー一覧",
+   "aliases": []
+  }
+ ],
+ "questions": []
+}

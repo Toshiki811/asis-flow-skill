@@ -1,0 +1,213 @@
+{
+ "title": "ページカード",
+ "file": "cards/<資料ID>/pNNNN.json",
+ "type": "object",
+ "additionalProperties": false,
+ "required": [
+  "doc_id",
+  "page",
+  "printed_page",
+  "page_type",
+  "title",
+  "section_path",
+  "actors",
+  "systems",
+  "documents",
+  "steps",
+  "decisions",
+  "diagram",
+  "figures",
+  "notes",
+  "toc_entries",
+  "cross_refs",
+  "unreadable",
+  "uncertain"
+ ],
+ "properties": {
+  "doc_id": {"type": "string", "pattern": "^M[0-9]+$", "description": "資料 ID（ファイルの置き場所と同じ）"},
+  "page": {"type": "integer", "minimum": 1, "description": "ファイル名 pNNNN の番号（データの鍵。資料の先頭から数えた番号で、納品物には出ない）"},
+  "printed_page": {"type": ["string", "null"], "description": "そのページに刷られたページ番号を、番号だけで（「13」「3-2」「ii」。「- 13 -」「P.13」の飾りは外す）。刷られていなければ null。数えて作らない"},
+  "page_type": {
+   "enum": ["cover", "toc", "overview", "flow_diagram", "procedure", "screen", "form", "table", "reference", "code", "blank", "other"],
+   "description": "`cover` 表紙／`toc` 目次／`overview` 概要・全体像／`flow_diagram` フロー図／`procedure` 手順／`screen` 画面の説明／`form` 帳票／`table` 表／`reference` 参考・用語・条文／`code` マクロ／`blank` 白紙／`other`。決め方は flow-rules.md 1.14"
+  },
+  "title": {"type": "string", "description": "ページの見出し（原文のまま）"},
+  "section_path": {"type": "array", "items": {"type": "string"}, "description": "章 > 節 > 項。そのページが属する見出しを上から"},
+  "summary": {"type": "string", "description": "書かなくてよい（機械は読まない。読取の担当の覚え書き）"},
+  "actors": {"type": "array", "items": {"type": "string"}, "description": "ページに出てくる担当（部門・役職）。原文の表記のまま"},
+  "systems": {"type": "array", "items": {"type": "string"}, "description": "ページに出てくるシステム・ツール"},
+  "documents": {"type": "array", "items": {"type": "string"}, "description": "ページに出てくる帳票・ファイル"},
+  "steps": {"type": "array", "items": {"$ref": "#/$defs/step"}, "description": "手順。本文のものも、補足（注記・ただし書き・囲み・表の欄外）の中の作業も、ここに書く"},
+  "decisions": {"type": "array", "items": {"$ref": "#/$defs/decision"}, "description": "分岐（条件で流れが変わるところ）"},
+  "diagram": {"$ref": "#/$defs/diagram", "description": "ページに描かれたフロー図の写し。無ければ nodes・edges を空に"},
+  "figures": {"type": "array", "items": {"$ref": "#/$defs/figure"}, "description": "画像・図・表の中身"},
+  "notes": {"type": "array", "items": {"$ref": "#/$defs/note"}, "description": "作業を含まない補足（背景・定義・理由・条文）。作業が書かれた補足は steps に書く"},
+  "toc_entries": {"type": "array", "items": {"$ref": "#/$defs/toc_entry"}, "description": "目次のページだけ"},
+  "cross_refs": {"type": "array", "items": {"$ref": "#/$defs/cross_ref"}, "description": "他ページ・他資料への参照"},
+  "unreadable": {"type": "array", "items": {"$ref": "#/$defs/unreadable"}, "description": "読めなかった箇所"},
+  "uncertain": {"type": "array", "items": {"$ref": "#/$defs/uncertain"}, "description": "読めたが決められないこと"},
+  "confidence": {"enum": ["high", "medium", "low"], "description": "書かなくてよい（機械は読まない。読めない所は unreadable、決められない所は uncertain に書く）"}
+ },
+ "$defs": {
+  "step": {
+   "title": "steps[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["id", "actor", "action", "system", "inputs", "outputs", "condition", "section", "quote", "from_image", "origin"],
+   "properties": {
+    "id": {"type": "string", "pattern": "^s[0-9]+$", "description": "カードの中で重ならない番号（s1、s2…）。フローの出典がこれを引く。あとから振り直さない"},
+    "no": {"type": ["integer", "string", "null"], "description": "原典に振られた番号（無ければ省く）"},
+    "actor": {"type": "string", "description": "担当。書かれていなければ空にして uncertain に書く"},
+    "action": {"type": "string", "minLength": 1, "description": "何をどうするか（動詞で終える。「申請書を起票する」。フローの箱の名前になる）"},
+    "system": {"type": "string", "description": "使うシステム"},
+    "inputs": {"type": "array", "items": {"type": "string"}, "description": "参照する帳票・データ"},
+    "outputs": {"type": "array", "items": {"type": "string"}, "description": "作る帳票・データ"},
+    "condition": {"type": "string", "description": "その手順を行う条件・時期"},
+    "section": {"type": "string", "description": "ページの中の小見出し（無ければ空）"},
+    "lines": {
+     "type": "array",
+     "items": {"type": "integer", "minimum": 1},
+     "minItems": 2,
+     "maxItems": 2,
+     "description": "原文の場所を、行の番号 [開始, 終了] で指す（`pages.py lines` が見せる番号。1行だけなら同じ番号を2つ）。書いたら `quote` は機械が入れる（`quotes.py fill`）。画像の中の文字（`from_image`）には書かない"
+    },
+    "quote": {"type": "string", "minLength": 1, "description": "原文の連続した一部をそのまま（必須）。行の番号 lines を書けば、機械が入れる（quotes.py fill。手で写さない）。手で書くのは、画像の中の文字（from_image）のときだけ"},
+    "from_image": {"type": "boolean", "description": "引用が画像の中の文字なら true"},
+    "origin": {"enum": ["body", "note"], "description": "`body` 本文の手順／`note` 補足（注記・ただし書き・囲み・表の欄外）に書かれた作業"},
+    "applies_to": {"type": "string", "description": "補足由来のとき、掛かる手順の id（原典から分かれば。分からなければ省く）"}
+   }
+  },
+  "decision": {
+   "title": "decisions[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["id", "question", "branches", "section", "quote", "from_image", "origin"],
+   "properties": {
+    "id": {"type": "string", "pattern": "^d[0-9]+$", "description": "カードの中で重ならない番号（d1、d2…）"},
+    "question": {"type": "string", "minLength": 1, "description": "何で分かれるか"},
+    "branches": {
+     "type": "array",
+     "description": "`label`（条件）と `to`（行き先の作業。分からなければ空）",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "to"],
+      "properties": {"label": {"type": "string"}, "to": {"type": "string"}}
+     }
+    },
+    "section": {"type": "string", "description": "ページの中の小見出し（無ければ空）"},
+    "lines": {
+     "type": "array",
+     "items": {"type": "integer", "minimum": 1},
+     "minItems": 2,
+     "maxItems": 2,
+     "description": "原文の場所を、行の番号 [開始, 終了] で指す（`pages.py lines` が見せる番号。1行だけなら同じ番号を2つ）。書いたら `quote` は機械が入れる（`quotes.py fill`）。画像の中の文字（`from_image`）には書かない"
+    },
+    "quote": {"type": "string", "minLength": 1, "description": "原文の連続した一部（lines を書けば、機械が入れる）"},
+    "from_image": {"type": "boolean", "description": "引用が画像の中の文字なら true"},
+    "origin": {"enum": ["body", "note"], "description": "`body` 本文／`note` 補足の中"}
+   }
+  },
+  "diagram": {
+   "title": "diagram",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["nodes", "edges"],
+   "properties": {
+    "nodes": {
+     "type": "array",
+     "description": "箱。`id`（g1、g2…）・`label`・`lane`・`shape`（process / decision / start / end / doc / system / other）",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "lane", "shape"],
+      "properties": {
+       "id": {"type": "string", "pattern": "^g[0-9]+$"},
+       "label": {"type": "string"},
+       "lane": {"type": "string"},
+       "shape": {"enum": ["process", "decision", "start", "end", "doc", "system", "other"]}
+      }
+     }
+    },
+    "edges": {
+     "type": "array",
+     "description": "線。`from`・`to`（箱の id）・`label`（線の上の文字）",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "label"],
+      "properties": {"from": {"type": "string"}, "to": {"type": "string"}, "label": {"type": "string"}}
+     }
+    }
+   }
+  },
+  "figure": {
+   "title": "figures[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["kind", "description", "texts"],
+   "properties": {
+    "kind": {"enum": ["screenshot", "flowchart", "table", "photo", "form", "other"], "description": "何の図か"},
+    "description": {"type": "string", "description": "何が描かれているか"},
+    "texts": {"type": "array", "items": {"type": "string"}, "description": "画像の中で読めた文字"},
+    "columns": {"type": "array", "items": {"type": "string"}, "description": "表（kind が table）の列見出し。表でなければ省く"},
+    "rows": {"type": "array", "items": {"type": "array", "items": {"type": "string"}}, "description": "表の行。表でなければ省く"}
+   }
+  },
+  "note": {
+   "title": "notes[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["id", "about", "text", "quote", "from_image"],
+   "properties": {
+    "id": {"type": "string", "pattern": "^n[0-9]+$", "description": "カードの中で重ならない番号（n1、n2…）"},
+    "about": {"type": "string", "description": "何についての補足か"},
+    "text": {"type": "string", "description": "要旨"},
+    "lines": {
+     "type": "array",
+     "items": {"type": "integer", "minimum": 1},
+     "minItems": 2,
+     "maxItems": 2,
+     "description": "原文の場所を、行の番号 [開始, 終了] で指す（`pages.py lines` が見せる番号。1行だけなら同じ番号を2つ）。書いたら `quote` は機械が入れる（`quotes.py fill`）。画像の中の文字（`from_image`）には書かない"
+    },
+    "quote": {"type": "string", "minLength": 1, "description": "原文の連続した一部（lines を書けば、機械が入れる）"},
+    "from_image": {"type": "boolean", "description": "引用が画像の中の文字なら true"},
+    "why_not_action": {"type": "string", "description": "「〜する」と書かれているのに作業として扱わない理由（check_extract.py が候補に挙げた行だけ必須）"}
+   }
+  },
+  "toc_entry": {
+   "title": "toc_entries[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["level", "number", "title", "page"],
+   "properties": {
+    "level": {"type": "integer", "minimum": 1, "description": "目次の段"},
+    "number": {"type": "string", "description": "項目の番号（無ければ空）"},
+    "title": {"type": "string", "minLength": 1, "description": "項目名（原文のまま）"},
+    "page": {"type": ["integer", "string", "null"], "description": "目次に刷られたページ番号（そのまま写す。足し引きしない）"},
+    "is_flow": {"type": "boolean", "description": "書かなくてよい（機械は読まない。業務かどうかは、分類の段で決める）"}
+   }
+  },
+  "cross_ref": {
+   "title": "cross_refs[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["text", "target"],
+   "properties": {"text": {"type": "string", "minLength": 1, "description": "原文"}, "target": {"type": "string", "description": "参照先（資料名・章・ページ）"}}
+  },
+  "unreadable": {
+   "title": "unreadable[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["where", "why"],
+   "properties": {"where": {"type": "string", "minLength": 1, "description": "どこが"}, "why": {"type": "string", "description": "なぜ読めないか"}}
+  },
+  "uncertain": {
+   "title": "uncertain[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["what", "why"],
+   "properties": {"what": {"type": "string", "minLength": 1, "description": "何が決まらないか"}, "why": {"type": "string", "description": "なぜ決まらないか"}}
+  }
+ }
+}

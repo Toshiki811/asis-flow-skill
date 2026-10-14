@@ -1,0 +1,191 @@
+{
+ "flow_id": "F01",
+ "name": "経費申請",
+ "number": "1.",
+ "parent": "F00",
+ "level": 2,
+ "basis": "toc",
+ "summary": "申請者が経費精算システムで経費申請書を作り、上長に提出する。",
+ "start_condition": "申請者が領収書を受け取ったとき",
+ "end_condition": "上長に提出したとき（承認 F02 へ）",
+ "lanes": [
+  {
+   "id": "L1",
+   "name": "申請者",
+   "kind": "role"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "start",
+   "type": "start",
+   "lane": "L1",
+   "label": "開始"
+  },
+  {
+   "id": "P-001",
+   "type": "process",
+   "lane": "L1",
+   "label": "経費精算システムにログインする",
+   "detail": "領収書を受け取ったら",
+   "action": "入力する",
+   "volume": "小",
+   "volume_reason": "ログインするだけ",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 3,
+     "quote": "申請者は、領収書を受け取ったら経費精算システムにログインする。",
+     "from_image": false,
+     "item": "s1"
+    }
+   ],
+   "systems": [
+    "経費精算システム"
+   ]
+  },
+  {
+   "id": "P-002",
+   "type": "process",
+   "lane": "L1",
+   "label": "経費申請書を作成し、領収書の画像を添付する",
+   "detail": "",
+   "action": "作成する",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 3,
+     "quote": "申請者は、経費申請書を作成し、領収書の画像を添付する。",
+     "from_image": false,
+     "item": "s2"
+    },
+    {
+     "doc_id": "M01",
+     "page": 4,
+     "quote": "申請者: 経費申請書を作成",
+     "from_image": false,
+     "item": "g1"
+    }
+   ],
+   "systems": [
+    "経費精算システム"
+   ]
+  },
+  {
+   "id": "F-001",
+   "type": "file",
+   "lane": "L1",
+   "label": "領収書",
+   "attach_to": "P-002",
+   "direction": "in",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 3,
+     "quote": "領収書の画像を添付する",
+     "from_image": false,
+     "item": "s2"
+    }
+   ]
+  },
+  {
+   "id": "P-003",
+   "type": "process",
+   "lane": "L1",
+   "label": "申請ボタンを押して上長に提出する",
+   "detail": "締め日は毎月25日／経費を使った日から1か月以内（規程 第5条）",
+   "action": "提出・回付する",
+   "volume": "小",
+   "volume_reason": "ボタンを押すだけ（出典の残りは、締め日の決まり）",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 3,
+     "quote": "申請者は、申請ボタンを押して上長に提出する。",
+     "from_image": false,
+     "item": "s3"
+    },
+    {
+     "doc_id": "M01",
+     "page": 3,
+     "quote": "申請の締め日は毎月25日。",
+     "from_image": false
+    },
+    {
+     "doc_id": "M04",
+     "page": 2,
+     "item": "s1",
+     "quote": "申請者は、経費を使った日から1か月以内に申請しなければならない。",
+     "from_image": false
+    }
+   ],
+   "systems": [
+    "経費精算システム"
+   ]
+  },
+  {
+   "id": "SUB-001",
+   "type": "subprocess",
+   "lane": "L1",
+   "label": "承認に進む",
+   "link_flow": "F02",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 4,
+     "quote": "課長: 承認",
+     "from_image": false,
+     "item": "g3"
+    }
+   ]
+  },
+  {
+   "id": "end",
+   "type": "end",
+   "lane": "L1",
+   "label": "終了"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "P-001"
+  },
+  {
+   "from": "P-001",
+   "to": "P-002"
+  },
+  {
+   "from": "P-002",
+   "to": "P-003"
+  },
+  {
+   "from": "P-003",
+   "to": "SUB-001"
+  },
+  {
+   "from": "SUB-001",
+   "to": "end"
+  }
+ ],
+ "unused_pages": [],
+ "questions": [
+  {
+   "id": "q1",
+   "severity": "mid",
+   "category": "記載なし",
+   "effect": "分岐",
+   "node": "P-003",
+   "question": "締め日（毎月25日）を過ぎた申請はどう扱うか（翌月回しか、受け付けないか）。",
+   "assumption": "フローには締め日の注記だけを載せた",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 3
+    }
+   ],
+   "ask": "管理部"
+  }
+ ],
+ "excluded_items": []
+}

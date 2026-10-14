@@ -1,0 +1,55 @@
+{
+ "title": "用語の対応",
+ "file": "structure/code_terms.json",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["terms"],
+ "properties": {"terms": {"type": "array", "items": {"$ref": "#/$defs/term"}, "description": "プログラムの中だけの名前（変数・項目・手続き・定数）と、図に書く業務の言葉。1つの名前に、言葉は1つ（どの図でも同じ言葉を使う）"}},
+ "$defs": {
+  "term": {
+   "title": "terms[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["project", "name", "word"],
+   "properties": {
+    "project": {"type": "string", "minLength": 1, "description": "プログラムのまとまりの ID（M02。`code_struct.py` が出す）"},
+    "name": {"type": "string", "minLength": 1, "description": "もとの名前。ソースの文字のまま（`KINGAKU-GOKEI`・`lngLastRow`）"},
+    "word": {"type": "string", "description": "図に書く業務の言葉（「金額の合計」）。`basis` が `unknown` のときは空でよい"},
+    "basis": {
+     "enum": ["comment", "definition", "spelling", "unknown"],
+     "description": "言葉の根拠。定義の行（行末・すぐ上）にコメントがあれば `comment`、定数の定義なら `definition` を、機械が場所ごと入れる（書かなくてよい）。どちらも無いときだけ書く: `spelling` 名前のつづりから読んだ（推定。一覧の「プログラムの用語対応」に色つきで出る。確認事項にはしない）／`unknown` 読めない（図には、もとの名前のまま「」で書く。一覧に「不明」として色つきで出る。確認事項にはしない）。`comment`・`definition` を自分で書くときは、その行を `source` に"
+    },
+    "source": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": ["module", "line"],
+     "properties": {"module": {"type": "string", "minLength": 1}, "line": {"type": "integer", "minimum": 1}},
+     "description": "根拠の行（その名前の定義・コメントのある行。モジュールの名前と、モジュールの行の番号）。機械が根拠を入れたときは、機械が書く"
+    },
+    "note": {"type": "string", "description": "補足（単位・とりうる値の意味 など）"}
+   }
+  },
+  "term_report": {
+   "title": "terms[]（報告の中。project は親が付ける）",
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "name": {"type": "string", "minLength": 1, "description": "もとの名前。ソースの文字のまま（`KINGAKU-GOKEI`・`lngLastRow`）"},
+    "word": {"type": "string", "description": "図に書く業務の言葉（「金額の合計」）。`basis` が `unknown` のときは空でよい"},
+    "basis": {
+     "enum": ["comment", "definition", "spelling", "unknown"],
+     "description": "言葉の根拠。定義の行（行末・すぐ上）にコメントがあれば `comment`、定数の定義なら `definition` を、機械が場所ごと入れる（書かなくてよい）。どちらも無いときだけ書く: `spelling` 名前のつづりから読んだ（推定。一覧の「プログラムの用語対応」に色つきで出る。確認事項にはしない）／`unknown` 読めない（図には、もとの名前のまま「」で書く。一覧に「不明」として色つきで出る。確認事項にはしない）。`comment`・`definition` を自分で書くときは、その行を `source` に"
+    },
+    "source": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": ["module", "line"],
+     "properties": {"module": {"type": "string", "minLength": 1}, "line": {"type": "integer", "minimum": 1}},
+     "description": "根拠の行（その名前の定義・コメントのある行。モジュールの名前と、モジュールの行の番号）。機械が根拠を入れたときは、機械が書く"
+    },
+    "note": {"type": "string", "description": "補足（単位・とりうる値の意味 など）"}
+   },
+   "required": ["name", "word"]
+  }
+ }
+}

@@ -1,0 +1,29 @@
+{
+ "title": "図の配置（点検と照合シートに使う）",
+ "file": "out/業務フロー_as-is.layout.json・out/アクティビティ図.layout.json",
+ "description": "機械が書く（図の書き出しのたびに）。箱・線・出典の位置。配置の点検と照合シートが読む",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["file", "pages"],
+ "properties": {
+  "file": {"type": "string", "minLength": 1, "description": "図のファイル名"},
+  "pages": {"type": "array", "items": {"$ref": "#/$defs/page"}}
+ },
+ "$defs": {
+  "page": {
+   "title": "pages[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["index", "id", "name", "bounds", "nodes", "edges"],
+   "properties": {
+    "index": {"type": "integer", "minimum": 1},
+    "id": {"type": "string"},
+    "name": {"type": "string"},
+    "bounds": {"type": "array", "minItems": 4, "maxItems": 4},
+    "nodes": {"type": "object", "additionalProperties": {"type": "array", "minItems": 4, "maxItems": 4}},
+    "edges": {"type": "array", "items": {"type": "object"}},
+    "captions": {"type": "object", "additionalProperties": {"type": "array", "minItems": 4, "maxItems": 4}}
+   }
+  }
+ }
+}

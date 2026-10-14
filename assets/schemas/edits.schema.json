@@ -1,0 +1,142 @@
+{
+ "title": "直しの一覧",
+ "file": "flows/<フローID>.edits.json",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["flow_id", "start_condition", "end_condition", "ops", "questions"],
+ "properties": {
+  "flow_id": {"type": "string", "pattern": "^F[0-9]+(-[0-9]+)*$", "description": "業務分類の id と同じ"},
+  "summary": {"type": "string", "description": "書かなくてよい（機械は読まない。flow.json の要約には、業務分類の名前が入る）"},
+  "start_condition": {"type": "string", "description": "開始条件（何を受けて始まるか）。原典に無ければ空にする（確認事項は機械が作る）"},
+  "end_condition": {"type": "string", "description": "終了条件（何ができたら終わるか）。原典に成果が書かれているときだけ書く。無ければ空にする（機械が、終了に入る最後の作業から「〜したとき」を入れる。最後の作業が 1 つに決まらなければ、確認事項を作る）"},
+  "default_lane": {"type": "string", "description": "担当の書かれていない手順を置くレーン（用語の正本の名前）。書かなければ、下書きでいちばん多い担当。確認事項は機械が1件作る"},
+  "lane_kinds": {
+   "type": "object",
+   "additionalProperties": {"$ref": "flow#/$defs/lane/properties/kind"},
+   "description": "書かなくてよい（図が見分けるのはシステムのレーンだけで、それは機械が用語の正本から決める）。レーンの種類を記録に残すときだけ（`{\"社外の委託先\": \"external\"}`）。`dept` 部門／`role` 役職・担当者／`system` システム／`external` 社外"
+  },
+  "ops": {"type": "array", "items": {"$ref": "#/$defs/op"}, "description": "下書きへの直し。直すところが無ければ空"},
+  "unused_pages": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["doc_id", "page", "reason"],
+    "properties": {"doc_id": {"$ref": "common#/$defs/doc_id"}, "page": {"type": "integer", "minimum": 1}, "reason": {"type": "string", "minLength": 1}}
+   },
+   "description": "使わなかったページの理由を、機械の決まり文句（「手順・分岐の記載が無いページ」）から書き換えるとき"
+  },
+  "questions": {"type": "array", "items": {"$ref": "common#/$defs/question_draft"}, "description": "機械が作らない確認事項（原典の中身についての問い）。無ければ空"}
+ },
+ "$defs": {
+  "op": {
+   "title": "ops[]（直し）",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["op"],
+   "properties": {
+    "op": {
+     "enum": [
+      "merge",
+      "unmerge",
+      "exclude",
+      "lane",
+      "label",
+      "detail",
+      "time",
+      "split",
+      "decide",
+      "branch",
+      "add",
+      "move",
+      "connect",
+      "disconnect",
+      "link",
+      "drop_file"
+     ],
+     "description": "直しの種類。種類ごとに書く項目は、上の表"
+    },
+    "item": {"type": "string", "description": "対象の項目のキー（`M01.35.s3`。下書きに出ているもの）"},
+    "items": {"type": "array", "items": {"type": "string"}, "minItems": 1, "description": "merge: まとめる項目のキー"},
+    "into": {"type": "string", "description": "merge: まとめ先の項目のキー（ラベル・レーンは、まとめ先のもの）"},
+    "values": {
+     "type": "object",
+     "additionalProperties": {"type": "string", "minLength": 1},
+     "description": "merge: 資料どうしで値（金額の基準・日付・件数）だけが違うとき、項目のキー → その資料の値（まとめ先 into も書く）。機械が補足を「まとめ先の値。〈資料の題名〉では、〈値〉」の形で書く（決まり 3.12）"
+    },
+    "reason": {"type": "string", "description": "exclude: フローに入れない理由（same_as・flow で決まった形にできるときは、書かなくてよい。書けば、決まった形のあとに続ける）。time・add: 量（volume）を、機械の決め方と変える理由"},
+    "same_as": {"type": "string", "description": "exclude: 同じ作業として、ほかの項目（キー）をフローに入れたとき。理由は、機械が決まった形で書く"},
+    "lane": {"type": "string", "description": "lane・add: 置くレーン（用語の正本の名前）"},
+    "label": {
+     "type": "string",
+     "description": "label: 短くした・動詞で終わるように直したラベル（原典の語で。判断は「〜か」）。branch: 書かれていない側の線のラベル（書かなければ、書かれた側の反対の語。表に無ければ「その他」）。add: 足すノードのラベル。link: リンクのラベル"
+    },
+    "type": {"enum": ["process", "decision"], "description": "add: 足すノードの種類"},
+    "key": {"type": "string", "pattern": "^x[0-9]+$", "description": "add: 足したノードを、あとの直しで指すための名前（x1、x2…）"},
+    "before": {"type": "string", "description": "add（decision）: この項目の前に置く。`yes` の線は、この項目へ進む"},
+    "branches": {"type": "array", "items": {"type": "string"}, "description": "label（分岐）: 行き先の線のラベル（カードの branches の順に、同じ数だけ。12 字まで）"},
+    "detail": {"type": "string", "description": "detail: 図の箱に出す補足（120 字まで。図には、機械がかっこで包んで出す）"},
+    "action": {
+     "enum": ["入力する", "作成する", "確認する", "承認する", "提出・回付する", "受け取る", "出力する", "連絡する", "計算する", "調べる", "保管する", "その他"],
+     "description": "time・add（process）: 動作の種類（人の作業の箱だけ）。処理時間の仮の値を、表から引く鍵。箱の中身に合うものを 1 つ選ぶ: 入力する（システム・台帳に入れる）／作成する（書類・資料を作る）／確認する（内容を確かめる・照合する）／承認する（承認・決裁・押印）／提出・回付する（出す・回す・送る）／受け取る／出力する（印刷・出力）／連絡する（知らせる・依頼する・報告する）／計算する（計算・集計）／調べる（調査・検討・選定）／保管する（整理・保存・廃棄）／その他。分の数字は、書かない"
+    },
+    "volume": {
+     "enum": ["小", "中", "大", "特大"],
+     "description": "time・add（process）: 量（小・中・大・特大）。書かなければ、機械が数えて決める（同じページの手順を 3 つ以上まとめた箱・見る帳票が 2 つ以上の箱は「大」、ほかは「中」）。変えるときは、理由も書く（reason）。「特大」は、時間・日の単位でかかる作業（資料から、そう読めるときだけ。機械は付けない。基準の表の値が、とくに粗いので、人が先に時間を入れる所になる）"
+    },
+    "reference": {"type": "string", "description": "detail: 箱に出さない参考情報（一覧・表の中身）"},
+    "parts": {
+     "type": "array",
+     "minItems": 2,
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "lane"],
+      "properties": {
+       "label": {"type": "string", "minLength": 1},
+       "lane": {"type": "string", "minLength": 1},
+       "inferred": {"type": "boolean"},
+       "action": {"enum": ["入力する", "作成する", "確認する", "承認する", "提出・回付する", "受け取る", "出力する", "連絡する", "計算する", "調べる", "保管する", "その他"]},
+       "volume": {"enum": ["小", "中", "大", "特大"]}
+      }
+     },
+     "description": "split: 分けたあとの作業（順に）。`label`・`lane`、動作の種類を部分ごとに変えるなら `action`、前の作業との順が原典に無ければ `inferred: true`。続く2つは別のレーン"
+    },
+    "question": {"type": "string", "description": "decide: 何で分かれるか（判断ノードのラベル）"},
+    "yes": {"type": "string", "description": "decide: その手順を行う側の線のラベル。add: before の項目へ進む側のラベル"},
+    "no": {"type": "string", "description": "decide: 行わない側の線のラベル。add: 進まない側のラベル。書かなければ、yes の反対の語（「不備がある」→「不備がない」。表に無ければ「その他」）"},
+    "no_to": {"type": "string", "description": "decide: 行わない側の行き先（`next` その手順の次／`end` 終了／項目のキー）。書かなければ `next`"},
+    "to": {"type": "string", "description": "branch: 書かれていない側の行き先（`next`／`end`／項目のキー）。connect・disconnect: 線の先（項目のキーか `end`）"},
+    "from": {"type": "string", "description": "connect・disconnect: 線の元の項目のキー"},
+    "after": {"type": "string", "description": "move・add（process）: この項目のあとに置く（move は、先頭なら `start`）。link: この項目のあとに置く（書かなければ、終了の前）"},
+    "inferred": {"type": "boolean", "description": "move・connect: 原典に順が書かれていれば false（connect は evidence が要る）。書かなければ true（推定。確認事項は機械が作る）"},
+    "evidence": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": ["doc_id", "page"],
+     "properties": {
+      "doc_id": {"$ref": "common#/$defs/doc_id"},
+      "page": {"type": "integer", "minimum": 1},
+      "lines": {"type": "array", "items": {"type": "integer", "minimum": 1}, "minItems": 2, "maxItems": 2}
+     },
+     "description": "connect（inferred: false）: 順が書かれた場所（資料・ファイルの番号・行の番号）"
+    },
+    "flow": {"$ref": "common#/$defs/flow_id", "description": "link: 続き先のフロー id。exclude: ほかのフローで描くとき、そのフロー id（理由は、機械が決まった形で書く）"},
+    "source": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": ["doc_id", "page"],
+     "properties": {
+      "doc_id": {"$ref": "common#/$defs/doc_id"},
+      "page": {"type": "integer", "minimum": 1},
+      "lines": {"type": "array", "items": {"type": "integer", "minimum": 1}, "minItems": 2, "maxItems": 2},
+      "quote": {"type": "string"},
+      "from_image": {"type": "boolean"}
+     },
+     "description": "link: 続くことが書かれた場所。add: そう読める場所（`lines` か `quote`）"
+    },
+    "name": {"type": "string", "description": "drop_file: 付けない帳票の名前（下書きの「参照」「作る」に出ている名前）"}
+   }
+  }
+ }
+}

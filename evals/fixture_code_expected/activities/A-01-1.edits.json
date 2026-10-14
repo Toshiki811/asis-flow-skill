@@ -1,0 +1,13 @@
+{
+ "activity": "A-01-1",
+ "questions": [],
+ "name": "対象月の初期値を入れる",
+ "summary": "ブックを開いたときに、前月を対象月に入れる。",
+ "ops": [
+  {
+   "op": "name",
+   "item": "Workbook_Open.7",
+   "label": "前月を「メニュー」の対象月に入れる"
+  }
+ ]
+}

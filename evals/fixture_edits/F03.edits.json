@@ -1,0 +1,173 @@
+{
+ "flow_id": "F03",
+ "summary": "経理部が承認済みの申請を出力し、領収書を照合して支払データを作り、経理課長の確認を受けて振り込む。",
+ "start_condition": "毎月末",
+ "end_condition": "",
+ "lane_kinds": {
+  "経理部": "dept"
+ },
+ "ops": [
+  {
+   "op": "merge",
+   "into": "M02.1.s2",
+   "items": [
+    "M01.6.s1",
+    "M03.1.s4"
+   ]
+  },
+  {
+   "op": "exclude",
+   "item": "M04.3.s1",
+   "reason": "支払日が手順書（翌月10日）と食い違う。同じ作業なので箱は足さず、日付は、箱の補足に両方を書く"
+  },
+  {
+   "op": "detail",
+   "item": "M02.1.s3",
+   "detail": "翌月10日。規程では、毎月25日"
+  },
+  {
+   "op": "move",
+   "item": "M03.1.s1",
+   "after": "M02.1.s1"
+  },
+  {
+   "op": "move",
+   "item": "M03.1.s2",
+   "after": "M03.1.s1",
+   "inferred": false
+  },
+  {
+   "op": "move",
+   "item": "M03.2.d1",
+   "after": "M03.1.s2",
+   "inferred": false
+  },
+  {
+   "op": "move",
+   "item": "M03.1.s3",
+   "after": "M03.2.d1",
+   "inferred": false
+  },
+  {
+   "op": "label",
+   "item": "M03.2.d1",
+   "label": "不備があるか",
+   "branches": [
+    "あり"
+   ]
+  },
+  {
+   "op": "branch",
+   "item": "M03.2.d1",
+   "to": "M02.1.s2"
+  },
+  {
+   "op": "split",
+   "item": "M02.1.s2",
+   "parts": [
+    {
+     "label": "支払データを作成する",
+     "lane": "経理部",
+     "action": "作成する"
+    },
+    {
+     "label": "支払データを確認する",
+     "lane": "経理課長",
+     "action": "確認する"
+    }
+   ]
+  },
+  {
+   "op": "move",
+   "item": "M02.1.s4",
+   "after": "M02.2.s4",
+   "inferred": false
+  },
+  {
+   "op": "add",
+   "key": "x2",
+   "type": "decision",
+   "before": "M02.2.s1",
+   "label": "振込エラーがあるか",
+   "yes": "あり",
+   "no": "なし",
+   "no_to": "M02.1.s4",
+   "source": {
+    "doc_id": "M02",
+    "page": 2,
+    "quote": "振込エラー時の対応",
+    "from_image": true
+   }
+  },
+  {
+   "op": "connect",
+   "from": "M02.2.s4",
+   "to": "x2"
+  },
+  {
+   "op": "drop_file",
+   "item": "M02.1.s3",
+   "name": "支払データ"
+  },
+  {
+   "op": "time",
+   "item": "M02.1.s1",
+   "action": "出力する"
+  },
+  {
+   "op": "time",
+   "item": "M03.1.s1",
+   "action": "受け取る"
+  },
+  {
+   "op": "time",
+   "item": "M03.1.s2",
+   "action": "確認する"
+  },
+  {
+   "op": "time",
+   "item": "M03.1.s3",
+   "action": "提出・回付する"
+  },
+  {
+   "op": "time",
+   "item": "M02.1.s3",
+   "action": "入力する"
+  },
+  {
+   "op": "time",
+   "item": "M02.2.s1",
+   "action": "出力する"
+  },
+  {
+   "op": "time",
+   "item": "M02.2.s2",
+   "action": "連絡する"
+  },
+  {
+   "op": "time",
+   "item": "M02.2.s3",
+   "action": "入力する"
+  },
+  {
+   "op": "time",
+   "item": "M02.2.s4",
+   "action": "入力する",
+   "volume": "小",
+   "reason": "台帳に 1 行、書くだけ"
+  }
+ ],
+ "questions": [
+  {
+   "id": "q1",
+   "severity": "mid",
+   "category": "記載なし",
+   "effect": "担当",
+   "items": [
+    "x2"
+   ],
+   "question": "振込エラーの有無は、経理部が確かめていますか、経理課長ですか。",
+   "assumption": "振込を実行した経理部が確かめるとした"
+  }
+ ]
+}

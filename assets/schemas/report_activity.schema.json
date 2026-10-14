@@ -1,0 +1,17 @@
+{
+ "title": "アクティビティ図の担当の報告",
+ "file": "reports/activity_<先頭の番号>.json",
+ "description": "アクティビティ図の直しの一覧を書いたサブエージェントが書く。親は terms を用語の対応（structure/code_terms.json）に足す。数は機械が数える（担当の数は使わない）",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["activities", "terms"],
+ "properties": {
+  "activities": {"type": "array", "minItems": 1, "items": {"$ref": "common#/$defs/activity_id"}},
+  "boxes": {"type": "integer", "minimum": 0},
+  "excluded": {"type": "integer", "minimum": 0},
+  "folded": {"type": "integer", "minimum": 0},
+  "questions": {"type": "integer", "minimum": 0},
+  "terms": {"type": "array", "items": {"$ref": "code_terms#/$defs/term_report"}, "description": "用語の対応に足す名前"},
+  "notes": {"type": "string", "description": "迷った所"}
+ }
+}

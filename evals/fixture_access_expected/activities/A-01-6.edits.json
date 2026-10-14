@@ -1,0 +1,22 @@
+{
+ "activity": "A-01-6",
+ "questions": [],
+ "name": "数量を確かめる",
+ "summary": "数量に 0 以下が入ったら、知らせて空にする。",
+ "ops": [
+  {
+   "op": "name",
+   "item": "txt数量_AfterUpdate.109",
+   "label": "数量が 0 以下か",
+   "branches": [
+    "0 以下",
+    "1 以上"
+   ]
+  },
+  {
+   "op": "name",
+   "item": "txt数量_AfterUpdate.111",
+   "label": "数量を空にする"
+  }
+ ]
+}

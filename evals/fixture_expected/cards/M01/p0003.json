@@ -1,0 +1,98 @@
+{
+ "doc_id": "M01",
+ "page": 3,
+ "page_type": "procedure",
+ "title": "1. 経費申請",
+ "section_path": [
+  "1. 経費申請"
+ ],
+ "summary": "申請者が経費精算システムで申請書を作り、上長に提出する手順。",
+ "actors": [
+  "申請者",
+  "上長"
+ ],
+ "systems": [
+  "経費精算システム"
+ ],
+ "documents": [
+  "領収書",
+  "経費申請書"
+ ],
+ "steps": [
+  {
+   "no": 1,
+   "actor": "申請者",
+   "action": "経費精算システムにログインする",
+   "system": "経費精算システム",
+   "inputs": [
+    "領収書"
+   ],
+   "outputs": [],
+   "condition": "領収書を受け取ったら",
+   "quote": "申請者は、領収書を受け取ったら経費精算システムにログインする。",
+   "from_image": false,
+   "id": "s1",
+   "section": "",
+   "origin": "body"
+  },
+  {
+   "no": 2,
+   "actor": "申請者",
+   "action": "経費申請書を作成し、領収書の画像を添付する",
+   "system": "経費精算システム",
+   "inputs": [
+    "領収書"
+   ],
+   "outputs": [
+    "経費申請書"
+   ],
+   "condition": "",
+   "quote": "申請者は、経費申請書を作成し、領収書の画像を添付する。",
+   "from_image": false,
+   "id": "s2",
+   "section": "",
+   "origin": "body"
+  },
+  {
+   "no": 3,
+   "actor": "申請者",
+   "action": "申請ボタンを押して上長に提出する",
+   "system": "経費精算システム",
+   "inputs": [
+    "経費申請書"
+   ],
+   "outputs": [],
+   "condition": "",
+   "quote": "申請者は、申請ボタンを押して上長に提出する。",
+   "from_image": false,
+   "id": "s3",
+   "section": "",
+   "origin": "body"
+  }
+ ],
+ "decisions": [],
+ "diagram": {
+  "nodes": [],
+  "edges": []
+ },
+ "figures": [],
+ "toc_entries": [],
+ "cross_refs": [],
+ "unreadable": [],
+ "uncertain": [
+  {
+   "what": "締め日（毎月25日）を過ぎた申請の扱い",
+   "why": "締め日の記載はあるが、過ぎた場合の扱いが書かれていない"
+  }
+ ],
+ "printed_page": null,
+ "notes": [
+  {
+   "id": "n1",
+   "about": "申請の締め日",
+   "text": "申請の締め日は毎月25日。",
+   "quote": "申請の締め日は毎月25日。",
+   "from_image": false
+  }
+ ]
+}

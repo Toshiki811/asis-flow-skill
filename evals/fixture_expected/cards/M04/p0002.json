@@ -1,0 +1,63 @@
+{
+ "doc_id": "M04",
+ "page": 2,
+ "printed_page": "1",
+ "page_type": "reference",
+ "title": "第1章 申請と承認",
+ "section_path": [
+  "第1章 申請と承認"
+ ],
+ "summary": "申請の期限（第5条）と、5万円以上の経費の承認（第6条）。",
+ "actors": [
+  "申請者",
+  "部長"
+ ],
+ "systems": [],
+ "documents": [],
+ "steps": [
+  {
+   "id": "s1",
+   "no": "第5条",
+   "actor": "申請者",
+   "action": "経費を申請する",
+   "system": "",
+   "inputs": [],
+   "outputs": [],
+   "condition": "経費を使った日から1か月以内",
+   "section": "",
+   "quote": "申請者は、経費を使った日から1か月以内に申請しなければならない。",
+   "from_image": false,
+   "origin": "body"
+  },
+  {
+   "id": "s2",
+   "no": "第6条",
+   "actor": "",
+   "action": "部長の承認を得る",
+   "system": "",
+   "inputs": [],
+   "outputs": [],
+   "condition": "5万円以上の経費",
+   "section": "",
+   "quote": "5万円以上の経費は、部長の承認を得るものとする。",
+   "from_image": false,
+   "origin": "body"
+  }
+ ],
+ "decisions": [],
+ "diagram": {
+  "nodes": [],
+  "edges": []
+ },
+ "figures": [],
+ "notes": [],
+ "toc_entries": [],
+ "cross_refs": [],
+ "unreadable": [],
+ "uncertain": [
+  {
+   "what": "第6条の主語",
+   "why": "誰が部長の承認を得るのかが書かれていない"
+  }
+ ]
+}

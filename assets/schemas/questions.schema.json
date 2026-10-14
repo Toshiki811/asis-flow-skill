@@ -1,0 +1,37 @@
+{
+ "title": "確認事項の台帳（通し番号）",
+ "file": "questions.json",
+ "description": "機械が書く（書き出しのたびに、全工程の確認事項を集める）。人も LLM も書かない。通し番号は、出どころと元の id で引き継ぐ。壊れていれば、番号を振り直さずに止まる",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["next", "questions", "assigned"],
+ "properties": {
+  "next": {"type": "integer", "minimum": 1, "description": "次に振る番号"},
+  "questions": {"type": "array", "items": {"$ref": "#/$defs/item"}, "description": "いまの確認事項（番号の順）"},
+  "assigned": {"type": "object", "additionalProperties": {"$ref": "common#/$defs/q_id"}, "description": "「出どころ|元の id」→ 通し番号。いま無い確認事項の番号も残す（戻ってきたら同じ番号）"}
+ },
+ "$defs": {
+  "item": {
+   "title": "questions[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["origin", "local", "id", "severity", "category", "effect", "question", "assumption", "sources", "ask"],
+   "properties": {
+    "origin": {"type": "string", "pattern": "^(inventory|hierarchy|glossary|taxonomy|systems|flow:.+|activity:.+)$", "description": "出どころ（どのファイルの確認事項か）"},
+    "local": {"type": "string", "minLength": 1, "description": "出どころの中の元の id"},
+    "id": {"$ref": "common#/$defs/q_id"},
+    "severity": {"enum": ["high", "mid", "low"]},
+    "category": {"$ref": "common#/$defs/question/properties/category"},
+    "effect": {"$ref": "common#/$defs/question/properties/effect"},
+    "flow": {"type": ["string", "null"], "description": "載せる行（フローの id かアクティビティ図の番号）"},
+    "node": {"type": ["string", "null"]},
+    "nodes": {"type": "array", "items": {"type": "string"}},
+    "edge": {"type": ["array", "null"], "items": {"type": "string"}},
+    "question": {"type": "string"},
+    "assumption": {"type": "string"},
+    "sources": {"type": "array", "items": {"type": "object"}},
+    "ask": {"type": "string"}
+   }
+  }
+ }
+}

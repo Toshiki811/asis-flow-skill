@@ -1,0 +1,27 @@
+{
+ "activity": "A-01-7",
+ "questions": [],
+ "name": "受注を登録する",
+ "summary": "顧客が選ばれていることを確かめて、受注を保存し、在庫を引き当てる。",
+ "ops": [
+  {
+   "op": "name",
+   "item": "cmd登録_Click.116",
+   "label": "顧客が選ばれているか",
+   "branches": [
+    "選ばれていない",
+    "選ばれている"
+   ]
+  },
+  {
+   "op": "name",
+   "item": "cmd登録_Click.120",
+   "label": "受注のレコードを保存する"
+  },
+  {
+   "op": "name",
+   "item": "cmd登録_Click.123",
+   "label": "在庫を引き当てる"
+  }
+ ]
+}

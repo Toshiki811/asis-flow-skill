@@ -1,0 +1,641 @@
+{
+ "about": "実物のサンプルでの確認の記録。名の通った公開プロジェクトのテスト用データだけ（中身は、このリポジトリに入れていない）。手元に取り込んだフォルダがあれば、python3 evals/real_samples.py <フォルダ> で、同じ確認をやり直せる。どのファイルも、Office・Access で開かない。マクロは実行しない（読むのは、バイトと文字だけ）。",
+ "checked": "2026-10-12",
+ "files": [
+  {
+   "path": "excel/xlsxwriter/vbaProject.bin",
+   "url": "https://raw.githubusercontent.com/jmcnamara/XlsxWriter/main/examples/vbaProject.bin",
+   "size": 15872,
+   "sha256": "0ced1464b3677e98f5e3a8c5d80135e18dc98dca39299f1a8cfd2a00999fbf9f",
+   "license": "BSD-2-Clause"
+  },
+  {
+   "path": "excel/libreoffice/tdf117266_macroButton.xlsm",
+   "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/unit/data/xlsm/tdf117266_macroButton.xlsm",
+   "size": 8664,
+   "sha256": "a0b874ab66d3bec2ddcc5844ed4264988bda65217532c1d4ffd775b94b19bdee",
+   "license": "MPL-2.0"
+  },
+  {
+   "path": "excel/libreoffice/vba-user-function.xlsm",
+   "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/unit/data/xlsm/vba-user-function.xlsm",
+   "size": 13111,
+   "sha256": "20ae63044d0f5edbbdd522cc710a4ef0333e9391cc33aafed875287b91452d4c",
+   "license": "MPL-2.0"
+  },
+  {
+   "path": "excel/libreoffice/tdf111974.xlsm",
+   "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/unit/data/xlsm/tdf111974.xlsm",
+   "size": 338812,
+   "sha256": "ca3fb186081eb2ac8768e17971e1e44b1a7c5b87fbde86077258aca6f9dd794a",
+   "license": "MPL-2.0"
+  },
+  {
+   "path": "excel/libreoffice/KeyShortcut.xlsm",
+   "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/extras/testdocuments/KeyShortcut.xlsm",
+   "size": 12947,
+   "sha256": "b66ef1aea070fb7d6eb8dedac6e4974841aa95ebf9b153c7166e7997b96fc478",
+   "license": "MPL-2.0"
+  },
+  {
+   "path": "excel/libreoffice/VariousTestMacros.xlsm",
+   "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/extras/testdocuments/VariousTestMacros.xlsm",
+   "size": 18110,
+   "sha256": "2e8fcacf3091f224de1d91a5cd7cd8cd876db08003f4b5a3bf380e1fbd340be5",
+   "license": "MPL-2.0"
+  },
+  {
+   "path": "excel/libreoffice/SimpleCopyPaste.xlsm",
+   "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/extras/testdocuments/SimpleCopyPaste.xlsm",
+   "size": 16139,
+   "sha256": "f933c0e410eedb5c3a4e7bdb6ba0d41ca35b80d2c937de3922e5aa3fa70e4bcd",
+   "license": "MPL-2.0"
+  },
+  {
+   "path": "excel/libreoffice/MiscControlTests.xls",
+   "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/extras/testdocuments/MiscControlTests.xls",
+   "size": 63488,
+   "sha256": "eba8ed349891a89ddc71c08ee5206864d984b565b4aa61a79b38883814808bcb",
+   "license": "MPL-2.0"
+  },
+  {
+   "path": "excel/libreoffice/GeneratedEventTest.xls",
+   "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/extras/testdocuments/GeneratedEventTest.xls",
+   "size": 31232,
+   "sha256": "9dd4008774e1513587fc7913e0b41ae33fa10d15b2d4036d6431ae6a1b41205e",
+   "license": "MPL-2.0"
+  },
+  {
+   "path": "excel/poi/60512.xlsm",
+   "url": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/spreadsheet/60512.xlsm",
+   "size": 66151,
+   "sha256": "bc94f5699255e8c093908e56f909827861b5baeed0b9c13bfc792530e2065268",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "excel/poi/ExcelWithAttachments.xlsm",
+   "url": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/spreadsheet/ExcelWithAttachments.xlsm",
+   "size": 62646,
+   "sha256": "34779a3208c1625d22058ae1f9dbe5afbde9c815785b77b1d883b4ef03ff42ee",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "excel/poi/57181.xlsm",
+   "url": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/spreadsheet/57181.xlsm",
+   "size": 334727,
+   "sha256": "2cf7459faa9d15c1deef4c410fc05142c4f57ebee622668e2526d7b3e34e08fa",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "excel/poi/0-www-crossref-org.lib.rivier.edu_education-files_suffix-generator.xlsm",
+   "url": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/spreadsheet/0-www-crossref-org.lib.rivier.edu_education-files_suffix-generator.xlsm",
+   "size": 28479,
+   "sha256": "8108853394e1ab8964f13d0ee81c122ebabd0c5587a9dfeb934340e7a8d333f1",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "excel/poi/47089.xlsm",
+   "url": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/spreadsheet/47089.xlsm",
+   "size": 17007,
+   "sha256": "f944e4f0eeeb68bd88dc544c014a9453260c4c2175b102030bb9a494665f9406",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "excel/poi/51519.xlsb",
+   "url": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/spreadsheet/51519.xlsb",
+   "size": 10897,
+   "sha256": "53ebff181db309ae9b602780591836515678db7590aeb59942f9c3348fe61192",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "excel/oletools/autostart-encrypt-standardpassword.xlsm",
+   "url": "https://raw.githubusercontent.com/decalage2/oletools/master/tests/test-data/encrypted/autostart-encrypt-standardpassword.xlsm",
+   "size": 19456,
+   "sha256": "70494fcc2d9ddbbe748cdccdcc8a4800f287a73db89f84c90e6599a86bdee0b9",
+   "license": "BSD-2-Clause"
+  },
+  {
+   "path": "excel/oletools/autostart-encrypt-standardpassword.xls",
+   "url": "https://raw.githubusercontent.com/decalage2/oletools/master/tests/test-data/encrypted/autostart-encrypt-standardpassword.xls",
+   "size": 29184,
+   "sha256": "607f6f160adfe499195942273d7f66a2feb442aa3e63a988ac2e5bb1dde1ca05",
+   "license": "BSD-2-Clause"
+  },
+  {
+   "path": "excel/oletools/autostart-encrypt-standardpassword.xlsb",
+   "url": "https://raw.githubusercontent.com/decalage2/oletools/master/tests/test-data/encrypted/autostart-encrypt-standardpassword.xlsb",
+   "size": 18944,
+   "sha256": "9babf0f3421659634bd1615ca756b6823af8806bbc03b2f275939612f241bed6",
+   "license": "BSD-2-Clause"
+  },
+  {
+   "path": "excel/oletools/encrypted.xlsm",
+   "url": "https://raw.githubusercontent.com/decalage2/oletools/master/tests/test-data/encrypted/encrypted.xlsm",
+   "size": 14336,
+   "sha256": "05f3e35090741d53a4afcedc8e6614061ca7f1ec4dfb822eb4cd2cfe3fbd6fca",
+   "license": "BSD-2-Clause"
+  },
+  {
+   "path": "excel/oletools/embedded-simple-2007.xlam",
+   "url": "https://raw.githubusercontent.com/decalage2/oletools/master/tests/test-data/oleobj/embedded-simple-2007.xlam",
+   "size": 12371,
+   "sha256": "88596b733faba7148a3c6538e9c102c38042ae7422107f25a3879e4d4e2b44ba",
+   "license": "BSD-2-Clause"
+  },
+  {
+   "path": "excel/oletools/embedded-simple-2007.xla",
+   "url": "https://raw.githubusercontent.com/decalage2/oletools/master/tests/test-data/oleobj/embedded-simple-2007.xla",
+   "size": 20480,
+   "sha256": "4439313db3d02791eab302f571568e800c4646204de9a07790612a669f840011",
+   "license": "BSD-2-Clause"
+  },
+  {
+   "path": "excel/tika/testEXCEL_macro.xlsm",
+   "url": "https://raw.githubusercontent.com/apache/tika/main/tika-parsers/tika-parsers-standard/tika-parsers-standard-modules/tika-parser-microsoft-module/src/test/resources/test-documents/testEXCEL_macro.xlsm",
+   "size": 14561,
+   "sha256": "4a82d32be9bbe6cbc0e232727668f2344edb249c8c0bcd8d3f3e1e16ffddd859",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "excel/tika/testEXCEL_macro_enabled_template.xltm",
+   "url": "https://raw.githubusercontent.com/apache/tika/main/tika-parsers/tika-parsers-standard/tika-parsers-standard-modules/tika-parser-microsoft-module/src/test/resources/test-documents/testEXCEL_macro_enabled_template.xltm",
+   "size": 8619,
+   "sha256": "70146cac3a4030b4eb0f97b0c1922ac90b493e0895df0c5f7ff7fd4b2577f658",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "access/vcs/Version_Control_v5.0.1.zip",
+   "url": "https://github.com/joyfullservice/msaccess-vcs-addin/releases/download/v5.0.1/Version_Control_v5.0.1.zip",
+   "size": 4621186,
+   "sha256": "9504af3dfaea2c8f072fdde8bbcd5ee2b8f03f656828348370f4f0129e642249",
+   "license": "BSD-style"
+  },
+  {
+   "path": "access/mdbtools/nwind.mdb",
+   "url": "https://raw.githubusercontent.com/mdbtools/mdbtestdata/master/data/nwind.mdb",
+   "size": 3002368,
+   "sha256": "4682dfc91be526e6508948cc53adf5c63d70fdf7f2cc1f1403ee76b66ac914b2",
+   "license": "（表示なし。Microsoft の見本）"
+  },
+  {
+   "path": "access/mdbtools/ASampleDatabase.accdb",
+   "url": "https://raw.githubusercontent.com/mdbtools/mdbtestdata/master/data/ASampleDatabase.accdb",
+   "size": 544768,
+   "sha256": "3ee857f318f953758970e2981ba6435d0240212365d1f2110ccd571d6db6a9fb",
+   "license": "（表示なし）"
+  },
+  {
+   "path": "access/jackcess/queryTestV2000.mdb",
+   "url": "https://raw.githubusercontent.com/jahlborn/jackcess/master/src/test/data/V2000/queryTestV2000.mdb",
+   "size": 176128,
+   "sha256": "03b303034e1d64779d9dff1e19d9e21d59d8fa440dc5da9dbcfd85ad051eb5ea",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "access/jackcess/queryTestV2003.mdb",
+   "url": "https://raw.githubusercontent.com/jahlborn/jackcess/master/src/test/data/V2003/queryTestV2003.mdb",
+   "size": 270336,
+   "sha256": "ff3512007fcbe9bf8019ec386fa4382396947b7ef3c06dfb3aa0c63f48ab88ba",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "access/jackcess/queryTestV2007.accdb",
+   "url": "https://raw.githubusercontent.com/jahlborn/jackcess/master/src/test/data/V2007/queryTestV2007.accdb",
+   "size": 364544,
+   "sha256": "5696f91225f40b4835610b3a1b1f99c868f889c49260935ddfa0f1d1622437b6",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "access/jackcess/queryTestV2010.accdb",
+   "url": "https://raw.githubusercontent.com/jahlborn/jackcess/master/src/test/data/V2010/queryTestV2010.accdb",
+   "size": 401408,
+   "sha256": "69fe529f94f193314f941c86e90a37b47c1e35a74d5202e6adf6fc3454ab0891",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "access/jackcess/QueryTest.java",
+   "url": "https://raw.githubusercontent.com/jahlborn/jackcess/master/src/test/java/com/healthmarketscience/jackcess/query/QueryTest.java",
+   "size": 25036,
+   "sha256": "b70b2c76f83aa76f43de739792f9fedbd4015573ab1eab4fdfa52b4bc4950fd1",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "access/tika/testAccess2.accdb",
+   "url": "https://raw.githubusercontent.com/apache/tika/main/tika-parsers/tika-parsers-standard/tika-parsers-standard-modules/tika-parser-microsoft-module/src/test/resources/test-documents/testAccess2.accdb",
+   "size": 794624,
+   "sha256": "93e7d6dcc9312a74c979b799d938fcf9953fa836fec54f44c785122efcd2d2e1",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "access/tika/testAccess2_2000.mdb",
+   "url": "https://raw.githubusercontent.com/apache/tika/main/tika-parsers/tika-parsers-standard/tika-parsers-standard-modules/tika-parser-microsoft-module/src/test/resources/test-documents/testAccess2_2000.mdb",
+   "size": 421888,
+   "sha256": "a639df512de81d9144da1143e63dfcc26a579ff8516e794f9626a3b959176c39",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "access/tika/testAccess2_2002-2003.mdb",
+   "url": "https://raw.githubusercontent.com/apache/tika/main/tika-parsers/tika-parsers-standard/tika-parsers-standard-modules/tika-parser-microsoft-module/src/test/resources/test-documents/testAccess2_2002-2003.mdb",
+   "size": 417792,
+   "sha256": "0b634b6ae6f90d290ec1ea6f1dc2b2ff5fc5e5c120a1a2813f678809b544fabc",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "access/tika/testAccess_V1997.mdb",
+   "url": "https://raw.githubusercontent.com/apache/tika/main/tika-parsers/tika-parsers-standard/tika-parsers-standard-modules/tika-parser-microsoft-module/src/test/resources/test-documents/testAccess_V1997.mdb",
+   "size": 118784,
+   "sha256": "27788b47e17412427830e80c2cb69366885aa11b12c61422de73029194bef135",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "access/tika/testAccess2_encrypted.accdb",
+   "url": "https://raw.githubusercontent.com/apache/tika/main/tika-parsers/tika-parsers-standard/tika-parsers-standard-modules/tika-parser-microsoft-module/src/test/resources/test-documents/testAccess2_encrypted.accdb",
+   "size": 557056,
+   "sha256": "1970dfeac26083fa27a72fe55f88f8e8c46e61c68c6d300c2fc5b2290f32c73d",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "code/carddemo/CBCUS01C.cbl",
+   "url": "https://raw.githubusercontent.com/aws-samples/aws-mainframe-modernization-carddemo/main/app/cbl/CBCUS01C.cbl",
+   "size": 6914,
+   "sha256": "233dbc3bc33a3b9ac555922085a92be56e88d16316bff624b5723c4c36c99714",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "code/carddemo/CBACT01C.cbl",
+   "url": "https://raw.githubusercontent.com/aws-samples/aws-mainframe-modernization-carddemo/main/app/cbl/CBACT01C.cbl",
+   "size": 17450,
+   "sha256": "f8eb6e3a561ff96a1889a8f777a8998850a11dddae221da2c5018067d7b95551",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "code/petclinic/OwnerController.java",
+   "url": "https://raw.githubusercontent.com/spring-projects/spring-petclinic/main/src/main/java/org/springframework/samples/petclinic/owner/OwnerController.java",
+   "size": 6600,
+   "sha256": "611115841f671065ca2796fbb096102d56ce6aafd20bfe9a264f0a6968cca3ff",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "code/petclinic/PetController.java",
+   "url": "https://raw.githubusercontent.com/spring-projects/spring-petclinic/main/src/main/java/org/springframework/samples/petclinic/owner/PetController.java",
+   "size": 6584,
+   "sha256": "1a8a8097ff334b85d3a62c4df79ec52c2dbee8777925970e140081cff7e7c25e",
+   "license": "Apache-2.0"
+  },
+  {
+   "path": "code/petclinic/VisitController.java",
+   "url": "https://raw.githubusercontent.com/spring-projects/spring-petclinic/main/src/main/java/org/springframework/samples/petclinic/owner/VisitController.java",
+   "size": 3789,
+   "sha256": "b7c8f9cb7b2b2b5827d85787d1f18c95762a0213760013cef9d0a9e1c2c0f8d8",
+   "license": "Apache-2.0"
+  }
+ ],
+ "git": {
+  "repo": "https://github.com/joyfullservice/msaccess-vcs-addin",
+  "tag": "v5.0.1",
+  "commit": "acf82e8",
+  "license": "BSD-style",
+  "paths": {
+   "Version Control.accda.src": 206,
+   "Testing/Testing.accdb.src": 88
+  },
+  "save_as": "access/vcs-src",
+  "how": "git clone --depth 1 --branch v5.0.1 --filter=blob:none --sparse <repo> access/vcs-src のあと、git sparse-checkout set 'Version Control.accda.src' 'Testing/Testing.accdb.src'"
+ },
+ "expected": {
+  "excel": {
+   "libreoffice/tdf117266_macroButton.xlsm": {
+    "modules": 1,
+    "procedures": 1,
+    "buttons": 1,
+    "sheets": 0,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": false,
+    "error": false,
+    "encrypted": false
+   },
+   "libreoffice/vba-user-function.xlsm": {
+    "modules": 1,
+    "procedures": 1,
+    "buttons": 0,
+    "sheets": 3,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": false,
+    "error": false,
+    "encrypted": false
+   },
+   "libreoffice/tdf111974.xlsm": {
+    "modules": 2,
+    "procedures": 2,
+    "buttons": 0,
+    "sheets": 8,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": false,
+    "error": false,
+    "encrypted": false
+   },
+   "libreoffice/KeyShortcut.xlsm": {
+    "modules": 1,
+    "procedures": 2,
+    "buttons": 0,
+    "sheets": 1,
+    "shortcuts": 2,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": false,
+    "error": false,
+    "encrypted": false
+   },
+   "libreoffice/VariousTestMacros.xlsm": {
+    "modules": 1,
+    "procedures": 5,
+    "buttons": 0,
+    "sheets": 1,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": false,
+    "error": false,
+    "encrypted": false
+   },
+   "libreoffice/SimpleCopyPaste.xlsm": {
+    "modules": 1,
+    "procedures": 1,
+    "buttons": 1,
+    "sheets": 1,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": false,
+    "error": false,
+    "encrypted": false
+   },
+   "libreoffice/MiscControlTests.xls": {
+    "modules": 3,
+    "procedures": 11,
+    "buttons": 0,
+    "sheets": 3,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 1,
+    "locked": false,
+    "error": false,
+    "encrypted": false
+   },
+   "libreoffice/GeneratedEventTest.xls": {
+    "modules": 2,
+    "procedures": 5,
+    "buttons": 0,
+    "sheets": 3,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 1,
+    "locked": false,
+    "error": false,
+    "encrypted": false
+   },
+   "poi/60512.xlsm": {
+    "modules": 0,
+    "procedures": 0,
+    "buttons": 0,
+    "sheets": 1,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": null,
+    "error": false,
+    "encrypted": false
+   },
+   "poi/ExcelWithAttachments.xlsm": {
+    "modules": 1,
+    "procedures": 1,
+    "buttons": 0,
+    "sheets": 3,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": false,
+    "error": false,
+    "encrypted": false
+   },
+   "poi/57181.xlsm": {
+    "modules": 6,
+    "procedures": 44,
+    "buttons": 21,
+    "sheets": 9,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": false,
+    "error": false,
+    "encrypted": false
+   },
+   "poi/0-www-crossref-org.lib.rivier.edu_education-files_suffix-generator.xlsm": {
+    "modules": 1,
+    "procedures": 2,
+    "buttons": 2,
+    "sheets": 3,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": false,
+    "error": false,
+    "encrypted": false
+   },
+   "poi/47089.xlsm": {
+    "modules": 0,
+    "procedures": 0,
+    "buttons": 0,
+    "sheets": 7,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": null,
+    "error": false,
+    "encrypted": false
+   },
+   "poi/51519.xlsb": {
+    "modules": 0,
+    "procedures": 0,
+    "buttons": 0,
+    "sheets": 0,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": null,
+    "error": false,
+    "encrypted": false
+   },
+   "oletools/autostart-encrypt-standardpassword.xlsm": {
+    "modules": 0,
+    "procedures": 0,
+    "buttons": 0,
+    "sheets": 0,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": null,
+    "error": true,
+    "encrypted": true
+   },
+   "oletools/autostart-encrypt-standardpassword.xls": {
+    "modules": 1,
+    "procedures": 1,
+    "buttons": 0,
+    "sheets": 0,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 2,
+    "locked": false,
+    "error": false,
+    "encrypted": false
+   },
+   "oletools/autostart-encrypt-standardpassword.xlsb": {
+    "modules": 0,
+    "procedures": 0,
+    "buttons": 0,
+    "sheets": 0,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": null,
+    "error": true,
+    "encrypted": true
+   },
+   "oletools/encrypted.xlsm": {
+    "modules": 0,
+    "procedures": 0,
+    "buttons": 0,
+    "sheets": 0,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": null,
+    "error": true,
+    "encrypted": true
+   },
+   "oletools/embedded-simple-2007.xlam": {
+    "modules": 0,
+    "procedures": 0,
+    "buttons": 0,
+    "sheets": 0,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": null,
+    "error": false,
+    "encrypted": false
+   },
+   "oletools/embedded-simple-2007.xla": {
+    "modules": 0,
+    "procedures": 0,
+    "buttons": 0,
+    "sheets": 0,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": null,
+    "error": false,
+    "encrypted": false
+   },
+   "tika/testEXCEL_macro.xlsm": {
+    "modules": 1,
+    "procedures": 1,
+    "buttons": 0,
+    "sheets": 3,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": false,
+    "error": false,
+    "encrypted": false
+   },
+   "tika/testEXCEL_macro_enabled_template.xltm": {
+    "modules": 0,
+    "procedures": 0,
+    "buttons": 0,
+    "sheets": 0,
+    "shortcuts": 0,
+    "ribbon": 0,
+    "unread": 0,
+    "locked": null,
+    "error": false,
+    "encrypted": false
+   }
+  },
+  "access_export": {
+   "Testing/Testing.accdb.src": {
+    "procedures": 48,
+    "entries": 7,
+    "units": 17,
+    "layout_events": 6
+   },
+   "Version Control.accda.src": {
+    "procedures": 2477,
+    "entries": 73,
+    "units": 377,
+    "layout_events": 70
+   }
+  },
+  "access_direct": {
+   "refuse": {
+    "access/tika/testAccess2_encrypted.accdb": "暗号化",
+    "access/mdbtools/nwind.mdb": "97 以前",
+    "access/tika/testAccess_V1997.mdb": "97 以前"
+   },
+   "queries_jackcess": [
+    36,
+    36
+   ],
+   "objects": {
+    "form": 17,
+    "macro": 1,
+    "module": 140,
+    "query": 5,
+    "table": 6
+   },
+   "table_fields": [
+    30,
+    31
+   ],
+   "queries_vcs": [
+    5,
+    5
+   ],
+   "vba_modules": [
+    157,
+    157
+   ],
+   "form_controls": [
+    407,
+    407
+   ],
+   "form_events": [
+    70,
+    70
+   ],
+   "macro_xml": [
+    1,
+    1
+   ],
+   "same_structure_as_export": {
+    "procedures": 2477,
+    "entries": 73,
+    "units": 377
+   }
+  }
+ },
+ "notes": [
+  "table_fields の 1 件の違いは、添付ファイル型の項目。書き出し（CREATE TABLE の文）には VARCHAR と出て、直接読みは attachment と読む",
+  "queries_jackcess のうち 4 件は、結合の条件を AND で並べる順だけが、Jackcess のテストの期待値と違う（意味は同じ）",
+  "VBA の 157 モジュールのうち 9 は、識別子の英字の大小だけが違う（VBA は、名前の大小をプロジェクトで1つに揃える。書き出しの側が、整えている）",
+  "フォームの定義のプロパティの番号（イベント 10 種類）は、この対のファイルから割り出したもの。別のファイルでの答え合わせは、していない",
+  "Access 97 以前の形式（nwind.mdb・testAccess_V1997.mdb）と、暗号化されたファイルは、読まないことを確かめただけ"
+ ]
+}

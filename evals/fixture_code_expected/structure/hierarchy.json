@@ -1,0 +1,40 @@
+{
+ "is_hierarchical": "no",
+ "basis": [
+  "filename"
+ ],
+ "rationale": "手順書が1つと、そのツールのソースだけ。",
+ "tree": [
+  {
+   "id": "H1",
+   "level": 1,
+   "title": "月次の請求集計",
+   "kind": "process",
+   "source": "heading",
+   "refs": [
+    {
+     "doc_id": "M03",
+     "pages": [
+      1
+     ],
+     "rel": "describes"
+    }
+   ],
+   "children": []
+  }
+ ],
+ "doc_relations": [],
+ "toc_flow_list": {
+  "found": false,
+  "source": [],
+  "entries": []
+ },
+ "questions": [],
+ "docs": [
+  {
+   "doc_id": "M03",
+   "role": "procedure"
+  }
+ ],
+ "sequence": []
+}

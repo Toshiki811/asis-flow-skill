@@ -1,0 +1,402 @@
+{
+ "flow_id": "F02",
+ "name": "承認",
+ "number": "2.",
+ "parent": "F00",
+ "level": 2,
+ "basis": "toc",
+ "summary": "上長が申請内容と領収書を照合し、5万円未満は課長、5万円以上は見積書の添付を確認したうえで部長が承認する。不備は申請者に差し戻す。",
+ "start_condition": "申請者から経費申請が提出されたとき",
+ "end_condition": "承認または差し戻し",
+ "lanes": [
+  {
+   "id": "L1",
+   "name": "申請者",
+   "kind": "role"
+  },
+  {
+   "id": "L2",
+   "name": "課長",
+   "kind": "role"
+  },
+  {
+   "id": "L3",
+   "name": "部長",
+   "kind": "role"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "start",
+   "type": "start",
+   "lane": "L2",
+   "label": "開始"
+  },
+  {
+   "id": "P-001",
+   "type": "process",
+   "lane": "L2",
+   "label": "申請内容と領収書を照合する",
+   "detail": "原典の担当は「上長」",
+   "action": "確認する",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 5,
+     "quote": "上長は、申請内容と領収書を照合する。",
+     "from_image": false,
+     "item": "s1"
+    }
+   ]
+  },
+  {
+   "id": "D-001",
+   "type": "decision",
+   "lane": "L2",
+   "label": "不備があるか",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 5,
+     "quote": "不備がある場合は、申請者に差し戻す。",
+     "from_image": false,
+     "item": "s4"
+    }
+   ]
+  },
+  {
+   "id": "P-002",
+   "type": "process",
+   "lane": "L2",
+   "label": "申請者に差し戻す",
+   "detail": "原典の担当は「上長」",
+   "action": "提出・回付する",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 5,
+     "quote": "不備がある場合は、申請者に差し戻す。",
+     "from_image": false,
+     "item": "s4"
+    }
+   ]
+  },
+  {
+   "id": "P-003",
+   "type": "process",
+   "lane": "L1",
+   "label": "差し戻しを受け取る",
+   "detail": "この後の対応は原典に記載なし",
+   "action": "受け取る",
+   "inferred": true,
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 5,
+     "quote": "不備がある場合は、申請者に差し戻す。",
+     "from_image": false
+    }
+   ]
+  },
+  {
+   "id": "D-002",
+   "type": "decision",
+   "lane": "L2",
+   "label": "申請金額が5万円以上か",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 5,
+     "quote": "申請金額が5万円未満の場合は課長が承認する。5万円以上の場合は部長が承認する。",
+     "from_image": false,
+     "item": "d1"
+    },
+    {
+     "doc_id": "M01",
+     "page": 4,
+     "quote": "5万円以上？",
+     "from_image": false,
+     "item": "d1"
+    }
+   ]
+  },
+  {
+   "id": "P-004",
+   "type": "process",
+   "lane": "L2",
+   "label": "承認する",
+   "detail": "5万円未満",
+   "action": "承認する",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 5,
+     "quote": "申請金額が5万円未満の場合は課長が承認する。",
+     "from_image": false,
+     "item": "s2"
+    },
+    {
+     "doc_id": "M01",
+     "page": 4,
+     "quote": "課長: 承認",
+     "from_image": false,
+     "item": "g3"
+    }
+   ]
+  },
+  {
+   "id": "P-005",
+   "type": "process",
+   "lane": "L3",
+   "label": "見積書の添付を確認する",
+   "detail": "原典（注記）に担当の記載なし",
+   "action": "確認する",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 5,
+     "item": "s5",
+     "quote": "5万円以上の申請は、承認の前に見積書の添付を確認すること。",
+     "from_image": false
+    }
+   ]
+  },
+  {
+   "id": "P-006",
+   "type": "process",
+   "lane": "L3",
+   "label": "承認する",
+   "detail": "5万円以上",
+   "action": "承認する",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 5,
+     "quote": "5万円以上の場合は部長が承認する。",
+     "from_image": false,
+     "item": "s3"
+    },
+    {
+     "doc_id": "M01",
+     "page": 4,
+     "quote": "部長: 承認",
+     "from_image": false,
+     "item": "g4"
+    },
+    {
+     "doc_id": "M04",
+     "page": 2,
+     "item": "s2",
+     "quote": "5万円以上の経費は、部長の承認を得るものとする。",
+     "from_image": false
+    }
+   ]
+  },
+  {
+   "id": "SUB-001",
+   "type": "subprocess",
+   "lane": "L2",
+   "label": "支払処理に進む",
+   "link_flow": "F03",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 4,
+     "quote": "経理部: 支払処理",
+     "from_image": false,
+     "item": "g5"
+    }
+   ]
+  },
+  {
+   "id": "end",
+   "type": "end",
+   "lane": "L2",
+   "label": "終了"
+  },
+  {
+   "id": "end2",
+   "type": "end",
+   "lane": "L1",
+   "label": "終了（差し戻し）"
+  },
+  {
+   "id": "F-001",
+   "type": "file",
+   "lane": "L3",
+   "label": "見積書",
+   "attach_to": "P-005",
+   "direction": "in",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 5,
+     "item": "s5",
+     "quote": "見積書の添付を確認する",
+     "from_image": false
+    }
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "P-001"
+  },
+  {
+   "from": "P-001",
+   "to": "D-001"
+  },
+  {
+   "from": "D-001",
+   "to": "D-002",
+   "label": "なし"
+  },
+  {
+   "from": "D-001",
+   "to": "P-002",
+   "label": "あり"
+  },
+  {
+   "from": "P-002",
+   "to": "P-003"
+  },
+  {
+   "from": "P-003",
+   "to": "end2",
+   "inferred": true
+  },
+  {
+   "from": "D-002",
+   "to": "P-004",
+   "label": "5万円未満"
+  },
+  {
+   "from": "D-002",
+   "to": "P-005",
+   "label": "5万円以上"
+  },
+  {
+   "from": "P-004",
+   "to": "SUB-001"
+  },
+  {
+   "from": "P-006",
+   "to": "SUB-001"
+  },
+  {
+   "from": "SUB-001",
+   "to": "end"
+  },
+  {
+   "from": "P-005",
+   "to": "P-006"
+  }
+ ],
+ "unused_pages": [],
+ "questions": [
+  {
+   "id": "q1",
+   "severity": "mid",
+   "category": "記載なし",
+   "effect": "担当",
+   "nodes": [
+    "P-001",
+    "P-002"
+   ],
+   "question": "照合と差し戻しを行う「上長」は誰か（課長か。5万円以上の申請は部長が照合もするのか）。",
+   "assumption": "課長のレーンに置いた",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 5
+    }
+   ],
+   "ask": "管理部"
+  },
+  {
+   "id": "q3",
+   "severity": "mid",
+   "category": "記載なし",
+   "effect": "箱",
+   "node": "P-003",
+   "question": "差し戻された申請者は何をするか（修正して再申請するのか）。再申請の場合、どこに戻るか。",
+   "assumption": "差し戻しを受け取って終了とした",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 5
+    }
+   ],
+   "ask": "管理部"
+  },
+  {
+   "id": "q4",
+   "severity": "high",
+   "category": "記載なし",
+   "effect": "フローの範囲",
+   "edge": [
+    "P-003",
+    "end2"
+   ],
+   "question": "差し戻し後にフローが終わるのか、経費申請（F01）に戻るのか。",
+   "assumption": "終了とした",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 5
+    }
+   ],
+   "ask": "管理部"
+  },
+  {
+   "id": "q5",
+   "severity": "mid",
+   "category": "読取不能",
+   "effect": "順序",
+   "node": "D-002",
+   "question": "全体の流れの図の線に矢じりが無い。左から右の流れという読みでよいか。",
+   "assumption": "左から右に読んだ",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 4
+    }
+   ],
+   "ask": "管理部"
+  },
+  {
+   "id": "q6",
+   "severity": "mid",
+   "category": "記載なし",
+   "effect": "担当",
+   "node": "P-005",
+   "question": "5万円以上の申請で見積書の添付を確認するのは、部長ですか、課長（上長）ですか。",
+   "assumption": "承認する部長のレーンに置いた",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 5
+    }
+   ],
+   "ask": "管理部"
+  },
+  {
+   "id": "q7",
+   "severity": "mid",
+   "category": "記載なし",
+   "effect": "担当",
+   "node": "P-006",
+   "question": "規程 第6条の「部長の承認を得る」のは申請者ですか。",
+   "assumption": "部長が承認する作業として描いた",
+   "sources": [
+    {
+     "doc_id": "M04",
+     "page": 2
+    }
+   ],
+   "ask": "管理部"
+  }
+ ],
+ "excluded_items": []
+}

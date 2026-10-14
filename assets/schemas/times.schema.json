@@ -1,0 +1,58 @@
+{
+ "title": "人が入れた処理時間",
+ "file": "times.json",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["version"],
+ "properties": {
+  "version": {"type": "integer", "description": "形の版（1）"},
+  "cells": {"type": "array", "items": {"$ref": "#/$defs/cell"}, "description": "人が入れた処理時間（分）。業務マトリクス一覧の時間のセルに、数を直に入れたもの"},
+  "counts": {"type": "array", "items": {"$ref": "#/$defs/count"}, "description": "人が入れた件数（フローごと）"},
+  "table": {"type": "array", "items": {"$ref": "#/$defs/row"}, "description": "「処理時間の基準」の、テンプレートから直した値"}
+ },
+ "$defs": {
+  "cell": {
+   "title": "cells[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["flow", "node", "value"],
+   "properties": {
+    "flow": {"$ref": "common#/$defs/flow_id", "description": "フロー id"},
+    "node": {"$ref": "common#/$defs/node_id", "description": "ノード番号（振り直しでは、一緒に直る）"},
+    "value": {"type": "number", "minimum": 0, "description": "分"},
+    "label": {"type": "string", "description": "入れたときの作業名（いまの名前と違えば、点検が見直しを促す）"},
+    "lane": {"type": "string", "description": "その作業の担当の名前（機械が書く。同じ作業名の箱が 2 つ以上あるフローで、番号がずれたときに、どの箱の値かを決める手がかり）"},
+    "after": {"type": "array", "items": {"type": "string"}, "description": "その作業の直前のノードの名前（機械が書く。担当で決まらないときの手がかり）"},
+    "book": {"type": "string", "description": "取り込んだブックの名前"},
+    "date": {"type": "string", "description": "取り込んだ日"}
+   }
+  },
+  "count": {
+   "title": "counts[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["flow", "value"],
+   "properties": {
+    "flow": {"$ref": "common#/$defs/flow_id", "description": "フロー id"},
+    "value": {"type": "number", "minimum": 0, "description": "件数（何の件数か・期間は、ブックの見出しで決める）"},
+    "book": {"type": "string", "description": "取り込んだブックの名前"},
+    "date": {"type": "string", "description": "取り込んだ日"}
+   }
+  },
+  "row": {
+   "title": "table[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["action", "volume", "value"],
+   "properties": {
+    "action": {
+     "enum": ["入力する", "作成する", "確認する", "承認する", "提出・回付する", "受け取る", "出力する", "連絡する", "計算する", "調べる", "保管する", "その他", "判断する", "システムが処理する", "別のフローへ進む"],
+     "description": "動作の種類（表の 1 列目の語。common.ACTIONS と、種別から決まる 3 つ）"
+    },
+    "volume": {"enum": ["小", "中", "大", "特大"]},
+    "value": {"type": "number", "minimum": 0, "description": "分"},
+    "from": {"enum": ["book", "calibrate"], "description": "`book` ブックで人が直した／`calibrate` 人が入れた時間の中央値から引き直した"}
+   }
+  }
+ }
+}

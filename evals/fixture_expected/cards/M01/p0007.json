@@ -1,0 +1,46 @@
+{
+ "doc_id": "M01",
+ "page": 7,
+ "printed_page": null,
+ "page_type": "procedure",
+ "title": "（旧）3. 支払処理",
+ "section_path": [
+  "（旧）3. 支払処理"
+ ],
+ "summary": "非表示のスライド。旧版の支払処理（紙の一覧と支払依頼書）。",
+ "actors": [
+  "経理部"
+ ],
+ "systems": [],
+ "documents": [
+  "支払依頼書"
+ ],
+ "steps": [
+  {
+   "id": "s1",
+   "actor": "経理部",
+   "action": "承認済みの申請を紙の一覧で確認し、支払依頼書を作成する",
+   "system": "",
+   "inputs": [],
+   "outputs": [
+    "支払依頼書"
+   ],
+   "condition": "",
+   "section": "",
+   "quote": "経理部は、承認済みの申請を紙の一覧で確認し、支払依頼書を作成する。",
+   "from_image": false,
+   "origin": "body"
+  }
+ ],
+ "decisions": [],
+ "diagram": {
+  "nodes": [],
+  "edges": []
+ },
+ "figures": [],
+ "notes": [],
+ "toc_entries": [],
+ "cross_refs": [],
+ "unreadable": [],
+ "uncertain": []
+}

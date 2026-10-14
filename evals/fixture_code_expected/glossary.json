@@ -1,0 +1,45 @@
+{
+ "terms": [
+  {
+   "kind": "actor",
+   "name": "営業担当",
+   "aliases": []
+  },
+  {
+   "kind": "actor",
+   "name": "経理担当",
+   "aliases": []
+  },
+  {
+   "kind": "actor",
+   "name": "経理課長",
+   "aliases": []
+  },
+  {
+   "kind": "system",
+   "name": "月次集計",
+   "aliases": []
+  },
+  {
+   "kind": "system",
+   "name": "販売管理システム",
+   "aliases": []
+  },
+  {
+   "kind": "document",
+   "name": "売上データ",
+   "aliases": []
+  },
+  {
+   "kind": "document",
+   "name": "請求一覧",
+   "aliases": []
+  },
+  {
+   "kind": "document",
+   "name": "集計表",
+   "aliases": []
+  }
+ ],
+ "questions": []
+}

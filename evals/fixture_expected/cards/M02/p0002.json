@@ -1,0 +1,108 @@
+{
+ "doc_id": "M02",
+ "page": 2,
+ "page_type": "procedure",
+ "title": "振込エラー時の対応",
+ "section_path": [],
+ "summary": "振込エラー時の経理部の対応（スキャン画像。文字層なし）。",
+ "actors": [
+  "経理部",
+  "申請者"
+ ],
+ "systems": [],
+ "documents": [
+  "エラー一覧",
+  "支払台帳"
+ ],
+ "steps": [
+  {
+   "no": 1,
+   "actor": "経理部",
+   "action": "エラー一覧を印刷する",
+   "system": "",
+   "inputs": [],
+   "outputs": [
+    "エラー一覧"
+   ],
+   "condition": "",
+   "quote": "① 経理部は、エラー一覧を印刷する。",
+   "from_image": true,
+   "id": "s1",
+   "section": "",
+   "origin": "body"
+  },
+  {
+   "no": 2,
+   "actor": "経理部",
+   "action": "口座情報の誤りを申請者に電話で確認する",
+   "system": "",
+   "inputs": [],
+   "outputs": [],
+   "condition": "口座情報の誤りの場合",
+   "quote": "② 口座情報の誤りは、申請者に電話で確認する。",
+   "from_image": true,
+   "id": "s2",
+   "section": "",
+   "origin": "body"
+  },
+  {
+   "no": 3,
+   "actor": "経理部",
+   "action": "再振込を行う",
+   "system": "",
+   "inputs": [],
+   "outputs": [],
+   "condition": "修正後、翌営業日",
+   "quote": "③ 修正後、翌営業日に再振込を行う。",
+   "from_image": true,
+   "id": "s3",
+   "section": "",
+   "origin": "body"
+  },
+  {
+   "no": 4,
+   "actor": "経理部",
+   "action": "再振込の記録を支払台帳に記入する",
+   "system": "",
+   "inputs": [],
+   "outputs": [
+    "支払台帳"
+   ],
+   "condition": "",
+   "quote": "④ 再振込の記録を支払台帳に記入する。",
+   "from_image": true,
+   "id": "s4",
+   "section": "",
+   "origin": "body"
+  }
+ ],
+ "decisions": [],
+ "diagram": {
+  "nodes": [],
+  "edges": []
+ },
+ "figures": [
+  {
+   "kind": "other",
+   "description": "ページ全体が画像（スキャン）。見出しと①〜④の手順。",
+   "texts": [
+    "振込エラー時の対応",
+    "① 経理部は、エラー一覧を印刷する。",
+    "② 口座情報の誤りは、申請者に電話で確認する。",
+    "③ 修正後、翌営業日に再振込を行う。",
+    "④ 再振込の記録を支払台帳に記入する。"
+   ]
+  }
+ ],
+ "toc_entries": [],
+ "cross_refs": [],
+ "unreadable": [],
+ "uncertain": [
+  {
+   "what": "口座情報の誤り以外のエラーの対応",
+   "why": "口座情報の誤りの場合しか書かれていない"
+  }
+ ],
+ "printed_page": null,
+ "notes": []
+}

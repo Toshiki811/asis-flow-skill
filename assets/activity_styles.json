@@ -1,0 +1,130 @@
+{
+ "template": "アクティビティ図_テンプレート.drawio",
+ "model": {
+  "dx": "1422",
+  "dy": "794",
+  "grid": "1",
+  "gridSize": "10",
+  "guides": "1",
+  "tooltips": "1",
+  "connect": "1",
+  "arrows": "1",
+  "fold": "1",
+  "page": "1",
+  "pageScale": "1",
+  "pageWidth": "1654",
+  "pageHeight": "2336",
+  "math": "0",
+  "shadow": "0"
+ },
+ "lane": {
+  "x0": 80.0,
+  "width": 300.0,
+  "header_y": 80.0,
+  "header_h": 40.0,
+  "content_y": 120.0,
+  "node_dx": 75.0,
+  "file_dx": 240.0,
+  "first_y": 140.0,
+  "row_pitch": 110.0
+ },
+ "palettes": [
+  {
+   "name": "操作者",
+   "fill": "#dae8fc",
+   "stroke": "#6c8ebf",
+   "header_style": "rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1;align=center;verticalAlign=middle;fontColor=#000000;",
+   "container_style": "rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;opacity=30;",
+   "process_style": "rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontColor=#000000;"
+  },
+  {
+   "name": "プログラム（システムの名前）",
+   "fill": "#e1d5e7",
+   "stroke": "#9673a6",
+   "header_style": "rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;fontStyle=1;align=center;verticalAlign=middle;fontColor=#000000;",
+   "container_style": "rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;opacity=30;",
+   "process_style": "rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontColor=#000000;"
+  }
+ ],
+ "system_palette": {
+  "name": "外部",
+  "fill": "#f5f5f5",
+  "stroke": "#666666",
+  "header_style": "rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=14;fontStyle=1;align=center;verticalAlign=middle;fontColor=#000000;",
+  "container_style": "rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;opacity=30;",
+  "system_style": "rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;fontColor=#000000;dashed=1;"
+ },
+ "node": {
+  "start_end": "ellipse;html=1;shape=startState;fillColor=#000000;strokeColor=#000000;",
+  "decision": "rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontColor=#000000;",
+  "file": "shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;size=12;fontSize=10;fontColor=#000000;",
+  "system": "rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;fontColor=#000000;dashed=1;"
+ },
+ "size": {
+  "process": [
+   150.0,
+   70.0
+  ],
+  "system": [
+   150.0,
+   80.0
+  ],
+  "decision": [
+   150.0,
+   80.0
+  ],
+  "start_end": [
+   30.0,
+   30.0
+  ],
+  "file": [
+   50.0,
+   60.0
+  ]
+ },
+ "edge": {
+  "flow": "edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;strokeWidth=2;endArrow=block;endFill=1;",
+  "flow_label": "edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;strokeWidth=2;endArrow=block;endFill=1;fontSize=10;fontColor=#d79b00;",
+  "system": "edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#0066CC;strokeWidth=2;dashed=1;dashPattern=8 8;endArrow=block;endFill=1;",
+  "ref": "edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;strokeWidth=1.5;dashed=1;dashPattern=3 3;endArrow=open;endFill=0;"
+ },
+ "legend": [],
+ "legend_gap": 60.0,
+ "info_style": "text;html=1;strokeColor=#d6b656;fillColor=#fff2cc;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;fontStyle=0;spacingLeft=5;spacingTop=5;",
+ "text_style": "text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=10;",
+ "extensions": {
+  "inferred": "dashed=1;dashPattern=4 3;strokeColor=#b85450;",
+  "badge": "ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#b85450;fontSize=9;fontStyle=1;fontColor=#b85450;",
+  "subprocess": "shape=process;size=0.07;",
+  "edge_label_bg": "labelBackgroundColor=#FFFFFF;",
+  "anchor": "rounded=0;fillColor=none;strokeColor=none;",
+  "title": "fontSize=16;fontStyle=1;",
+  "link_text": "fontSize=11;fontColor=#0066CC;fontStyle=4;",
+  "source_font": "font-size:9px;color:#666666",
+  "system_tag_font": "font-size:10px;color:#0066CC"
+ },
+ "process_extra": "absoluteArcSize=1;arcSize=28;",
+ "start": "ellipse;html=1;shape=startState;fillColor=#000000;strokeColor=#000000;",
+ "end": "ellipse;html=1;shape=endState;fillColor=#000000;strokeColor=#000000;",
+ "start_end_size": [
+  30.0,
+  30.0
+ ],
+ "legend_lines": [
+  "<b>凡例（アクティビティ図）</b>",
+  "● 開始　◎ 終了",
+  "角の丸い箱＝処理（続く文のまとまりを、業務の言葉で1つにしたもの）",
+  "分かれた道は、横に並ぶ（まっすぐ下＝ふつうの流れ／右の列＝条件に当たったとき・途中で終わる側）",
+  "ひし形＝判断（業務の条件・操作者の選択・繰り返しの続き）",
+  "左右に縦線のある箱＝別ページの処理の呼び出し（クリックで移動）",
+  "黄色い紙＝シート・ファイル・テーブル（点線の矢印＝読む・書く）",
+  "灰色の破線の箱＝外部（メール・ほかのプログラム）",
+  "↻＝繰り返し（同じ処理を、対象の数だけ繰り返す）",
+  "「」の中＝画面・シート・ファイルに出てくる名前のまま（ほかは、業務の言葉に直してある。もとの名前は、業務マトリクス一覧の「プログラムの用語対応」）",
+  "箱・ひし形の右下（枠の外）の灰色の字＝出典（もとのソースの場所。資料・モジュール・行）",
+  "Q-＝確認事項の番号（確認事項一覧と対応）",
+  "レーン＝操作者（人が見る・答える所）／プログラム／外部"
+ ],
+ "legend_style": "text;html=1;strokeColor=#666666;fillColor=#f5f5f5;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=5;spacingTop=5;",
+ "legend_width": 450.0
+}

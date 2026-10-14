@@ -1,0 +1,152 @@
+{
+ "doc_id": "M03",
+ "page": 1,
+ "printed_page": null,
+ "page_type": "procedure",
+ "title": "月次の請求集計の手順",
+ "section_path": [
+  "月次の請求集計の手順"
+ ],
+ "summary": "月次の請求を集計し、承認を受け、入金を消し込む手順。",
+ "actors": [
+  "営業担当",
+  "経理担当",
+  "経理課長"
+ ],
+ "systems": [
+  "月次集計",
+  "販売管理システム"
+ ],
+ "documents": [
+  "売上データ",
+  "請求一覧",
+  "集計表"
+ ],
+ "steps": [
+  {
+   "id": "s1",
+   "no": 1,
+   "actor": "営業担当",
+   "action": "売上データ（CSV）を共有フォルダに置く",
+   "system": "",
+   "inputs": [],
+   "outputs": [
+    "売上データ"
+   ],
+   "condition": "月末までに",
+   "section": "",
+   "lines": [
+    2,
+    2
+   ],
+   "quote": "1. 営業担当は、月末までに売上データ（CSV）を共有フォルダに置く。",
+   "from_image": false,
+   "origin": "body"
+  },
+  {
+   "id": "s2",
+   "no": 2,
+   "actor": "経理担当",
+   "action": "「月次集計」のブックを開き、対象月を確かめる",
+   "system": "月次集計",
+   "inputs": [],
+   "outputs": [],
+   "condition": "",
+   "section": "",
+   "lines": [
+    3,
+    3
+   ],
+   "quote": "2. 経理担当は、「月次集計」のブックを開き、メニューのシートで対象月を確かめる。",
+   "from_image": false,
+   "origin": "body"
+  },
+  {
+   "id": "s3",
+   "no": 3,
+   "actor": "経理担当",
+   "action": "マクロ「Main」を実行する",
+   "system": "月次集計",
+   "inputs": [],
+   "outputs": [],
+   "condition": "",
+   "section": "",
+   "lines": [
+    4,
+    4
+   ],
+   "quote": "3. 経理担当は、マクロ「Main」を実行する（メニューの「集計」ボタン）。",
+   "from_image": false,
+   "origin": "body"
+  },
+  {
+   "id": "s4",
+   "no": 4,
+   "actor": "経理担当",
+   "action": "請求一覧の「要確認」の行を、売上と照合する",
+   "system": "販売管理システム",
+   "inputs": [
+    "請求一覧"
+   ],
+   "outputs": [],
+   "condition": "",
+   "section": "",
+   "lines": [
+    5,
+    5
+   ],
+   "quote": "4. 経理担当は、請求一覧の「要確認」の行を、販売管理システムの売上と照合する。",
+   "from_image": false,
+   "origin": "body"
+  },
+  {
+   "id": "s5",
+   "no": 5,
+   "actor": "経理課長",
+   "action": "集計表を確認し、承認する",
+   "system": "",
+   "inputs": [
+    "集計表"
+   ],
+   "outputs": [],
+   "condition": "",
+   "section": "",
+   "lines": [
+    6,
+    6
+   ],
+   "quote": "5. 経理課長は、集計表を確認し、承認する。",
+   "from_image": false,
+   "origin": "body"
+  },
+  {
+   "id": "s6",
+   "no": 6,
+   "actor": "経理担当",
+   "action": "入金の消込を行う",
+   "system": "",
+   "inputs": [],
+   "outputs": [],
+   "condition": "",
+   "section": "",
+   "lines": [
+    7,
+    7
+   ],
+   "quote": "6. 経理担当は、入金の消込を行う。",
+   "from_image": false,
+   "origin": "body"
+  }
+ ],
+ "decisions": [],
+ "diagram": {
+  "nodes": [],
+  "edges": []
+ },
+ "figures": [],
+ "notes": [],
+ "toc_entries": [],
+ "cross_refs": [],
+ "unreadable": [],
+ "uncertain": []
+}

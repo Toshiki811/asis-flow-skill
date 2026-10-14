@@ -1,0 +1,294 @@
+{
+ "is_hierarchical": "yes",
+ "basis": [
+  "folder",
+  "toc",
+  "cross_ref"
+ ],
+ "rationale": "フォルダが「00_全体」「01_手順書」「02_規程」に分かれ、全体マニュアル（経費精算業務マニュアル）の目次に業務が3つ並ぶ。規程（経費精算規程）は細則を全体マニュアルに委ね、手順書（支払処理手順）は全体マニュアルの「3. 支払処理」を詳しくし、別紙としてチェックシート（経費精算チェックシート）を参照する。",
+ "tree": [
+  {
+   "id": "H1",
+   "level": 1,
+   "title": "経費精算業務",
+   "kind": "domain",
+   "source": "toc",
+   "refs": [
+    {
+     "doc_id": "M01",
+     "pages": [
+      1,
+      2
+     ],
+     "rel": "describes"
+    }
+   ],
+   "children": [
+    {
+     "id": "H1.1",
+     "level": 2,
+     "title": "経費申請",
+     "kind": "process",
+     "source": "toc",
+     "refs": [
+      {
+       "doc_id": "M01",
+       "pages": [
+        3,
+        4
+       ],
+       "rel": "describes"
+      },
+      {
+       "doc_id": "M04",
+       "pages": [
+        2
+       ],
+       "rel": "describes",
+       "evidence": "第5条 申請者は、経費を使った日から1か月以内に申請しなければならない。",
+       "sources": [
+        {
+         "doc_id": "M04",
+         "page": 2
+        }
+       ]
+      }
+     ],
+     "children": []
+    },
+    {
+     "id": "H1.2",
+     "level": 2,
+     "title": "承認",
+     "kind": "process",
+     "source": "toc",
+     "refs": [
+      {
+       "doc_id": "M01",
+       "pages": [
+        5
+       ],
+       "rel": "describes"
+      },
+      {
+       "doc_id": "M04",
+       "pages": [
+        2
+       ],
+       "rel": "describes",
+       "evidence": "第6条 5万円以上の経費は、部長の承認を得るものとする。",
+       "sources": [
+        {
+         "doc_id": "M04",
+         "page": 2
+        }
+       ]
+      }
+     ],
+     "children": []
+    },
+    {
+     "id": "H1.3",
+     "level": 2,
+     "title": "支払処理",
+     "kind": "process",
+     "source": "toc",
+     "refs": [
+      {
+       "doc_id": "M01",
+       "pages": [
+        6
+       ],
+       "rel": "describes"
+      },
+      {
+       "doc_id": "M02",
+       "pages": [
+        1,
+        2
+       ],
+       "rel": "details",
+       "evidence": "経理部は、承認済みの申請を下の画面で確認し、支払データを登録する。",
+       "sources": [
+        {
+         "doc_id": "M01",
+         "page": 6
+        },
+        {
+         "doc_id": "M02",
+         "page": 1
+        }
+       ]
+      },
+      {
+       "doc_id": "M03",
+       "pages": [
+        1,
+        2
+       ],
+       "rel": "details",
+       "evidence": "詳細は別紙「経費精算チェックシート」を参照。",
+       "sources": [
+        {
+         "doc_id": "M02",
+         "page": 1
+        }
+       ]
+      },
+      {
+       "doc_id": "M04",
+       "pages": [
+        3
+       ],
+       "rel": "describes",
+       "evidence": "第7条 経理部は、承認済みの経費を毎月25日に支払う。",
+       "sources": [
+        {
+         "doc_id": "M04",
+         "page": 3
+        }
+       ]
+      }
+     ],
+     "children": []
+    }
+   ]
+  }
+ ],
+ "doc_relations": [
+  {
+   "from": "M04",
+   "to": "M01",
+   "type": "basis_of",
+   "evidence": "この規程の細則は、経費精算業務マニュアルに定める。",
+   "sources": [
+    {
+     "doc_id": "M04",
+     "page": 3
+    }
+   ]
+  },
+  {
+   "from": "M01",
+   "to": "M02",
+   "type": "parent_of",
+   "evidence": "経理部は、承認済みの申請を下の画面で確認し、支払データを登録する。",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 6
+    },
+    {
+     "doc_id": "M02",
+     "page": 1
+    }
+   ]
+  },
+  {
+   "from": "M02",
+   "to": "M03",
+   "type": "appendix_of",
+   "evidence": "詳細は別紙「経費精算チェックシート」を参照。",
+   "sources": [
+    {
+     "doc_id": "M02",
+     "page": 1
+    }
+   ]
+  }
+ ],
+ "toc_flow_list": {
+  "found": true,
+  "source": [
+   {
+    "doc_id": "M01",
+    "pages": [
+     2
+    ]
+   }
+  ],
+  "entries": [
+   {
+    "number": "1",
+    "title": "経費申請",
+    "level": 1,
+    "page": 3
+   },
+   {
+    "number": "2",
+    "title": "承認",
+    "level": 1,
+    "page": 5
+   },
+   {
+    "number": "3",
+    "title": "支払処理",
+    "level": 1,
+    "page": 6
+   }
+  ]
+ },
+ "questions": [
+  {
+   "id": "h1",
+   "severity": "mid",
+   "category": "階層",
+   "effect": "フローの範囲",
+   "question": "「支払処理手順」は、「経費精算業務マニュアル」の「3. 支払処理」の下位の手順書という理解でよいか。",
+   "assumption": "経費精算業務マニュアルの下位資料として扱い、F03 に統合した",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 6
+    },
+    {
+     "doc_id": "M02",
+     "page": 1
+    }
+   ],
+   "ask": "管理部"
+  }
+ ],
+ "docs": [
+  {
+   "doc_id": "M01",
+   "role": "manual"
+  },
+  {
+   "doc_id": "M02",
+   "role": "procedure"
+  },
+  {
+   "doc_id": "M03",
+   "role": "appendix"
+  },
+  {
+   "doc_id": "M04",
+   "role": "regulation"
+  }
+ ],
+ "sequence": [
+  {
+   "from": "H1.1",
+   "to": "H1.2",
+   "evidence": "申請者は、申請ボタンを押して上長に提出する。",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 3
+    }
+   ]
+  },
+  {
+   "from": "H1.2",
+   "to": "H1.3",
+   "evidence": "経理部は、承認済みの申請を下の画面で確認し、支払データを登録する。",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 6
+    }
+   ]
+  }
+ ]
+}

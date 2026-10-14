@@ -1,0 +1,153 @@
+{
+ "basis": "toc",
+ "rationale": "経費精算業務マニュアルの目次に業務が3つ並んでいるので、その名称・順序・番号のまま業務分類とした。",
+ "categories": [
+  {
+   "id": "F00",
+   "number": "",
+   "name": "経費精算業務",
+   "parent": null,
+   "hierarchy_id": "H1",
+   "level": 1,
+   "basis": "toc",
+   "toc_ref": {
+    "doc_id": "M01",
+    "page": 1,
+    "text": "経費精算業務マニュアル"
+   },
+   "pages": [],
+   "make_flow": false
+  },
+  {
+   "id": "F01",
+   "number": "1.",
+   "name": "経費申請",
+   "parent": "F00",
+   "hierarchy_id": "H1.1",
+   "level": 2,
+   "basis": "toc",
+   "toc_ref": {
+    "doc_id": "M01",
+    "page": 2,
+    "text": "1. 経費申請"
+   },
+   "pages": [
+    {
+     "doc_id": "M01",
+     "pages": [
+      3,
+      4
+     ]
+    },
+    {
+     "doc_id": "M04",
+     "pages": [
+      2
+     ]
+    }
+   ],
+   "make_flow": true
+  },
+  {
+   "id": "F02",
+   "number": "2.",
+   "name": "承認",
+   "parent": "F00",
+   "hierarchy_id": "H1.2",
+   "level": 2,
+   "basis": "toc",
+   "toc_ref": {
+    "doc_id": "M01",
+    "page": 2,
+    "text": "2. 承認"
+   },
+   "pages": [
+    {
+     "doc_id": "M01",
+     "pages": [
+      4,
+      5
+     ]
+    },
+    {
+     "doc_id": "M04",
+     "pages": [
+      2
+     ]
+    }
+   ],
+   "make_flow": true
+  },
+  {
+   "id": "F03",
+   "number": "3.",
+   "name": "支払処理",
+   "parent": "F00",
+   "hierarchy_id": "H1.3",
+   "level": 2,
+   "basis": "toc",
+   "toc_ref": {
+    "doc_id": "M01",
+    "page": 2,
+    "text": "3. 支払処理"
+   },
+   "pages": [
+    {
+     "doc_id": "M01",
+     "pages": [
+      6
+     ]
+    },
+    {
+     "doc_id": "M02",
+     "pages": [
+      1,
+      2
+     ]
+    },
+    {
+     "doc_id": "M03",
+     "pages": [
+      1,
+      2
+     ]
+    },
+    {
+     "doc_id": "M04",
+     "pages": [
+      3
+     ]
+    }
+   ],
+   "make_flow": true
+  }
+ ],
+ "unassigned_pages": [
+  {
+   "doc_id": "M01",
+   "page": 1,
+   "reason": "表紙"
+  },
+  {
+   "doc_id": "M01",
+   "page": 2,
+   "reason": "目次"
+  },
+  {
+   "doc_id": "M01",
+   "page": 7,
+   "reason": "非表示のスライド（旧版の手順）"
+  },
+  {
+   "doc_id": "M01",
+   "page": 8,
+   "reason": "改訂履歴"
+  },
+  {
+   "doc_id": "M04",
+   "page": 1,
+   "reason": "表紙"
+  }
+ ],
+ "questions": []
+}

@@ -1,0 +1,121 @@
+{
+ "doc_id": "M01",
+ "page": 4,
+ "page_type": "flow_diagram",
+ "title": "1. 経費申請（全体の流れ）",
+ "section_path": [
+  "1. 経費申請"
+ ],
+ "summary": "申請から支払までの全体の流れの図。5万円以上かで承認者が分かれる。",
+ "actors": [
+  "申請者",
+  "課長",
+  "部長",
+  "経理部"
+ ],
+ "systems": [],
+ "documents": [],
+ "steps": [],
+ "decisions": [
+  {
+   "question": "5万円以上？",
+   "branches": [
+    {
+     "label": "いいえ",
+     "to": "課長: 承認"
+    },
+    {
+     "label": "はい",
+     "to": "部長: 承認"
+    }
+   ],
+   "quote": "5万円以上？",
+   "from_image": false,
+   "id": "d1",
+   "section": "",
+   "origin": "body"
+  }
+ ],
+ "diagram": {
+  "nodes": [
+   {
+    "id": "g1",
+    "label": "申請者: 経費申請書を作成",
+    "lane": "申請者",
+    "shape": "process"
+   },
+   {
+    "id": "g2",
+    "label": "5万円以上？",
+    "lane": "",
+    "shape": "decision"
+   },
+   {
+    "id": "g3",
+    "label": "課長: 承認",
+    "lane": "課長",
+    "shape": "process"
+   },
+   {
+    "id": "g4",
+    "label": "部長: 承認",
+    "lane": "部長",
+    "shape": "process"
+   },
+   {
+    "id": "g5",
+    "label": "経理部: 支払処理",
+    "lane": "経理部",
+    "shape": "process"
+   }
+  ],
+  "edges": [
+   {
+    "from": "g1",
+    "to": "g2",
+    "label": ""
+   },
+   {
+    "from": "g2",
+    "to": "g3",
+    "label": "いいえ"
+   },
+   {
+    "from": "g2",
+    "to": "g4",
+    "label": "はい"
+   },
+   {
+    "from": "g3",
+    "to": "g5",
+    "label": ""
+   },
+   {
+    "from": "g4",
+    "to": "g5",
+    "label": ""
+   }
+  ]
+ },
+ "figures": [
+  {
+   "kind": "flowchart",
+   "description": "左から 申請者→判断（5万円以上？）→課長または部長の承認→経理部の支払処理。線に矢じりは無い。",
+   "texts": [
+    "いいえ",
+    "はい"
+   ]
+  }
+ ],
+ "toc_entries": [],
+ "cross_refs": [],
+ "unreadable": [],
+ "uncertain": [
+  {
+   "what": "線の向き",
+   "why": "線に矢じりが無く、左から右への流れと読んだ"
+  }
+ ],
+ "printed_page": null,
+ "notes": []
+}

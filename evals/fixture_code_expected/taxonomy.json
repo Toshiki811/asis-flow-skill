@@ -1,0 +1,49 @@
+{
+ "basis": "llm",
+ "rationale": "目次が無い。手順書の題を業務の名前にした。",
+ "categories": [
+  {
+   "id": "F01",
+   "number": "",
+   "name": "月次の請求集計",
+   "parent": null,
+   "hierarchy_id": "H1",
+   "level": 1,
+   "basis": "llm",
+   "name_ref": {
+    "kind": "heading",
+    "doc_id": "M03",
+    "page": 1,
+    "text": "月次の請求集計の手順"
+   },
+   "pages": [
+    {
+     "doc_id": "M03",
+     "pages": [
+      1
+     ]
+    }
+   ],
+   "make_flow": true
+  }
+ ],
+ "unassigned_pages": [],
+ "questions": [
+  {
+   "id": "t1",
+   "severity": "low",
+   "category": "分類",
+   "effect": "フローの範囲",
+   "flow": "F01",
+   "question": "手順書「月次の請求集計の手順」を、1 つの業務（月次の請求集計）として分けました。この分け方でよいですか。",
+   "assumption": "手順書 1 つを、1 つの業務にした",
+   "sources": [
+    {
+     "doc_id": "M03",
+     "page": 1
+    }
+   ],
+   "ask": "経理担当"
+  }
+ ]
+}

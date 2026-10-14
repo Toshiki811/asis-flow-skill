@@ -1,0 +1,347 @@
+{
+ "title": "プログラムのブロックの木（LLM の読取）",
+ "file": "code/<まとまりの ID>.tree.json",
+ "type": "object",
+ "additionalProperties": false,
+ "required": [
+  "project",
+  "procedures",
+  "entries"
+ ],
+ "properties": {
+  "project": {
+   "type": "string",
+   "pattern": "^M[0-9]+$",
+   "description": "まとまりの ID（`code_struct.py` が出す、先頭の資料の ID）"
+  },
+  "skip": {
+   "type": "string",
+   "description": "このまとまりを読まないと決めたときの理由（利用者と決めた範囲の外、など）。書いたら、`procedures` と `entries` は空にする"
+  },
+  "procedures": {
+   "type": "array",
+   "items": {
+    "$ref": "#/$defs/procedure"
+   },
+   "description": "読んだ手続き（図にする範囲のものだけでよい。起動点からたどれるもの）"
+  },
+  "entries": {
+   "type": "array",
+   "items": {
+    "$ref": "#/$defs/entry"
+   },
+   "description": "起動点（プログラムの外から始まる所）"
+  }
+ },
+ "$defs": {
+  "procedure": {
+   "title": "procedures[]（手続き）",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "module",
+    "name",
+    "lines",
+    "body"
+   ],
+   "properties": {
+    "module": {
+     "type": "string",
+     "description": "モジュールの名前（`code_struct.py --hints` の見出しに出る名前。ふつうはファイル名）"
+    },
+    "name": {
+     "type": "string",
+     "minLength": 1,
+     "description": "手続きの名前（ソースの文字のまま。同じ名前が2つあるときは、引数を添えて分ける）"
+    },
+    "lines": {
+     "type": "array",
+     "items": {
+      "type": "integer",
+      "minimum": 1
+     },
+     "minItems": 2,
+     "maxItems": 2,
+     "description": "手続きの最初の行と最後の行（モジュールの行の番号）"
+    },
+    "head": {
+     "type": "array",
+     "items": {
+      "type": "integer",
+      "minimum": 1
+     },
+     "minItems": 2,
+     "maxItems": 2,
+     "description": "手続きの見出し（宣言）の行の範囲。書かなければ、最初の1行"
+    },
+    "body": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/node"
+     },
+     "description": "ブロックの並び（ソースの順）"
+    }
+   }
+  },
+  "node": {
+   "title": "body[]（ブロック）",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "kind",
+    "lines"
+   ],
+   "properties": {
+    "kind": {
+     "enum": [
+      "seq",
+      "if",
+      "select",
+      "loop",
+      "call",
+      "interact",
+      "exit"
+     ],
+     "description": "`seq` 続く文のまとまり／`if` 分岐（try の catch も、これ）／`select` 値での振り分け（switch・EVALUATE）／`loop` 繰り返し／`call` 木の中の手続きの呼び出し／`interact` 操作者とのやり取り／`exit` 抜ける・戻る・例外を投げる"
+    },
+    "lines": {
+     "type": "array",
+     "items": {
+      "type": "integer",
+      "minimum": 1
+     },
+     "minItems": 2,
+     "maxItems": 2,
+     "description": "このブロックの最初の行と最後の行"
+    },
+    "head": {
+     "type": "array",
+     "items": {
+      "type": "integer",
+      "minimum": 1
+     },
+     "minItems": 2,
+     "maxItems": 2,
+     "description": "if・select・loop: 条件の行の範囲。書かなければ、最初の1行"
+    },
+    "tail": {
+     "type": "array",
+     "items": {
+      "type": "integer",
+      "minimum": 1
+     },
+     "minItems": 2,
+     "maxItems": 2,
+     "description": "loop: うしろに条件のある繰り返し（do … while）の、条件の行の範囲"
+    },
+    "branches": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/branch"
+     },
+     "description": "if・select: 出口（ソースの順）"
+    },
+    "body": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/node"
+     },
+     "description": "loop: 繰り返す中身"
+    },
+    "to": {
+     "type": "string",
+     "description": "call: 呼び先（「モジュール.手続き」。この木の `procedures` にあるもの。範囲の外の呼び出しは、`call` にせず `seq` にする）"
+    },
+    "calls": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "if・select・loop: 条件の行の中で呼んでいる、木の中の手続き（「モジュール.手続き」）。条件の行は `call` にできないので、ここに書く（書かないと、呼び先が「たどれない手続き」になる）"
+    },
+    "how": {
+     "enum": [
+      "msgbox",
+      "inputbox",
+      "filedialog",
+      "form"
+     ],
+     "description": "interact: `msgbox` 知らせる／`inputbox` 入力を求める／`filedialog` ファイルを選ばせる／`form` 画面を開く"
+    },
+    "text": {
+     "type": "string",
+     "minLength": 1,
+     "description": "interact: 操作者に見せる文字（その行にある文字のまま）。書かなければ、その行の最初の文字の定数。最初の定数が見せる文字でないとき（項目の名前・キーが先に来る書き方）に書く"
+    },
+    "what": {
+     "enum": [
+      "proc",
+      "loop",
+      "continue",
+      "select",
+      "program"
+     ],
+     "description": "exit: `proc` この処理を終える（return・throw）／`loop` 繰り返しを抜ける（break）／`continue` 次の回へ進む／`select` 振り分けの出口の終わり（switch の中の break。次へ進む）／`program` プログラムごと終える（STOP RUN・異常終了の呼び出し・System.exit。呼んだ側には戻らない）"
+    },
+    "leave": {
+     "enum": [
+      "proc",
+      "loop",
+      "continue",
+      "select",
+      "program"
+     ],
+     "description": "seq・call・interact: この文のあと、抜ける（`return 手続き(…)`・`return 読み出し(…)` のように、1行が「する」と「戻る」を兼ねるとき）。値は `what` と同じ"
+    },
+    "tech": {
+     "enum": [
+      "変数の準備",
+      "ログ",
+      "後片付け",
+      "画面の更新の制御"
+     ],
+     "description": "seq: 技術的な文だけのまとまり（図にしない候補）"
+    },
+    "io": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/io"
+     },
+     "description": "このブロックが読む・書くもの"
+    }
+   }
+  },
+  "branch": {
+   "title": "branches[]（出口）",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "label",
+    "body"
+   ],
+   "properties": {
+    "label": {
+     "enum": [
+      "then",
+      "elseif",
+      "else",
+      "case"
+     ],
+     "description": "`then` 条件に合うとき／`elseif` 次の条件／`else` どれにも合わないとき／`case` 振り分けの1つ"
+    },
+    "head": {
+     "type": "array",
+     "items": {
+      "type": "integer",
+      "minimum": 1
+     },
+     "minItems": 2,
+     "maxItems": 2,
+     "description": "elseif・case: その条件の行の範囲（then は書かない。else は、`default:` のように行があるときだけ書く）"
+    },
+    "body": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/node"
+     },
+     "description": "その出口の中身"
+    }
+   }
+  },
+  "io": {
+   "title": "io[]（入出力）",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "kind",
+    "name",
+    "way",
+    "line"
+   ],
+   "properties": {
+    "kind": {
+     "enum": [
+      "ファイル",
+      "テーブル",
+      "データベース",
+      "帳票",
+      "画面",
+      "メール",
+      "外部プログラム",
+      "外部システム"
+     ],
+     "description": "何を触るか（メール・外部プログラム・外部システムは、外部のレーンの箱になる）"
+    },
+    "name": {
+     "type": "string",
+     "minLength": 1,
+     "description": "名前（その行にある文字のまま。実行するときに決まるものは「（実行時に決まる）」）"
+    },
+    "way": {
+     "enum": [
+      "in",
+      "out"
+     ],
+     "description": "`in` 読む／`out` 書く・送る"
+    },
+    "line": {
+     "type": "integer",
+     "minimum": 1,
+     "description": "その名前が書いてある行（ふつうは、ブロックの中の行。名前が定数なら、定数を決めている行）"
+    }
+   }
+  },
+  "entry": {
+   "title": "entries[]（起動点）",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "procedure",
+    "trigger",
+    "label",
+    "line"
+   ],
+   "properties": {
+    "procedure": {
+     "type": "string",
+     "description": "始まる手続き（「モジュール.手続き」）"
+    },
+    "trigger": {
+     "enum": [
+      "entry",
+      "button",
+      "event",
+      "timer",
+      "script",
+      "auto",
+      "form",
+      "manual"
+     ],
+     "description": "`entry` 入口（main・画面や API の受け口・ジョブ）／`button` ボタン／`event` イベント／`timer` 定時／`script` スクリプトの本体／`auto` 自動実行／`form` 画面の操作／`manual` 手で実行"
+    },
+    "label": {
+     "type": "string",
+     "minLength": 1,
+     "description": "きっかけの名前（かぎかっこの中は、根拠の行かファイル名にある文字。例: バッチ「OrderBatch」を実行。名前の前半が別の行にあるときは、`also` にその行を書く）"
+    },
+    "line": {
+     "type": "integer",
+     "minimum": 1,
+     "description": "根拠の行（その手続きのモジュールの行。入口の宣言・割り当ての行）"
+    },
+    "also": {
+     "type": "integer",
+     "minimum": 1,
+     "description": "名前の前半が書いてある、もう1つの行（クラスに付いた URL の前置きなど）。`label` のかぎかっこの中は、この行の文字と根拠の行の文字を、この順につないだものでもよい"
+    },
+    "before": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "枠組みが、この起動点の手続きの前に必ず呼ぶ手続き（「モジュール.手続き」。呼ばれる順）。図の先頭に、呼び出しとして入る。枠組みの決まりで呼ばれることが、ソースの宣言から分かるものだけ（受け口の前に値を用意する宣言・前処理の宣言）"
+    }
+   }
+  }
+ }
+}

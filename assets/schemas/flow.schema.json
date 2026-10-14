@@ -1,0 +1,144 @@
+{
+ "title": "フロー",
+ "file": "flows/<フローID>.flow.json",
+ "type": "object",
+ "additionalProperties": false,
+ "required": [
+  "flow_id",
+  "name",
+  "number",
+  "parent",
+  "level",
+  "basis",
+  "summary",
+  "start_condition",
+  "end_condition",
+  "lanes",
+  "nodes",
+  "edges",
+  "unused_pages",
+  "excluded_items",
+  "questions"
+ ],
+ "properties": {
+  "flow_id": {"type": "string", "pattern": "^F[0-9]+(-[0-9]+)*$", "description": "業務分類の id と同じ"},
+  "name": {"type": "string", "minLength": 1, "description": "業務分類の名前と同じ"},
+  "number": {"type": "string", "description": "原典の番号"},
+  "parent": {"type": ["string", "null"], "description": "上位の分類の id"},
+  "level": {"type": "integer", "minimum": 1, "description": "段"},
+  "basis": {"enum": ["toc", "llm"], "description": "分類の根拠"},
+  "summary": {"type": "string", "description": "フローの要約（1〜2文）"},
+  "start_condition": {"type": "string", "description": "開始条件（何を受けて始まるか）。原典に無ければ空にして確認事項"},
+  "end_condition": {"type": "string", "description": "終了条件（何ができたら終わるか）。原典に無ければ、終了に入る最後の作業から機械が「〜したとき」を入れる。それも決まらなければ空にして確認事項"},
+  "lanes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/lane"}, "description": "担当。並び順がそのまま列の順になる"},
+  "nodes": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/node"}, "description": "ノード"},
+  "edges": {"type": "array", "items": {"$ref": "#/$defs/edge"}, "description": "線"},
+  "unused_pages": {"type": "array", "items": {"$ref": "common#/$defs/page_reason"}, "description": "この分類に割り当てたのにノードの出典にしなかったページと理由"},
+  "excluded_items": {"type": "array", "items": {"$ref": "#/$defs/excluded"}, "description": "カードの手順・分岐のうち、フローに入れなかったものと理由。入れたものは出典の `item` で引く"},
+  "questions": {"type": "array", "items": {"$ref": "common#/$defs/question"}, "description": "確認事項"}
+ },
+ "$defs": {
+  "lane": {
+   "title": "lanes[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["id", "name", "kind"],
+   "properties": {
+    "id": {"type": "string", "pattern": "^L[0-9]+$", "description": "L1、L2…"},
+    "name": {"type": "string", "minLength": 1, "description": "原典の呼び方のまま（用語の正本 glossary.json にある名前）"},
+    "kind": {"enum": ["dept", "role", "system", "external"], "description": "`dept` 部門／`role` 役職・担当者／`system` システム／`external` 社外"}
+   }
+  },
+  "node": {
+   "title": "nodes[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["id", "type", "lane", "label"],
+   "properties": {
+    "id": {
+     "type": "string",
+     "pattern": "^(start|end)[0-9]*$|^(P|D|S|F|SUB)-[0-9]{3}$",
+     "description": "`start`・`end`（複数なら end2…）、P-001（プロセス）・D-001（判断）・S-001（システム処理）・F-001（ファイル）・SUB-001（別フローへ）。番号は renumber.py が時系列に振り直す"
+    },
+    "type": {"enum": ["start", "end", "process", "decision", "system", "file", "subprocess"], "description": "ノードの種類"},
+    "lane": {"type": "string", "description": "レーンの id"},
+    "label": {"type": "string", "description": "「目的語＋動詞」。原典の言葉で。動詞で終える（判断は「〜か」。最後に置く相手・物の名前は、かっこ書き）"},
+    "detail": {"type": "string", "description": "条件・時期・補足（図の箱に、かっこ書きで出る。120 字まで。自分では、かっこを付けない）"},
+    "reference": {"type": "string", "description": "補足に収まらない参考情報（条件の一覧・金額の表・例の一覧）。原典の言い回しで書く。図の箱には出さず、ノードにマウスを乗せたときの説明と出典対応表に出す"},
+    "action": {
+     "enum": ["入力する", "作成する", "確認する", "承認する", "提出・回付する", "受け取る", "出力する", "連絡する", "計算する", "調べる", "保管する", "その他"],
+     "description": "動作の種類（人の作業の箱だけ）。処理時間の仮の値を、表から引く鍵。箱の中身に合うものを 1 つ選ぶ: 入力する（システム・台帳に入れる）／作成する（書類・資料を作る）／確認する（内容を確かめる・照合する）／承認する（承認・決裁・押印）／提出・回付する（出す・回す・送る）／受け取る／出力する（印刷・出力）／連絡する（知らせる・依頼する・報告する）／計算する（計算・集計）／調べる（調査・検討・選定）／保管する（整理・保存・廃棄）／その他。分の数字は、書かない"
+    },
+    "volume": {
+     "enum": ["小", "中", "大", "特大"],
+     "description": "量（小・中・大・特大）。書かなければ、機械が数えて決める（同じページの手順を 3 つ以上まとめた箱・見る帳票が 2 つ以上の箱は「大」、ほかは「中」）。変えるときは、理由も書く。「特大」は、時間・日の単位でかかる作業（資料から、そう読めるときだけ。機械は付けない。基準の表の値が、とくに粗いので、人が先に時間を入れる所になる）"
+    },
+    "volume_reason": {"type": "string", "description": "量を、機械の決め方と変えた理由（「決算書一式で、作る表が多い」のように、原典から言えること）。「特大」は、理由が無ければ、点検で FAIL"},
+    "systems": {
+     "type": "array",
+     "items": {"type": "string", "minLength": 1},
+     "description": "札: その作業で使うシステムの名前（用語の正本の名前）。機械が付ける（`renumber.py`・`apply_edits.py`: 出典に引いたカードの手順の `system` と、その手順の文に出てくるシステム名）。図では箱の中の「［会計システム］」"
+    },
+    "activity": {
+     "type": "string",
+     "pattern": "^A-[0-9]{2,}-[0-9]+$",
+     "description": "system ノードだけ。そのプログラムのアクティビティ図の番号（A-02-1）。機械が置く箱に付く（システム台帳の紐付けから）。図では「▶ A-02-1」"
+    },
+    "inferred": {"type": "boolean", "description": "原典に無いノード（推定）。作業のノード（process・decision・system）は機械が付ける（`renumber.py`: 出典に `item` が1つも無ければ true）。確認事項が要る"},
+    "sources": {"type": "array", "items": {"$ref": "#/$defs/source"}, "description": "出典。process・decision・system・file・subprocess は1つ以上"},
+    "attach_to": {"type": "string", "description": "file ノードだけ。使うプロセスの id"},
+    "direction": {"enum": ["in", "out"], "description": "file ノードだけ。`in` 参照する／`out` 作る"},
+    "link_flow": {"type": "string", "description": "subprocess ノードだけ。続き先のフロー id"}
+   }
+  },
+  "source": {
+   "title": "nodes[].sources[]（出典）",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["doc_id", "page", "quote", "from_image"],
+   "properties": {
+    "doc_id": {"$ref": "common#/$defs/doc_id", "description": "資料 ID"},
+    "page": {"type": "integer", "minimum": 1, "description": "ファイル名 pNNNN の番号（刷られたページ番号ではない。図や一覧に出る番号は機械が引く）"},
+    "item": {
+     "type": "string",
+     "pattern": "^[sdge][0-9]+$",
+     "description": "もとにしたカードの項目の id（s3・d1・g2）。カードの手順・分岐をフローに入れたら必ず書く。`e1` は、プログラムの起動点（機械が置くシステム処理の箱だけ）"
+    },
+    "lines": {
+     "type": "array",
+     "items": {"type": "integer", "minimum": 1},
+     "minItems": 2,
+     "maxItems": 2,
+     "description": "原文の場所を、行の番号 [開始, 終了] で指す（`item` の無い出典で使う。`item` があれば、カードの項目の番号と引用を機械が写す）"
+    },
+    "quote": {"type": "string", "description": "原文の連続した一部"},
+    "from_image": {"type": "boolean", "description": "引用が画像の中の文字なら true"}
+   }
+  },
+  "edge": {
+   "title": "edges[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["from", "to"],
+   "properties": {
+    "from": {"$ref": "common#/$defs/node_id"},
+    "to": {"$ref": "common#/$defs/node_id"},
+    "label": {"type": "string", "description": "判断から出る線には必須（原典の言葉）"},
+    "kind": {"enum": ["flow", "system", "data"], "description": "省略可。`flow` 通常／`system` システム連携／`data`"},
+    "inferred": {"type": "boolean", "description": "原典に順が書かれていない線は true。確認事項が要る"}
+   }
+  },
+  "excluded": {
+   "title": "excluded_items[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["doc_id", "page", "item", "reason"],
+   "properties": {
+    "doc_id": {"$ref": "common#/$defs/doc_id"},
+    "page": {"type": "integer", "minimum": 1},
+    "item": {"type": "string", "pattern": "^[sdg][0-9]+$", "description": "カードの項目の id"},
+    "reason": {"type": "string", "minLength": 1, "description": "入れない理由（ほかのフローで描く・作業でない・重複 など）"}
+   }
+  }
+ }
+}

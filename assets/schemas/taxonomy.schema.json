@@ -1,0 +1,57 @@
+{
+ "title": "業務分類",
+ "file": "taxonomy.json",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["basis", "rationale", "categories", "unassigned_pages", "questions"],
+ "properties": {
+  "basis": {"enum": ["toc", "llm", "mixed"], "description": "`toc` 目次に準拠／`llm` LLM が分類／`mixed` 目次に準拠し、目次に無い部分だけ LLM"},
+  "rationale": {"type": "string", "description": "分類の考え方（`llm`・`mixed` は必須）"},
+  "categories": {"type": "array", "items": {"$ref": "#/$defs/category"}, "description": "業務分類"},
+  "unassigned_pages": {"type": "array", "items": {"$ref": "common#/$defs/page_reason"}, "description": "どの分類にも入れないページと理由（表紙・目次・改訂履歴 など）"},
+  "questions": {"type": "array", "items": {"$ref": "common#/$defs/question"}, "description": "分類についての確認事項"}
+ },
+ "$defs": {
+  "category": {
+   "title": "categories[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["id", "number", "name", "parent", "hierarchy_id", "level", "basis", "pages", "make_flow"],
+   "properties": {
+    "id": {"type": "string", "pattern": "^F[0-9]+(-[0-9]+)*$", "description": "F01、F02…。下位は F01-1。`flows/<id>.flow.json` のファイル名になる"},
+    "number": {"type": "string", "description": "原典の番号（「3.2」。無ければ空）"},
+    "name": {"type": "string", "minLength": 1, "description": "名前。目次準拠なら目次の文字のまま"},
+    "parent": {"type": ["string", "null"], "description": "上位の分類の id"},
+    "hierarchy_id": {"$ref": "common#/$defs/hier_id", "description": "対応する業務の木の id（hierarchy.json の tree）", "type": ["string", "null"]},
+    "level": {"type": "integer", "minimum": 1, "description": "段"},
+    "basis": {"enum": ["toc", "llm"], "description": "その分類が目次由来か、LLM 由来か"},
+    "toc_ref": {
+     "type": ["object", "null"],
+     "additionalProperties": false,
+     "required": ["doc_id", "page", "text"],
+     "properties": {"doc_id": {"$ref": "common#/$defs/doc_id"}, "page": {"type": "integer", "minimum": 1}, "text": {"type": "string"}},
+     "description": "目次のどこか（`basis` が `toc` なら必須）。`page` は目次のページのファイル名の番号"
+    },
+    "pages": {"type": "array", "items": {"$ref": "common#/$defs/page_set"}, "description": "割り当てたページ。2つの分類にまたがるページは両方に入れる"},
+    "make_flow": {"type": "boolean", "description": "フローを描く分類か。束ねるだけの分類（上位の見出し）と、対象外の分類は false"},
+    "out_of_scope": {
+     "type": "string",
+     "minLength": 1,
+     "description": "業務でない項目（総則・体制の説明・予定表・用語集 など）を対象外とする理由。`make_flow` が false で、下にフローを描く分類も無い分類に必ず書く。束ねるだけの見出し（下にフローがある）には書かない。そのページは `unassigned_pages` に入れる"
+    },
+    "name_ref": {
+     "type": ["object", "null"],
+     "additionalProperties": false,
+     "required": ["kind", "doc_id", "text"],
+     "properties": {
+      "kind": {"enum": ["heading", "title"], "description": "`heading` 本文の見出し（章・節の題、セクション名、シート名）／`title` 資料の題名・ファイル名・フォルダ名"},
+      "doc_id": {"$ref": "common#/$defs/doc_id"},
+      "page": {"type": "integer", "minimum": 1, "description": "その文字があるページ（ファイル名の番号）。`heading` は必須"},
+      "text": {"type": "string", "minLength": 1, "description": "原典の文字のまま。分類の名前を含むこと"}
+     },
+     "description": "`basis` が `llm` の分類の名前が、原典のどこにあるか。原典に名前が無く LLM が名付けたときは書かない（その分類を指す確認事項が要る）"
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,40 @@
+{
+ "title": "人が埋める欄に入れた値",
+ "file": "answers.json",
+ "description": "機械が書く（表の納品物を書き出す前に、いまのブックから取り込む）。確認事項一覧の回答・回答者・回答日と、様式で足した人が埋める欄。書き出しのたびに、行の鍵で戻す",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["version"],
+ "properties": {
+  "version": {"type": "integer", "description": "形の版（1）"},
+  "books": {
+   "type": "object",
+   "additionalProperties": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": {"$ref": "#/$defs/row"}}},
+   "description": "ブックの名前 → 一覧 → 行の鍵（確認事項は Q 番号、業務マトリクスはフロー ID、業務フローのノード一覧は「フロー ID｜ノード番号」）→ 値"
+  }
+ },
+ "$defs": {
+  "row": {
+   "title": "books の行",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["cells"],
+   "properties": {
+    "cells": {"type": "object", "additionalProperties": {"$ref": "#/$defs/cell"}, "description": "人が埋める欄の見出し → 値"},
+    "seen": {"type": "string", "description": "取り込んだときの、その行の中身（確認事項は質問の文、業務マトリクスはフローの名前、ノード一覧は作業名）。いまと違えば、点検が見直しを促す"},
+    "date": {"type": "string", "description": "取り込んだ日"}
+   }
+  },
+  "cell": {
+   "title": "cells の値",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["value"],
+   "properties": {
+    "value": {"type": ["string", "number", "boolean"], "description": "値（日時は ISO の形の文字）"},
+    "type": {"enum": ["datetime", "date", "time"], "description": "日時の値の種類"},
+    "format": {"type": "string", "description": "セルの表示の形（Excel の書式。日付など）"}
+   }
+  }
+ }
+}
