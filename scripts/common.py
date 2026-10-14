@@ -101,7 +101,8 @@ FLOW_FIG, ACT_FIG, MATRIX_BOOK = "業務フロー_as-is", "アクティビティ
 REPORTS = ("確認事項一覧.md", "確認事項一覧.xlsx", "出典対応表.md", "出典対応表.csv", "階層と業務分類.md")
 DELIVERABLES = (f"{FLOW_FIG}*.drawio", ACT_FIG, MATRIX_BOOK) + REPORTS
 NUMBERS_FILE = "納品の数"                                              # 納品の門が書く数（out/納品の数.md・.json）
-RECORDS = ("チェック_*.txt", "照合シート_*.pdf", "原典照合レビュー_採否表.md", f"{NUMBERS_FILE}.md", f"{NUMBERS_FILE}.json")
+BASELINE_FILE = "現状の処理時間.json"                                    # 納品の門が書く、現状の処理時間の写し（BPR の比較の基準。表の版つき）
+RECORDS = ("チェック_*.txt", "照合シート_*.pdf", "原典照合レビュー_採否表.md", f"{NUMBERS_FILE}.md", f"{NUMBERS_FILE}.json", BASELINE_FILE)
 REVIEW_MIN = 0.95                                                    # 原典照合の支持率の下限（業務フロー・アクティビティ図それぞれ）。下回れば、図を直して照合し直す
 MAX_STEPS, MAX_LANES = 25, 8                                         # 1 ページの図の目安（作業の箱の数・レーンの数）。超えたら分ける
 

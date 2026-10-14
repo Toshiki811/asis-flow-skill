@@ -1,0 +1,47 @@
+{
+ "title": "現状の処理時間の写し",
+ "file": "out/現状の処理時間.json",
+ "description": "納品の門を通ったときの、業務マトリクス一覧の処理時間（保存した計算の結果）。BPR で、見直しの前と後を比べる基準。比べるのは、同じ版の基準の表で出した時間どうし（決まり 3.22）",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["version", "date", "table_version", "table", "flows", "total", "human", "soft"],
+ "properties": {
+  "version": {"type": "integer", "description": "形の版（1）"},
+  "date": {"type": "string", "description": "写した日"},
+  "table_version": {"type": "string", "pattern": "^T-[0-9a-f]{6}$", "description": "基準の表の版（表の値から作る印）"},
+  "table": {"type": "array", "items": {"type": "array", "minItems": 3, "maxItems": 3}, "description": "基準の表の値（動作の種類・量・分）"},
+  "flows": {"type": "array", "items": {"$ref": "#/$defs/flow"}, "description": "フローごとの時間"},
+  "total": {"type": "number", "minimum": 0, "description": "全フローの合計（分）"},
+  "human": {"type": "integer", "minimum": 0, "description": "人が入れた値のセルの数"},
+  "soft": {"type": "integer", "minimum": 0, "description": "仮の値（基準の表を引く式）のセルの数"}
+ },
+ "$defs": {
+  "flow": {
+   "title": "flows[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["flow", "name", "count", "cells", "total"],
+   "properties": {
+    "flow": {"$ref": "common#/$defs/flow_id"},
+    "name": {"type": "string", "description": "フローの名前"},
+    "count": {"type": ["number", "null"], "description": "人が入れた件数（無ければ null）"},
+    "cells": {"type": "array", "items": {"$ref": "#/$defs/cell"}, "description": "作業ごとの時間（業務マトリクス一覧の時間のセル）"},
+    "total": {"type": "number", "minimum": 0, "description": "そのフローの合計（分）"}
+   }
+  },
+  "cell": {
+   "title": "cells[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["node", "label", "value", "by", "action", "volume"],
+   "properties": {
+    "node": {"$ref": "common#/$defs/flow_node_id"},
+    "label": {"type": "string", "description": "作業名"},
+    "value": {"type": ["number", "null"], "description": "分（保存した計算の結果）"},
+    "by": {"enum": ["人", "仮"], "description": "人が入れた値か、仮の値（基準の表を引く式）か。比べるときは、仮の値だけを同じ版の表で引き直す"},
+    "action": {"type": "string", "description": "動作の種類（仮の値の鍵）"},
+    "volume": {"type": "string", "description": "量（仮の値の鍵）"}
+   }
+  }
+ }
+}

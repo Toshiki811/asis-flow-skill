@@ -701,6 +701,7 @@ def fill(template, spec, sheets, values, out_path, table=None, info=None, keys=N
     at.table.update({k: v for k, (v, _why) in (table or {}).items() if k in at.table})
     if tpl.time:                                                      # 書き出したときの、基準の表の値（次に取り込むとき、人が直したかを、これと比べる）
         side["table"] = [[a, v, x] for (a, v), x in sorted(at.table.items())]
+        side["table_version"] = table_version(at.table)
     for title, tb in tables.items():
         canon = tb["canon"]
         side["sheets"][title] = write_table(wb[title], plans[canon], sheets[canon], tpl, at, row_keys(spec, canon, sheets[canon], (keys or {}).get(canon)),
@@ -718,6 +719,10 @@ def fill(template, spec, sheets, values, out_path, table=None, info=None, keys=N
             if (action, volume) in t["values"] and v != t["values"][(action, volume)]:
                 x = wb[t["title"]].cell(t["rows"][action], t["col"] + t["cols"][volume] - 1)
                 x.value, x.comment = v, Comment(f"テンプレートの値は {t['values'][(action, volume)]}（{why}）", "asis-flow-skill", width=320, height=60)
+        head = wb[t["title"]].cell(min(t["rows"].values()) - 1, t["col"])   # 表の左上の見出し: 表の版（見直しの前と後は、同じ版の表で比べる）
+        was = [p for p in (head.comment.text.split("\n\n") if head.comment is not None else []) if p.strip() and not p.startswith("基準の表の版")]
+        head.comment = Comment("\n\n".join(was + [""]) + f"基準の表の版 {side['table_version']}（表の値から作る印。値が 1 つでも変われば、版が変わる）。"
+                               "見直しの前と後の処理時間は、同じ版の表で比べる", "asis-flow-skill", width=320, height=90)
     if STYLE_SHEET in wb.sheetnames:
         del wb[STYLE_SHEET]
     wb.active = 0
@@ -726,6 +731,14 @@ def fill(template, spec, sheets, values, out_path, table=None, info=None, keys=N
     tpl.unkept = keep_results(out_path, at.results)                   # 式のセルに、計算の結果も書く（書けなかった数）
     save(side_path(out_path), side)
     return tpl
+
+
+def table_version(table):
+    """基準の表の版: 表の値（動作の種類 × 量 → 分）から作る短い指紋（T-3f9a1c）。値が 1 つでも違えば変わる。
+    見直しの前と後の処理時間は、同じ版の表で比べる（決まり 3.22）"""
+    import hashlib
+    rows = sorted([a, v, x] for (a, v), x in table.items())
+    return "T-" + hashlib.sha1(json.dumps(rows, ensure_ascii=False).encode("utf-8")).hexdigest()[:6]
 
 
 def read_side(book):

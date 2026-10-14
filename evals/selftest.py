@@ -1054,6 +1054,19 @@ def time_tests(tmp, good):
                 c0 == 0 and "値の違うセルが 5 個" in o0 and c1 == 0 and vals() == kept and c2 == 0 and "0 FAIL / 0 WARN" in o2
                 and [t[k].value for k in sorted(kept[0])] == [20, 8, 9, 10] and sum(soft(c) for c in t.values()) == len(t) - 4 and n["F01"].value == 120 and n["F02"].value is None
                 and base(wb, "確認する", "中").value == 6 and base(wb, "確認する", "大").value == 15))
+    from validate import validate
+    side, snap = json.loads(BM.side_path(book).read_text(encoding="utf-8")), BM.baseline(w)
+    cells = {(f["flow"], x["node"]): x for f in snap["flows"] for x in f["cells"]}
+    tb = TT.time_table(wb, BM.SPEC["time"])[0]
+    note = wb[tb["title"]].cell(min(tb["rows"].values()) - 1, tb["col"]).comment
+    moved = re.search(r"基準の表の版 (T-[0-9a-f]{6})（前の書き出し (T-[0-9a-f]{6}) から変わった", o1)
+    out.append(("処理時間: 基準の表を直して書き出すと、版（表の値の印）が変わったと知らせ、表の見出しのコメントにも出る。"
+                "現状の時間の写しは、形が正しく、合計がセルの足し算・人の値に「人」・版がブックと同じ",
+                moved is not None and moved.group(1) == side["table_version"] != moved.group(2) and note is not None and note.text.count("基準の表の版") == 1
+                and side["table_version"] in note.text and validate(snap, "baseline") == [] and snap["table_version"] == side["table_version"]
+                and snap["total"] == sum(x["value"] or 0 for x in cells.values()) > 0 and snap["human"] == 4 and snap["soft"] == len(t) - 4
+                and (cells[("F01", "P-002")]["value"], cells[("F01", "P-002")]["by"]) == (20, "人") and cells[("F01", "P-001")]["by"] == "仮"
+                and [f["count"] for f in snap["flows"]] == [120, None, None]))
     c1, o1 = run("check_flow.py", w, "--stage", "matrix")
     c2, o2 = run("build_matrix.py", w, "--calibrate")
     wb, t, n = now()
@@ -2063,12 +2076,14 @@ def gate_tests(tmp, good):
     files = {p.relative_to(dest).as_posix() for p in dest.rglob("*") if p.is_file()}
     want = {"納品物/業務フロー_as-is.drawio", "納品物/業務マトリクス一覧.xlsx", "納品物/確認事項一覧.xlsx", "納品物/確認事項一覧.md", "納品物/出典対応表.md",
             "納品物/出典対応表.csv", "納品物/階層と業務分類.md", "作業の記録/チェック_フロー.txt", "作業の記録/チェック_配置.txt", "作業の記録/原典照合レビュー_採否表.md",
-            "作業の記録/納品の数.md", "作業の記録/納品の数.json", "作業の記録/照合シート_F01.pdf"}
+            "作業の記録/納品の数.md", "作業の記録/納品の数.json", "作業の記録/照合シート_F01.pdf", "作業の記録/現状の処理時間.json"}
     _c, st = run("status.py", w)
     nums = json.loads((w / "out" / "納品の数.json").read_text(encoding="utf-8")) if (w / "out" / "納品の数.json").exists() else {}
     passed = code == 0 and want <= files and any(f.startswith("納品物/png/") for f in files) and "書き出しをやり直す" in text \
-        and bool(re.search(r"10 納品の門\s+済み", st)) and nums.get("review", {}).get("flow", {}).get("support") == nums.get("nodes") and nums.get("fails") == 0
-    out.append(("納品の門: 照合が済めば、古い書き出し（PNG が無い）をやり直して通り、納品物・作業の記録・納品の数を写す。進み具合は「10 納品の門 済み」"
+        and bool(re.search(r"10 納品の門\s+済み", st)) and nums.get("review", {}).get("flow", {}).get("support") == nums.get("nodes") and nums.get("fails") == 0 \
+        and re.search(r"合計 [0-9.]+ 分・基準の表の版 T-[0-9a-f]{6}", (w / "out" / "納品の数.md").read_text(encoding="utf-8")) is not None
+    out.append(("納品の門: 照合が済めば、古い書き出し（PNG が無い）をやり直して通り、納品物・作業の記録（現状の処理時間の写しも）・納品の数（合計と基準の表の版）を写す。"
+                "進み具合は「10 納品の門 済み」"
                 + ("" if passed else f"\n{text[-1500:]}\n{sorted(want - files)}"), passed))
     os.utime(w / "flows" / "F02.flow.json")
     (w / "out" / "~$業務マトリクス一覧.xlsx").write_bytes(b"")

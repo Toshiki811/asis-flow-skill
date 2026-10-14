@@ -12,7 +12,8 @@
   "static": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": {"type": "string"}}, "description": "シート → セル → 書いた文"},
   "timed": {"type": "boolean", "description": "処理時間の行を出したか"},
   "empty": {"type": "array", "items": {"type": "string"}, "description": "中身が無いので入れなかった一覧"},
-  "table": {"type": "array", "items": {"type": "array", "minItems": 3, "maxItems": 3}, "description": "書き出したときの「処理時間の基準」（動作・量・分）"}
+  "table": {"type": "array", "items": {"type": "array", "minItems": 3, "maxItems": 3}, "description": "書き出したときの「処理時間の基準」（動作・量・分）"},
+  "table_version": {"type": "string", "pattern": "^T-[0-9a-f]{6}$", "description": "基準の表の版（表の値から作る印。table_template.table_version）"}
  },
  "$defs": {
   "sheet": {

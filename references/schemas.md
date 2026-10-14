@@ -1275,6 +1275,7 @@ LLM は書かない。機械が、作った直後か読む所で形を確かめ�
 | `timed` |  | true / false | 処理時間の行を出したか |
 | `empty` |  | 配列（文字） | 中身が無いので入れなかった一覧 |
 | `table` |  | 配列（配列） | 書き出したときの「処理時間の基準」（動作・量・分） |
+| `table_version` |  | 文字 | 基準の表の版（表の値から作る印。table_template.table_version） |
 
 **sheets{}**
 
@@ -1311,6 +1312,44 @@ LLM は書かない。機械が、作った直後か読む所で形を確かめ�
 | `captions` |  | オブジェクト |  |
 
 <!-- END schema:layout -->
+
+現状の処理時間の写し `out/現状の処理時間.json`（納品の門が、門を通ったときに書く。BPR で、見直しの前と後を比べる基準。比べるのは、同じ版の基準の表で出した時間どうし）:
+
+<!-- BEGIN schema:baseline（validate.py --doc が書く。手で直さない） -->
+
+| 項目 | 必須 | 型 | 中身 |
+| --- | --- | --- | --- |
+| `version` | ○ | 整数 | 形の版（1） |
+| `date` | ○ | 文字 | 写した日 |
+| `table_version` | ○ | 文字 | 基準の表の版（表の値から作る印） |
+| `table` | ○ | 配列（配列） | 基準の表の値（動作の種類・量・分） |
+| `flows` | ○ | 配列 | フローごとの時間 |
+| `total` | ○ | 数 | 全フローの合計（分） |
+| `human` | ○ | 整数 | 人が入れた値のセルの数 |
+| `soft` | ○ | 整数 | 仮の値（基準の表を引く式）のセルの数 |
+
+**flows[]**
+
+| 項目 | 必須 | 型 | 中身 |
+| --- | --- | --- | --- |
+| `flow` | ○ | 文字 | フロー（業務分類）の id（F03・F03-1） |
+| `name` | ○ | 文字 | フローの名前 |
+| `count` | ○ | 数 / null | 人が入れた件数（無ければ null） |
+| `cells` | ○ | 配列 | 作業ごとの時間（業務マトリクス一覧の時間のセル） |
+| `total` | ○ | 数 | そのフローの合計（分） |
+
+**cells[]**
+
+| 項目 | 必須 | 型 | 中身 |
+| --- | --- | --- | --- |
+| `node` | ○ | 文字 | 業務フローのノード番号（P-003・D-001・start・end・end2） |
+| `label` | ○ | 文字 | 作業名 |
+| `value` | ○ | 数 / null | 分（保存した計算の結果） |
+| `by` | ○ | 決まった語 | 人が入れた値か、仮の値（基準の表を引く式）か。比べるときは、仮の値だけを同じ版の表で引き直す（`人`／`仮`） |
+| `action` | ○ | 文字 | 動作の種類（仮の値の鍵） |
+| `volume` | ○ | 文字 | 量（仮の値の鍵） |
+
+<!-- END schema:baseline -->
 
 棚卸し `manifest.json`（`inventory.py` が書き、`render_pages.py` が描画の結果を足す。形が崩れていれば終了コード 1）:
 
@@ -1428,3 +1467,4 @@ LLM は書かない。機械が、作った直後か読む所で形を確かめ�
 | `assets/template_styles.json`・`assets/activity_styles.json` | `harvest_template.py` | `build_drawio.py`・`build_activity.py` | 様式の図から取った見た目（形・色・字・寸法） |
 | `direct/<名前>_direct/`（`access_export.txt` ほか） | `inventory.py`（`access_direct.py`） | `inventory.py`（元のファイルの印 `sha256` で、読み直すかを決める）・`render_pages.py`・`extract_access.py` | Access のファイルを直接読んだ書き出し（アドインの書き出しと同じ形） |
 | `out/納品の数.json` | `deliver.py` | `status.py`（門の済み・未。出力先 `to`） | 納品の数（`納品の数.md` と同じ中身） |
+| `out/現状の処理時間.json` | `deliver.py`（`build_matrix.baseline`） | 人（BPR で、見直しの前と後を比べる。比べる道具は、まだ無い） | 門を通ったときの処理時間の写し（基準の表の版と値・作業ごとの時間・人の値か仮の値か・合計） |

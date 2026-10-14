@@ -46,7 +46,7 @@ import statistics
 import unicodedata
 
 from build_reports import KIND, Reports
-from common import (ACTIONS, REL_LABEL, STEP_TYPES, SYSTEM_KIND, TYPE_ACTION, VOLUME_SPARE, VOLUMES, Answers, BadJson, Times, answer_gaps, category_path, flow_key, locate, node_clues, node_details, order_of, own_number,
+from common import (ACTIONS, REL_LABEL, STEP_TYPES, SYSTEM_KIND, TYPE_ACTION, VOLUME_SPARE, VOLUMES, Answers, BadJson, Times, answer_gaps, category_path, flow_key, load, locate, node_clues, node_details, order_of, own_number,
                     question_ids, step_order_by_branch, system_ledger, time_basis, tree_nodes, whole, work_dir, unlinked_note, ASSETS)
 from table_template import (Cell, Template, TemplateError, circled, clean, fill as fill_template, lock_of, manual_back, remembered,
                             side_path, time_table)
@@ -906,6 +906,39 @@ def model(work, write=False):
     return Matrix(work, write).texts()
 
 
+def baseline(work):
+    """現状の処理時間の写し（BPR の比較の基準。納品の門が out/現状の処理時間.json に書く）。書き出したブックの、保存した計算の結果から取る。
+    処理時間の行の無いブックなら None"""
+    from openpyxl import load_workbook
+    book = pathlib.Path(work) / "out" / BOOK
+    side = load(side_path(book), {}) or {}
+    if not side.get("timed"):
+        return None
+    mx = Matrix(work, False)
+    basis = {(r["id"], s["id"]): s["time"] for r in mx.rows for s in r["steps"]}
+    names = {r["id"]: str(r["flow"].get("name") or "") for r in mx.rows}
+    flows = {}
+    for row in load_workbook(book, data_only=True)[M].iter_rows():   # 時間・件数のセルは、コメントの札で見分ける（列の順・シートの名前はテンプレートが決める）
+        for c in row:
+            text = c.comment.text if c.comment is not None else ""
+            m, k = TAG_TIME.match(text), TAG_COUNT.match(text)
+            if m:
+                F, i = m.groups()
+                act, vol, _why = basis.get((F, i), ("", "", ""))
+                lab = TAG_LABEL.search(text)
+                flows.setdefault(F, {"flow": F, "name": names.get(F, ""), "count": None, "cells": []})["cells"].append(
+                    {"node": i, "label": lab.group(1) if lab else "", "value": c.value if isinstance(c.value, (int, float)) else None,
+                     "by": "人" if (F, i) in mx.times.cells else "仮", "action": act, "volume": vol})
+            elif k:
+                flows.setdefault(k.group(1), {"flow": k.group(1), "name": names.get(k.group(1), ""), "count": None, "cells": []})["count"] = \
+                    c.value if isinstance(c.value, (int, float)) else None
+    for f in flows.values():
+        f["total"] = sum(x["value"] or 0 for x in f["cells"])
+    return {"version": 1, "date": datetime.date.today().isoformat(), "table_version": side.get("table_version", ""), "table": side.get("table") or [],
+            "flows": list(flows.values()), "total": sum(f["total"] for f in flows.values()),
+            "human": sum(x["by"] == "人" for f in flows.values() for x in f["cells"]), "soft": sum(x["by"] == "仮" for f in flows.values() for x in f["cells"])}
+
+
 def answer_rows(flows):
     """人が埋める欄の行の鍵 → いまの行の中身（取り込んだあとで変わったかを見る）: {一覧: {鍵: 文字}}"""
     out = {M: {}, NODES: {}}
@@ -1014,10 +1047,14 @@ def main():
         t.save()
     elif a.keep or a.calibrate or a.accept or a.forget:
         said.append(f"テンプレートに、基準の表（名前「{TIME_NAME}」の範囲）が無いので、処理時間は扱わない")
+    was = (load(side_path(book), {}) or {}).get("table_version") if side_path(book).exists() else None
     try:
         write(mx, book, tpl, kept=ans.kept(BOOK))
     except TemplateError as e:
         raise SystemExit(f"{again}:\n{e}")
+    now = (load(side_path(book), {}) or {}).get("table_version")
+    if now:
+        said.append(f"基準の表の版 {now}" + (f"（前の書き出し {was} から変わった。見直しの前と後の処理時間は、同じ版の表で比べる。決まり 3.22）" if was and was != now else ""))
     for n in tpl.notes:
         print(f"テンプレート: {n}")
     if getattr(tpl, "unkept", 0):

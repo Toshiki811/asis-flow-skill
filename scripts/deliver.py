@@ -16,10 +16,10 @@
 build_matrix → build_reports → make_compare）、もう一度見る（2 回まで）。データを直す必要があるもの（ほかの FAIL・照合がまだ）は止めて、
 直す工程とコマンド（status.py と同じ）を出す。人が入れた値を取り込めないブック（開いたまま・列を動かした）も、書き出しが止まり、門も止まる。
 通ったら: out/納品の数.md・.json を書き、出力先の 納品物/ に図・PNG・業務マトリクス一覧・確認事項一覧・出典対応表・階層と業務分類を、
-作業の記録/ にチェック結果・照合シート・採否表・納品の数を写す。出力先に、いまの一式に無いファイル（前の納品物の残り）があれば、写さずに止まる
+作業の記録/ にチェック結果・照合シート・採否表・納品の数・現状の処理時間の写し（BPR の比較の基準。基準の表の版つき）を写す。出力先に、いまの一式に無いファイル（前の納品物の残り）があれば、写さずに止まる
 （消さない。別の出力先を指定するか、人が片付けてから）。
 納品の数: 資料・ページ・フロー・ノードの数、網羅率、引用照合率（完全一致の率も）、推定の数、確認事項の重要度別の件数（回答済みで残っているもの）、
-支持率、人が入れた処理時間の割合、残った WARN。
+支持率、人が入れた処理時間の割合・処理時間の合計・基準の表の版、残った WARN。
 終了コード: 門を通れば 0、通らなければ 1。
 """
 import argparse
@@ -30,9 +30,10 @@ import subprocess
 import sys
 import tempfile
 
-from common import (ACT_FIG, DELIVERABLES, FLOW_FIG, MATRIX_BOOK, NUMBERS_FILE, RECORDS, REPORTS, REVIEW_MIN, flow_key, load, load_flows, save, split_figs,
+from common import (ACT_FIG, BASELINE_FILE, DELIVERABLES, FLOW_FIG, MATRIX_BOOK, NUMBERS_FILE, RECORDS, REPORTS, REVIEW_MIN, flow_key, load, load_flows, save, split_figs,
                     work_dir)
 from status import Status, newest, source_files
+from validate import validate
 
 S = pathlib.Path(__file__).resolve().parent
 ROUNDS = 2                                                           # 書き出しをやり直す回数の上限
@@ -169,7 +170,8 @@ def numbers_text(work, nums, warns, dest):
             rows.append((f"原典照合（{name}）", f"支持率 {rate(s['support'], s['nodes'])}（支持 {s['support']} ÷ 開始・終了を除く全ノード {s['nodes']}。"
                                                 f"判定 {s['judged']}・一部支持 {s['partial']}・不支持 {s['against']}。照合した図 {s['reviewed']}/{s['figures']}。下限 {REVIEW_MIN:.0%}）"))
     if t:
-        rows.append(("処理時間", f"人が入れた値 {t.get('human', 0)} セル・仮の値 {t.get('soft', 0)} セル（人の値の割合 {rate(t.get('human', 0), t.get('human', 0) + t.get('soft', 0))}）・件数 {t.get('counts', 0)} 行"))
+        rows.append(("処理時間", f"人が入れた値 {t.get('human', 0)} セル・仮の値 {t.get('soft', 0)} セル（人の値の割合 {rate(t.get('human', 0), t.get('human', 0) + t.get('soft', 0))}）・件数 {t.get('counts', 0)} 行"
+                                 + (f"・合計 {t['total']} 分・基準の表の版 {t['table_version']}（見直しの前と後は、同じ版の表で比べる。写しは {BASELINE_FILE}）" if t.get("table_version") else "")))
     rows.append(("残った WARN", f"{len(warns)} 件（中身は、作業の記録のチェック結果）"))
     return ["# 納品の数", "", f"作成: {datetime.date.today().isoformat()}（deliver.py。納品の門を通ったときの数）" + (f"。写した先: {dest}" if dest else ""), "",
             "| 項目 | 数 |", "| --- | --- |"] + [f"| {a} | {b} |" for a, b in rows] + [""] + ([f"- {w}" for w in warns[:50]] + ([f"- ほか {len(warns) - 50} 件"] if len(warns) > 50 else []) if warns else [])
@@ -232,6 +234,16 @@ def main():
                 print("\n門を通らない: 書き出しが止まった（人が入れた値を守るため。理由を見て直してから、もう一度 deliver.py）")
                 sys.exit(1)
         out = work / "out"
+        import build_matrix as BM
+        base = BM.baseline(work)                                     # 現状の処理時間の写し（BPR の比較の基準）。形を確かめてから書く
+        if base is not None:
+            errs = validate(base, "baseline")
+            if errs:
+                raise SystemExit(f"{BASELINE_FILE} の形が崩れる（{'／'.join(errs[:3])}）。build_matrix.py で書き出し直してから、もう一度")
+            save(out / BASELINE_FILE, base)
+            nums["times"] = dict(nums.get("times") or {}, total=base["total"], table_version=base["table_version"])
+        elif (out / BASELINE_FILE).exists():
+            (out / BASELINE_FILE).unlink()                           # 処理時間の行の無い様式に変えた: 前の写しを残さない
         lines = numbers_text(work, nums, warns, dest)
         (out / f"{NUMBERS_FILE}.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
         save(out / f"{NUMBERS_FILE}.json", dict(nums, warn_lines=warns, date=datetime.date.today().isoformat(), to=str(dest) if dest else None))

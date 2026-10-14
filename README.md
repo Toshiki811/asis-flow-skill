@@ -125,7 +125,7 @@ python3 evals/excel_check.py -w /tmp/fx_work             # 計算した値・数
 | `scripts/make_compare.py` | 照合シート（出典ページとノードを並べた PDF） |
 | `scripts/review.py` | 照合の報告から、採否表の下書きを作る（判定と指摘は機械が写す。親は採否と対応だけを書く） |
 | `scripts/build_reports.py` | 確認事項一覧・出典対応表・階層と業務分類・採否表。確認事項一覧の回答と足した列を、いまあるブックから取り込んで残す |
-| `scripts/deliver.py` | 納品の門。書き出しと点検を回し直し、全部通ったら出力先の `納品物/`・`作業の記録/` に写す。`納品の数.md` を書く |
+| `scripts/deliver.py` | 納品の門。書き出しと点検を回し直し、全部通ったら出力先の `納品物/`・`作業の記録/` に写す。`納品の数.md` と、現状の処理時間の写し（基準の表の版つき）を書く |
 | `scripts/quotes.py` | 引用を行の番号（`lines`）で指したカード・フローに、その行の文字を入れる（`fill`）。いまの引用から番号を引く（`locate`） |
 | `scripts/draft_flow.py`・`scripts/apply_edits.py` | フローの下書きをカードから機械で作る／LLM が書いた直しの一覧を当てて `flow.json` を作る（下書き方式。`references/flow-edits-guide.md`） |
 | `scripts/code_struct.py` | プログラムのソースから、構造（手続き・分岐・繰り返し・呼び出し・入出力・起動点・図にする単位）を機械で取り出す。認証情報を伏せる |
