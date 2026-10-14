@@ -4,6 +4,7 @@
   python3 scripts/renumber.py -w <作業フォルダ>                 # 全フロー
   python3 scripts/renumber.py -w <作業フォルダ> --only F03      # フローを選ぶ
   python3 scripts/renumber.py -w <作業フォルダ> --dry-run       # 何が変わるかだけ見る
+  python3 scripts/renumber.py -w <作業フォルダ> --lanes         # JSON をまるごと書いたフローのレーンも、決まり 4.2 で並べ直す（付けたときだけ）
 
 番号は LLM に数えさせない（飛び・重なり・順不同が出て、実行のたびに変わる）。フローを書いたあと・ノードを足し引きしたあとに実行する。
 あわせて、作業のノードの推定の印（inferred）を出典から付け直す: カードの項目（item）を1つも引かないノードが推定（原典に無いノード）。
@@ -19,12 +20,29 @@
 import argparse
 import re
 
-from common import CardItems, Times, flow_heads, infer_nodes, order_of, save, settle_flow, system_names, tag_systems, try_load, work_dir
+from common import CardItems, Times, flow_heads, infer_nodes, order_lanes, order_of, save, settle_flow, system_names, tag_systems, try_load, work_dir
 from validate import blocking, validate
 
 PREFIX = {"process": "P", "decision": "D", "system": "S", "file": "F", "subprocess": "SUB"}
 # 振り直しに関わる形の違反（番号・種別・線の端・確認事項の指す先、必須の項目の欠け、型の違い）。余分な項目などは、振り直しを止めない
 RISKY = re.compile(r"\.(id|type|attach_to|from|to|node|edge)(\[\d+\])?: |必須の項目が無い|型が違う")
+
+
+def relane(fl):
+    """JSON をまるごと書いたフローのレーンを、決まり 4.2 で並べ直す（開始の担当が左端・システムが右端・線がまたぐレーンの数が最小）。
+    変えたら (前の並び, 後の並び)、変わらなければ None"""
+    lanes = [x for x in fl.get("lanes") or [] if isinstance(x, dict)]
+    name = {x.get("id"): x.get("name") for x in lanes}
+    at = {n.get("id"): name.get(n.get("lane")) for n in fl.get("nodes") or [] if isinstance(n, dict)}
+    names = [x.get("name") for x in lanes]
+    systems = [x.get("name") for x in lanes if x.get("kind") == "system"]
+    start = at.get("start")
+    new = order_lanes(names, [(at.get(e.get("from")), at.get(e.get("to"))) for e in fl.get("edges") or [] if isinstance(e, dict)],
+                      keep=[] if start in systems or start is None else [start], right=systems)
+    if new == names:
+        return None
+    fl["lanes"] = sorted(lanes, key=lambda x: new.index(x.get("name")))
+    return names, new
 
 
 def renumber(fl):
@@ -70,6 +88,7 @@ def main():
     ap.add_argument("-w", "--work", required=True)
     ap.add_argument("--only", help="フロー ID（カンマ区切り）")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--lanes", action="store_true", help="JSON をまるごと書いたフローのレーンも、決まり 4.2 で並べ直す（直しの一覧のフローは apply_edits.py が並べる）")
     a = ap.parse_args()
     work = work_dir(a.work)
     blocking(work)
@@ -97,6 +116,9 @@ def main():
         if heads:                                                    # 名前・番号・親・段・準拠は、業務分類の写し（分類を直したら、ここで付いていく）
             print(f"{f.name}: 見出しを業務分類から{'写す' if a.dry_run else '写した'}（" + "・".join(f"{k}「{fl.get(k)}」→「{x}」" for k, x in heads.items()) + "）")
             fl.update(heads)
+        lanes = a.lanes and not (work / "flows" / f"{fl.get('flow_id')}.edits.json").exists() and relane(fl)
+        if lanes:
+            print(f"{f.name}: レーンを{'並べ直す' if a.dry_run else '並べ直した'}（{'・'.join(lanes[0])} → {'・'.join(lanes[1])}）")
         marks = infer_nodes(fl)                                      # 推定の印は、採否表があっても付け直す（番号は変わらない）
         if marks:
             print(f"{f.name}: 作業のノードの推定の印を{'付け直す' if a.dry_run else '付け直した'}（"
@@ -125,7 +147,7 @@ def main():
         rules = settle_flow(fl)                                      # 決まりで決まる所（判断の名前・分岐のラベル・終了条件・確認事項の重要度）。採否表があっても当てる（番号は変わらない）
         for x in rules:
             print(f"{f.name}: {x}")
-        if ren or marks or tags or boxes or heads or rules:                # 振り直しが止まっても、ほかの当てはめは保存する（renumber は番号を書き換える前に止まる）
+        if ren or marks or tags or boxes or heads or rules or lanes:                # 振り直しが止まっても、ほかの当てはめは保存する（renumber は番号を書き換える前に止まる）
             changed += 1
             if not a.dry_run:
                 save(f, fl)

@@ -2197,6 +2197,37 @@ def mech_tests(tmp, good):
     edit(w / "structure/hierarchy.json", lambda h: h["questions"][0].update(severity="low", effect="フローの範囲"))
     got = [q for q in collect_questions(w, write=False) if q["origin"] == "hierarchy"]
     out.append(("重要度: 階層・用語・分類・台帳（LLM が書くファイル）の問いも、書いた重要度は使わず決まりで決める", bool(got) and got[0]["severity"] == "high"))
+    # レーンの順（決まり 4.2）: 機械が並べる。直しの一覧の lane_order で指定できる。JSON をまるごと書いたフローは renumber.py --lanes のときだけ
+    from common import order_lanes
+    pairs = [("A", "C"), ("A", "C"), ("C", "B"), ("A", "B")]
+    out.append(("レーンの順: 開始の担当を左端、システムを右端に置き、残りは線がまたぐレーンの数が最小の順。同じなら出てくる順",
+                order_lanes(["A", "B", "C", "S"], pairs, keep=["A"], right=["S"]) == ["A", "C", "B", "S"] and order_lanes(["A", "B", "C"], [], keep=["A"]) == ["A", "B", "C"]
+                and order_lanes(["A", "B", "C"], pairs, keep=["B", "A"]) == ["B", "A", "C"]))
+    ln = tmp / "lanes"
+    shutil.copytree(good, ln)
+    run("quotes.py", ln, "locate", "--rewrite")
+    run("quotes.py", ln, "fill")
+    e = json.loads((SKILL / "evals/fixture_edits/F03.edits.json").read_text(encoding="utf-8"))
+    (ln / "flows/F03.edits.json").write_text(json.dumps(e, ensure_ascii=False), encoding="utf-8")
+    run("apply_edits.py", ln, "--flow", "F03")
+    names = [x["name"] for x in json.loads((ln / "flows/F03.flow.json").read_text(encoding="utf-8"))["lanes"]]
+    pick = next(x for x in reversed(names) if x != names[0] and x != "会計システム")
+    (ln / "flows/F03.edits.json").write_text(json.dumps(dict(e, lane_order=[pick]), ensure_ascii=False), encoding="utf-8")
+    c1, _o = run("apply_edits.py", ln, "--flow", "F03")
+    after = [x["name"] for x in json.loads((ln / "flows/F03.flow.json").read_text(encoding="utf-8"))["lanes"]]
+    (ln / "flows/F03.edits.json").write_text(json.dumps(dict(e, lane_order=["財務部"]), ensure_ascii=False), encoding="utf-8")
+    c2, o2 = run("apply_edits.py", ln, "--flow", "F03")
+    out.append(("レーンの順: 直しの一覧の lane_order のとおりに左から並ぶ（システムは右端のまま）。フローに無いレーンを書けば、何も書かずに止まる",
+                c1 == 0 and after[0] == pick and after[-1] == "会計システム" and sorted(after) == sorted(names) and c2 == 1 and "lane_order の「財務部」" in o2))
+    before = [x["name"] for x in json.loads((ln / "flows/F02.flow.json").read_text(encoding="utf-8"))["lanes"]]
+    run("renumber.py", ln, "--only", "F02")
+    kept = [x["name"] for x in json.loads((ln / "flows/F02.flow.json").read_text(encoding="utf-8"))["lanes"]]
+    c3, o3 = run("renumber.py", ln, "--only", "F02", "--lanes")
+    fl2 = json.loads((ln / "flows/F02.flow.json").read_text(encoding="utf-8"))
+    lane_name = {x["id"]: x["name"] for x in fl2["lanes"]}
+    start = lane_name[next(n["lane"] for n in fl2["nodes"] if n["id"] == "start")]
+    out.append(("レーンの順: JSON をまるごと書いたフローは、renumber.py --lanes のときだけ並べ直す（開始の担当が左端）",
+                kept == before and c3 == 0 and "レーンを並べ直した" in o3 and [x["name"] for x in fl2["lanes"]][0] == start))
     return out
 
 

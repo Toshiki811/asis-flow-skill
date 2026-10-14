@@ -113,7 +113,7 @@ def page_problems(pg):
                 yield "fail", (f"線 {e1['from']}→{e1['to']} と {e2['from']}→{e2['to']} が、同じ所を重なって走る（別の箱へ進むように読める。"
                                f"線の通り道が足りない。箱・分岐を減らす（畳む・まとめる・図を分ける）か、レーンの順・ノードの順を入れ替える）")
         if n_cross >= 4:
-            yield "warn", f"線 {e1['from']}→{e1['to']} がほかの線と {n_cross} 回交わる（レーンの順を見直す）"
+            yield "warn", f"線 {e1['from']}→{e1['to']} がほかの線と {n_cross} 回交わる（レーンの順を見直す。直しの一覧のフローは lane_order、JSON をまるごと書いたフローは lanes の順か renumber.py --lanes）"
 
 
 def stale_pngs(folder, layouts):

@@ -1197,6 +1197,37 @@ def collect_questions(work, write=True):
     return items
 
 
+def order_lanes(names, pairs, keep=(), right=()):
+    """レーンの並び（決まり 4.2）。keep: 左から、この順に固定する名前。right: 右端に置く名前（出てくる順）。
+    残りは、線がまたぐレーンの数の合計（線の本数 × 位置の差）が最小になる順。同じなら、出てくる順（names の順）。
+    7 つまでは全部の順を試し、多ければ、隣どうしの入れ替えで詰める。決まりなので、毎回同じ並びになる"""
+    import itertools
+    head = list(dict.fromkeys(x for x in keep if x in names))
+    tail = [x for x in names if x in right and x not in head]
+    mid = [x for x in names if x not in head and x not in tail]
+    w = collections.Counter(tuple(sorted((a, b))) for a, b in pairs if a != b and a in names and b in names)
+
+    def cost(seq):
+        pos = {x: i for i, x in enumerate(seq)}
+        return sum(n * abs(pos[a] - pos[b]) for (a, b), n in w.items())
+    best, low = mid, cost(head + mid + tail)
+    if len(mid) <= 7:
+        for p in itertools.permutations(mid):
+            c = cost(head + list(p) + tail)
+            if c < low:
+                best, low = list(p), c
+    else:
+        moved = True
+        while moved:
+            moved = False
+            for i in range(len(best) - 1):
+                trial = best[:i] + [best[i + 1], best[i]] + best[i + 2:]
+                c = cost(head + trial + tail)
+                if c < low:
+                    best, low, moved = trial, c, True
+    return head + best + tail
+
+
 def flow_heads(c):
     """業務分類（taxonomy.json の categories[]）から写す、フローの見出しの項目。apply_edits.py が作るとき・renumber.py が付いていくときに写し、
     check_flow.py が分類と同じかを見る（図の見出し・業務マトリクス一覧の行に出る）"""

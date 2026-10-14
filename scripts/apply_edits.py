@@ -20,7 +20,7 @@ import pathlib
 import re
 import sys
 
-from common import (ACTIONS, EFFECTS, ELSE, ENDS_ASKED, LABEL_LONG, SEV_LABEL, VOLUMES, CardItems, ask_form, flow_heads, infer_nodes, load, load_page, norm, opposite, page_json, page_units, same_text,
+from common import (ACTIONS, EFFECTS, ELSE, ENDS_ASKED, LABEL_LONG, SEV_LABEL, VOLUMES, CardItems, ask_form, flow_heads, infer_nodes, load, load_page, norm, opposite, order_lanes, page_json, page_units, same_text,
                     save, settle_flow, severity_of, span_text, system_names, tag_systems, try_load, work_dir)
 from draft_flow import PAGE_TYPE_JA, Draft
 from renumber import PREFIX, apply_ids, renumber
@@ -486,7 +486,15 @@ class Builder:
         for n in order:
             if n["lane"] not in names:
                 names.append(n["lane"])
-        names.sort(key=lambda x: d.terms.kind(x) == "system")       # システムは右端。ほかは出てくる順
+        lane_of = {n["id"]: n["lane"] for n in order + subs}
+        lane_of.update(start=order[0]["lane"], end=order[-1]["lane"], end2=order[-1]["lane"])
+        systems = [x for x in names if d.terms.kind(x) == "system"]
+        want = [str(x).strip() for x in e.get("lane_order") or [] if str(x).strip()]
+        lost = [x for x in want if x not in names]
+        if lost:
+            self.err.append(f"lane_order の「{'・'.join(lost)}」は、このフローのレーンに無い（いまのレーン: {'・'.join(names)}）")
+        keep = want or ([] if order[0]["lane"] in systems else [order[0]["lane"]])
+        names = order_lanes(names, [(lane_of.get(x["from"]), lane_of.get(x["to"])) for x in edges], keep=keep, right=[x for x in systems if x not in want])   # 決まり 4.2
         lid = {nm: f"L{i}" for i, nm in enumerate(names, 1)}
         kinds = e.get("lane_kinds") if isinstance(e.get("lane_kinds"), dict) else {}
         nodes = [{"id": "start", "type": "start", "lane": lid[order[0]["lane"]], "label": "開始"}]
