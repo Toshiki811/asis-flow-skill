@@ -8,7 +8,7 @@
   "flow_id": {"$ref": "common#/$defs/figure_id", "description": "フローの id か、アクティビティ図の番号"},
   "verdicts": {"type": "array", "items": {"$ref": "#/$defs/verdict"}, "description": "ノードごとの判定（開始・終了を除く全ノード）"},
   "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}, "description": "指摘と採否。指摘が無ければ空"},
-  "reviewed": {"$ref": "#/$defs/reviewed", "description": "照合した版の写し（review.py draft が書く。手で書かない）。いまの図と違う箱は、照合していない箱として点検が FAIL にする。無ければ前の版の採否表（点検は WARN）"}
+  "sheets": {"type": "object", "additionalProperties": {"$ref": "common#/$defs/sheet_id"}, "description": "照合の報告 → その報告が照合したシートの番号（review.py draft が書く。手で書かない）。無ければ前の版の採否表（点検は WARN）"}
  },
  "$defs": {
   "verdict": {
@@ -20,34 +20,6 @@
     "node": {"$ref": "common#/$defs/node_id", "description": "ノード番号"},
     "verdict": {"enum": ["支持", "一部支持", "不支持"], "description": "レビュー担当の判定"},
     "evidence": {"type": "string", "description": "原典の該当箇所の引用と、違う点"}
-   }
-  },
-  "reviewed": {
-   "title": "reviewed",
-   "type": "object",
-   "additionalProperties": false,
-   "required": ["nodes", "reports", "figures"],
-   "properties": {
-    "nodes": {"type": "object", "additionalProperties": {"$ref": "#/$defs/seen"}, "description": "ノード番号 → 照合したときの要約"},
-    "reports": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{12}$"}, "description": "写しを取ったときの照合の報告（ファイル名 → 中身の印）。新しい報告・変わった報告が見た箱だけ、写しを取り直す"},
-    "figures": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{12}$"}, "description": "報告ごとの、その報告を受けたときの図のデータの印。採用した指摘の図が、まだこの印のままなら、反映していない（点検が FAIL）。snapshot --assume-current では空（反映済みと認める）"},
-    "assumed": {"type": "string", "description": "review.py snapshot --assume-current で、いまの図を照合済みとして写した日（利用者が認めた）"}
-   }
-  },
-  "seen": {
-   "title": "reviewed.nodes{}",
-   "type": "object",
-   "additionalProperties": false,
-   "required": ["type", "label", "lane", "detail", "inferred", "link", "pages", "edges"],
-   "properties": {
-    "type": {"type": "string", "description": "種類"},
-    "label": {"type": "string", "description": "名前"},
-    "lane": {"type": "string", "description": "レーンの名前"},
-    "detail": {"type": "string", "description": "補足"},
-    "inferred": {"type": "boolean", "description": "推定の印"},
-    "link": {"type": "string", "description": "リンク先の図"},
-    "pages": {"type": "array", "items": {"type": "string"}, "description": "出典のページ（資料 ID とページ）"},
-    "edges": {"type": "array", "items": {"type": "string"}, "description": "前後の線（→行き先・←もと と、ラベル）"}
    }
   },
   "finding": {
@@ -63,6 +35,7 @@
     },
     "target": {"type": "string", "description": "ノード・線・ページ（照合シートの見出しの書き方で）"},
     "text": {"type": "string", "minLength": 1, "description": "指摘（レビュー担当の原文のまま）"},
+    "sheet": {"$ref": "common#/$defs/sheet_id", "description": "この指摘を受けたシートの番号（機械が写す。前の版の採否表には無い）。採用した指摘は、このシートの図といまの図が同じなら、まだ反映していない（点検が FAIL）"},
     "decision": {"enum": ["採用", "不採用", "保留"], "description": "採否"},
     "action": {"type": "string", "minLength": 1, "description": "採用なら何を直したか。不採用・保留なら理由"}
    }

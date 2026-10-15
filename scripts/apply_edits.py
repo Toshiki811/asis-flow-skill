@@ -5,7 +5,7 @@
   python3 scripts/apply_edits.py -w <作業フォルダ> --flow F03 --no-edits     # 直しの一覧なしで、下書きのままのフローを作る（確かめ用）
 
 LLM が書くのは、直しの一覧だけ（形は references/schemas.md の「直しの一覧」）。ここが、下書きに直しを当て、線・帳票・開始と終了・
-決まった形の確認事項・番号を機械で付けて、flow.json にする。flow.json から先（点検・図・業務マトリクス一覧・原典照合）は、いままでと同じ。
+決まった形の確認事項・番号・レーンの並び（決まり 4.2。直しの一覧の lane_order で指定できる）を機械で付けて、flow.json にする。flow.json から先（点検・図・業務マトリクス一覧・原典照合）は、いままでと同じ。
   直しの種類（ops[].op）   merge まとめる／unmerge まとめた候補を外す／exclude フローに入れない（理由）／lane レーンを決める／label ラベルを短くする／
                            detail 補足・参考を書く／split 担当の違う作業に分ける／decide 手順の条件を判断にする／branch 書かれていない側の行き先／
                            add 原典に無い作業・判断を足す（推定）／move 並べ替える／connect・disconnect 線を足す・外す／link ほかの業務へ続く／drop_file 帳票を付けない／
@@ -488,15 +488,21 @@ class Builder:
                 names.append(n["lane"])
         lane_of = {n["id"]: n["lane"] for n in order + subs}
         lane_of.update(start=order[0]["lane"], end=order[-1]["lane"], end2=order[-1]["lane"])
-        systems = [x for x in names if d.terms.kind(x) == "system"]
+        kinds = e.get("lane_kinds") if isinstance(e.get("lane_kinds"), dict) else {}
+        kind_of = {nm: kinds.get(nm) or LANE_KIND.get(d.terms.kind(nm), "role") for nm in names}
+        systems = [x for x in names if kind_of[x] == "system"]
         want = [str(x).strip() for x in e.get("lane_order") or [] if str(x).strip()]
         lost = [x for x in want if x not in names]
         if lost:
             self.err.append(f"lane_order の「{'・'.join(lost)}」は、このフローのレーンに無い（いまのレーン: {'・'.join(names)}）")
+        twice = [x for x in dict.fromkeys(want) if want.count(x) > 1]
+        if twice:
+            self.err.append(f"lane_order に、同じレーンを2回以上書いている: {'・'.join(twice)}（並べたい順に1回ずつ書く）")
+        if [x for x in want if x in systems]:
+            d.notes.append(f"lane_order に書いたシステムのレーン（{'・'.join(x for x in want if x in systems)}）は、書いた位置に置いた（決まり 4.2 では右端）")
         keep = want or ([] if order[0]["lane"] in systems else [order[0]["lane"]])
         names = order_lanes(names, [(lane_of.get(x["from"]), lane_of.get(x["to"])) for x in edges], keep=keep, right=[x for x in systems if x not in want])   # 決まり 4.2
         lid = {nm: f"L{i}" for i, nm in enumerate(names, 1)}
-        kinds = e.get("lane_kinds") if isinstance(e.get("lane_kinds"), dict) else {}
         nodes = [{"id": "start", "type": "start", "lane": lid[order[0]["lane"]], "label": "開始"}]
         for n in order:
             x = {"id": n["id"], "type": n["type"], "lane": lid[n["lane"]], "label": n["label"]}
@@ -521,7 +527,7 @@ class Builder:
             nodes.append({"id": "end2", "type": "end", "lane": end_lane, "label": "終了"})
         fl = {"flow_id": d.cid, **flow_heads(d.cat), "summary": str(e.get("summary") or d.cat.get("name") or "").strip(),
               "start_condition": str(e.get("start_condition") or "").strip(), "end_condition": str(e.get("end_condition") or "").strip(),
-              "lanes": [{"id": lid[nm], "name": nm, "kind": kinds.get(nm) or LANE_KIND.get(d.terms.kind(nm), "role")} for nm in names],
+              "lanes": [{"id": lid[nm], "name": nm, "kind": kind_of[nm]} for nm in names],
               "nodes": nodes, "edges": edges, "unused_pages": self.unused(order), "excluded_items": [
                   {"doc_id": self.nodes[k]["doc"], "page": self.nodes[k]["page"], "item": self.nodes[k]["item"], "reason": r} for k, r in self.excluded.items()],
               "questions": []}

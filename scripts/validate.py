@@ -19,11 +19,11 @@ import pathlib
 import re
 import sys
 
-from common import ASSETS, SKILL_DIR, parse_pages
+from common import ASSETS, BASELINE_FILE, SKILL_DIR, parse_pages
 
 SCHEMA_DIR = ASSETS / "schemas"
 KINDS = ["card", "hierarchy", "taxonomy", "glossary", "systems", "code_tree", "flow", "edits", "activity_edits", "activity", "code_terms", "report_read", "report_flow",
-         "report_activity", "report_review", "report_code_review", "review", "times", "answers", "questions", "columns", "layout", "baseline"]
+         "report_activity", "report_review", "report_code_review", "review", "times", "answers", "questions", "columns", "layout", "baseline", "sheets"]
 DOC = SKILL_DIR / "references" / "schemas.md"
 TYPES = {"object": dict, "array": list, "string": str, "boolean": bool}
 TYPE_JA = {"object": "オブジェクト", "array": "配列", "string": "文字", "boolean": "true / false", "integer": "整数",
@@ -146,7 +146,7 @@ def files_of(work, kind):
            "glossary": "glossary.json", "systems": "structure/systems.json", "code_tree": "code/*.tree.json", "activity": "activities/*.activity.json", "activity_edits": "activities/*.edits.json", "code_terms": "structure/code_terms.json", "flow": "flows/*.flow.json", "edits": "flows/*.edits.json", "report_read": "reports/read_*.json",
            "report_flow": "reports/flow_*.json", "report_activity": "reports/activity_*.json", "report_review": "reports/review_*.json",
            "report_code_review": "reports/code_review_*.json", "review": "review/*.review.json", "times": "times.json", "answers": "answers.json", "questions": "questions.json",
-           "columns": "out/*.columns.json", "layout": "out/*.layout.json", "baseline": "out/現状の処理時間.json"}[kind]
+           "columns": "out/*.columns.json", "layout": "out/*.layout.json", "baseline": f"out/{BASELINE_FILE}", "sheets": "review/sheets.json"}[kind]
     return sorted(work.glob(pat))
 
 

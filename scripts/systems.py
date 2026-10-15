@@ -439,9 +439,6 @@ def place_entries(fl, led):
             for q in fl.get("questions") or []:
                 if isinstance(q.get("edge"), list):
                     q["edge"] = [ren.get(v, v) for v in q["edge"]]
-    lanes = sorted(fl["lanes"], key=lambda l: l.get("kind") == "system")   # システムのレーンは右端
-    if [l["id"] for l in lanes] != [l["id"] for l in fl["lanes"]]:
-        fl["lanes"] = lanes
     return json.dumps(fl, ensure_ascii=False, sort_keys=True) != before
 
 

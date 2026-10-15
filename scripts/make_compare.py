@@ -4,15 +4,18 @@
   python3 scripts/make_compare.py -w <作業フォルダ>              # out/照合シート_<フローID>.pdf
   python3 scripts/make_compare.py -w <作業フォルダ> --only F03
   python3 scripts/make_compare.py -w <作業フォルダ> --max-pages 8   # 1本の PDF に入れる出典ページの数（既定 12）。超えたら _1・_2… に分ける
-  python3 scripts/make_compare.py -w <作業フォルダ> --only F03 --nodes P-003,P-007   # 差分照合のシート out/差分照合シート_F03.pdf
+  python3 scripts/make_compare.py -w <作業フォルダ> --only F03 --nodes P-003,P-007   # 差分照合のシート out/差分照合シート_F03_S-<n>.pdf
 
 1ページ＝出典の1ページ。左にフロー図（そのページを出典にしたノードを赤枠で囲む）とノードの一覧（引用つき）、
 右に出典ページの画像。「このページに本当にそう書いてあるか」「このページの手順でフローに無いものはないか」を、
 人と、作り方を知らない別のエージェント（references/source-review-prompt.md）が見るための紙。
 最後に、このフローに割り当てたのに使わなかったページと理由、カードにあるのにフローに入れなかった手順と理由を載せる。
 見出しのページ番号は、資料に刷られた番号（Excel はシート名）。出典ページが多いフローは、レビュー担当が1回で読み切れるように PDF を分ける。
+作るたびに、照合に出す版（箱ごとの要約と図の印）を review/sheets.json に控え（review.record）、見出しの頭にシートの番号［S-<n>］を出す。
+レビュー担当は、この番号を報告の sheet に写す（どの版の図を照合したかは、この番号で決まる）。図が同じなら、前と同じ番号（作り直しでは増やさない）。
 差分照合（--nodes）: 照合のあとに変わった・足した箱（check_flow.py --stage review が挙げる）だけを照合し直すためのシート。
 1ページ目に、照合し直す箱の一覧（図の中で赤枠）。続けて、その箱の出典ページだけ（赤枠と一覧も、その箱だけ）。使わなかったページの一覧は付けない。
+差分照合のシートは、番号ごとに残す（照合した記録として、納品の門が作業の記録に写す）。
 先に check_layout.py を実行しておく（フロー図の PNG を使う）。
 """
 import argparse
@@ -107,13 +110,14 @@ class Sheets:
         self.dmap = docs_by_id(m)
         self.q_node, _ = question_ids(questions, self.F)
         self.items_of = CardItems(work)
+        self.sheet = ""                                              # 照合に出した版の番号（S-<n>。見出しの頭に出す）
 
     def src(self, s):
         return src_label(self.m, s)
 
     def source_page(self, page, k, uses):
         """出典ページ1枚分。k は (資料, ファイルの番号)、uses はそのページを出典にした [(ノード, 出典)]"""
-        head = f"{self.F} {self.fl['name']}　／　出典: {self.src({'doc_id': k[0], 'page': k[1]})}　{self.dmap.get(k[0], {}).get('rel_path', '')}"
+        head = f"［{self.sheet}］{self.F} {self.fl['name']}　／　出典: {self.src({'doc_id': k[0], 'page': k[1]})}　{self.dmap.get(k[0], {}).get('rel_path', '')}"
         put(page, 24, 28, head, size=12, width=W - 48, max_lines=1)
         self.flow_crop(page, uses)
         self.node_list(page, k, uses)
@@ -186,10 +190,11 @@ class Sheets:
         """差分照合の1ページ目: 照合し直す箱（図の中で赤枠）と、その名前・レーン・出典・前後の線"""
         nodes = [n for n in self.fl["nodes"] if n["id"] in targets]
         lanes = {x.get("id"): x.get("name") for x in self.fl.get("lanes") or []}
-        put(page, MARGIN, 28, f"{self.F} {self.fl['name']}　／　差分照合: 照合のあとに変わった・足した箱（この箱だけを判定する）", size=12, width=W - 2 * MARGIN, max_lines=1)
+        put(page, MARGIN, 28, f"［{self.sheet}］{self.F} {self.fl['name']}　／　差分照合: 照合のあとに変わった・足した箱（この箱だけを判定する）", size=12, width=W - 2 * MARGIN, max_lines=1)
         self.flow_crop(page, [(n, {}) for n in nodes])
         x = MARGIN + LEFT_W + 20
-        y = put(page, x, TOP + 12, "照合のあとに図を直したので、赤枠の箱だけを照合し直す。ほかの箱は、前の照合で済んでいる。", size=10, width=W - x - MARGIN)
+        y = put(page, x, TOP + 12, f"照合のあとに図を直したので、赤枠の箱だけを照合し直す。ほかの箱は、前の照合で済んでいる。報告の sheet に「{self.sheet}」と書く。",
+                size=10, width=W - x - MARGIN)
         put(page, x, y + 6, "次のページから、この箱の出典ページ（赤枠と一覧も、この箱だけ）。箱の前後の線（つなぎ）も、原典どおりかを見る。出典の無い箱（推定）は、図とフローの定義で見る。",
             size=10, width=W - x - MARGIN, max_lines=4)
         y = TOP + FLOW_H + 22
@@ -208,7 +213,7 @@ class Sheets:
         """最後のページ: 割り当てたのに出典にしなかったページと、カードにあるのにフローに入れなかった手順・分岐（どちらも理由つき）。
         pages（このフローのページ）のカードで、作業として扱わなかった補足（notes の why_not_action）も載せる"""
         fl, wide = self.fl, W - 2 * MARGIN
-        put(page, MARGIN, 28, f"{self.F} {fl['name']}　／　この業務分類に割り当てたが、ノードの出典にしなかったページ", size=12, width=wide, max_lines=1)
+        put(page, MARGIN, 28, f"［{self.sheet}］{self.F} {fl['name']}　／　この業務分類に割り当てたが、ノードの出典にしなかったページ", size=12, width=wide, max_lines=1)
         y = 56
         if not unused:
             put(page, MARGIN, y, "なし（割り当てたページはすべて、どれかのノードの出典になっている）", size=10)
@@ -258,13 +263,12 @@ def write_sheets(work, sheets, assigned, max_pages, targets=None):
             sheets.source_page(pdf.new_page(width=W, height=H), k, by_page[k])
     if not targets:
         sheets.leftover_page(pdfs[-1].new_page(width=W, height=H), [k for k in assigned if k not in by_page], pages=set(assigned) | set(by_page))
-    name = "差分照合シート" if targets else "照合シート"
-    for old in (work / "out").glob(f"*照合シート_{F}*.pdf"):         # 前に作った分（分け方が変わると名前が変わる）。下位フロー F03-1 の分は消さない
-        hit = re.fullmatch(rf"(差分)?照合シート_{re.escape(F)}(_\d+)?", old.stem)
-        if hit and (hit.group(1) or not targets):                    # 差分照合なら前の差分照合のシートだけ。全体を作り直せば、前の差分照合のシートも消す
+    name = f"差分照合シート_{F}_{sheets.sheet}" if targets else f"照合シート_{F}"
+    for old in (work / "out").glob(f"{name}*.pdf"):                  # 前に作った分（分け方が変わると名前が変わる）。下位フロー F03-1 の分・ほかの差分照合のシートは消さない
+        if re.fullmatch(rf"{re.escape(name)}(_\d+)?", old.stem):
             old.unlink()
     for i, pdf in enumerate(pdfs, 1):
-        out = work / "out" / (f"{name}_{F}.pdf" if len(pdfs) == 1 else f"{name}_{F}_{i}.pdf")
+        out = work / "out" / (f"{name}.pdf" if len(pdfs) == 1 else f"{name}_{i}.pdf")
         try:                                                         # 和文の書体を、使った字だけにする（しないと、ページごとに書体が丸ごと入って 1 ページ 7〜10 MB になる）
             pdf.subset_fonts()
         except Exception as e:
@@ -280,12 +284,13 @@ def main():
     ap.add_argument("-w", "--work", required=True)
     ap.add_argument("--only")
     ap.add_argument("--max-pages", type=int, default=12, help="1本の PDF に入れる出典ページの数（レビュー担当が1回で読み切れる量）")
-    ap.add_argument("--nodes", help="差分照合: 照合し直す箱の番号（カンマ区切り。--only に 1 本だけ）。out/差分照合シート_<フローID>.pdf を作る")
+    ap.add_argument("--nodes", help="差分照合: 照合し直す箱の番号（カンマ区切り。--only に 1 本だけ）。out/差分照合シート_<フローID>_S-<n>.pdf を作る")
     a = ap.parse_args()
     targets = [x.strip() for x in a.nodes.split(",") if x.strip()] if a.nodes else None
     if targets is not None and (not a.only or "," in a.only or not targets):
         ap.error("--nodes は、--only にフローを 1 本だけ指定して使う（箱の番号も 1 つ以上）")
     from PIL import Image
+    import review as RV
     pick_font()
     work = work_dir(a.work)
     m = manifest(work)
@@ -310,10 +315,11 @@ def main():
             if bad:
                 raise SystemExit(f"--nodes の番号が、{F} の箱に無い（開始・終了は照合しない）: {'・'.join(bad)}")
         sheets = Sheets(work, m, fl, layout, Image.open(png).convert("RGB"), questions, flows)
+        sheets.sheet = RV.record(work, {F: fl}, "差分" if targets else "全体", targets)[F]   # 照合に出す版を控える（報告の sheet と結ぶ）
         write_sheets(work, sheets, cat_pages.get(F, []), a.max_pages, targets)
     ids = {fl["flow_id"] for fl in flows}
     for old in sorted((work / "out").glob("*照合シート_*.pdf")) if not only else []:   # 消えた・番号を変えたフローのシート（残すと、照合に出してしまう）
-        if re.sub(r"_\d+$", "", old.stem.split("照合シート_", 1)[1]) not in ids:
+        if re.sub(r"(_S-\d+)?(_\d+)?$", "", old.stem.split("照合シート_", 1)[1]) not in ids:
             old.unlink()
             print(f"{old.name}: いまの業務フローに無いので消した")
     if skipped:

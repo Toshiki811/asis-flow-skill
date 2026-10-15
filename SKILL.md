@@ -49,7 +49,7 @@ description: 業務マニュアル・手順書・規程類（PowerPoint・PDF・
 | 3・5 | `pages.py rows` / `taxonomy --draft` / `orphans` | 縦軸（業務マトリクスの行）の案・目次に準拠した分類の下書き・どの分類にも入っていないページと目次の候補 |
 | 5 | `pages.py outline` / `digest` / `pagemap` / `terms` / `links` / `plan-flows` | 全体の集計・ページ1行の要約・ページ番号の対応・用語（`--draft` で正本の下書き）・紐付けの候補（`--accept R1,S2` で採る。根拠は機械が写す）・材料の大きさ |
 | 6〜7 | `renumber.py` / `build_drawio.py` / `build_matrix.py` / `check_flow.py` / `check_layout.py` | 番号の振り直し・図の書き出し・業務マトリクス一覧の書き出し・中身の点検・配置の点検と PNG |
-| 8 | `make_compare.py` / `review.py draft` | 照合シート／照合の報告から採否表の下書き（判定と指摘は機械が写す） |
+| 8 | `make_compare.py` / `review.py draft` / `review.py record` / `review.py snapshot` | 照合シート（照合に出す版を控え、見出しに番号［S-<n>］。`--nodes` で差分照合のシート）／照合の報告から採否表の下書き（判定と指摘は機械が写す）／アクティビティ図を照合に出す版を控える／前の版の採否表の図を照合済みと認める（利用者が認めたときだけ） |
 | 9 | `build_reports.py` | 確認事項一覧・出典対応表・階層と業務分類・採否表（確認事項一覧の回答は `answers.json` に取り込んで戻す） |
 | 5〜6 | `code_struct.py` / `systems.py` / `activity.py` / `build_activity.py` | **入力にプログラムがあるとき**（`references/code-guide.md`）: 構造（手続き・分岐・呼び出し・入出力・起動点）を機械で取り出す／システム台帳の下書き・起動点の一覧・紐付けの候補／アクティビティ図の下書きと、直しの一覧の適用／アクティビティ図の書き出し |
 | 6 | `draft_flow.py` / `apply_edits.py` | フローを「機械が下書き、LLM が直しの一覧」で作る（既定。`references/flow-edits-guide.md`）: カードから下書きを作って見せる／直しの一覧（`flows/<ID>.edits.json`）を当てて `flow.json` を作る |
@@ -78,11 +78,11 @@ description: 業務マニュアル・手順書・規程類（PowerPoint・PDF・
    python3 scripts/check_flow.py -w <WORK> --report <WORK>/out/チェック_フロー.txt     # FAIL 0（図と業務マトリクス一覧が、いまのデータのとおりかも見る）
    ```
    **PNG を全ページ目で見る。** 機械は重なりと貫通しか見ない。フローが 10 本を超えるときは、数本ずつ別のエージェントに見させて指摘だけを受け取る。読みにくければ直して書き出し直す（直しの一覧で作ったフローは直しの一覧を、JSON をまるごと書いたフローは `flow.json` を直す。直し方は `flow-guide.md` の末尾）。
-8. **原典照合**（`references/source-review-prompt.md`）: `python3 scripts/make_compare.py -w <WORK>` で照合シートを作り、作り方を伝えない別のエージェントに原典と突き合わせさせる。レビュー担当には `reports/review_<フローID>.json` に書かせ、`python3 scripts/review.py draft -w <WORK>` で採否表 `review/<フローID>.review.json` の下書きを作って（判定と指摘は機械が写す）、採否（採用／不採用／保留＋理由）を決め、採用分を反映して工程7をやり直す（図と業務マトリクス一覧の両方を書き出し直す。番号は引き継ぐ）。採否表には、照合した版の写しが残る。照合のあとに直した箱（採用した指摘の直しも）は、点検が「照合していない箱」として挙げるので、その箱だけを照合し直す（差分照合: `make_compare.py --only <フローID> --nodes <箱>` → 報告 `reports/review_<フローID>_差分<N>.json` → `review.py draft`）。`python3 scripts/check_flow.py -w <WORK> --stage review` が FAIL 0（支持率 95% 以上）になるまで。アクティビティ図も同じ（`references/code-review-prompt.md`）。
+8. **原典照合**（`references/source-review-prompt.md`）: `python3 scripts/make_compare.py -w <WORK>` で照合シートを作り、作り方を伝えない別のエージェントに原典と突き合わせさせる。レビュー担当には `reports/review_<フローID>.json` に、シートの見出しの番号［S-<n>］を `sheet` に写して書かせ、`python3 scripts/review.py draft -w <WORK>` で採否表 `review/<フローID>.review.json` の下書きを作って（判定と指摘は機械が写す）、採否（採用／不採用／保留＋理由）を決め、採用分を反映して工程7をやり直す（図と業務マトリクス一覧の両方を書き出し直す。番号は引き継ぐ）。照合に出した版は、照合シートを作るときに、機械が `review/sheets.json` に控える（手で直さない）。照合のあとに直した箱（採用した指摘の直しも）は、点検が「照合したあとに変わった・足した箱」として挙げるので、その箱だけを照合し直す（差分照合: `make_compare.py --only <フローID> --nodes <箱>` → 報告 `reports/review_<フローID>_差分<N>.json`（`sheet` は差分照合シートの番号）→ `review.py draft`）。`python3 scripts/check_flow.py -w <WORK> --stage review` が FAIL 0（支持率 95% 以上）になるまで。アクティビティ図も同じ（`references/code-review-prompt.md`）。
 9. **報告書**: `python3 scripts/build_reports.py -w <WORK>` → `python3 scripts/check_flow.py -w <WORK> --stage reports` と `--stage deliverables`（納品物の文字に、資料の ID・内部の番号・ファイルの場所・項目名・【下書き】が無いか）を FAIL 0 に。
-10. **納品の門**: 出力先を利用者に聞き、`python3 scripts/deliver.py -w <WORK> --to <出力先>`。門は、書き出しと点検を決まった順に回し直し（古い出力は自分で作り直す。2 回まで）、全段 FAIL 0・PNG と照合シートがそろって新しい・原典照合が済んでいる、を確かめてから、`納品物/`（図・PNG・業務マトリクス一覧・確認事項一覧・出典対応表・階層と業務分類）と `作業の記録/`（チェック結果・照合シート・採否表・納品の数）に写す。データを直す必要があるものは止まり、直す工程とコマンドを出す。利用者には次をまとめて渡す。
+10. **納品の門**: 出力先を利用者に聞き、`python3 scripts/deliver.py -w <WORK> --to <出力先>`。門は、書き出しと点検を決まった順に回し直し（古い出力は自分で作り直す。2 回まで）、全段 FAIL 0・PNG と照合シートがそろって新しい・原典照合が済んでいる、を確かめてから、`納品物/`（図・PNG・業務マトリクス一覧・確認事項一覧・出典対応表・階層と業務分類）と `作業の記録/`（チェック結果・照合シート・採否表・納品の数・現状の処理時間の写し）に写す。データを直す必要があるものは止まり、直す工程とコマンドを出す。利用者には次をまとめて渡す。
    - 写した 2 つのフォルダ
-   - 数（`納品の数.md`。機械が書く）: 資料とページの数、フローとノードの数、網羅率（ページ・手順の項目）、引用照合率（完全一致の率も）、推定の数、確認事項の件数（重要度別。回答済みで残っているものも）、レビューの支持率、人が入れた処理時間の割合
+   - 数（`納品の数.md`。機械が書く）: 資料とページの数、フローとノードの数、網羅率（ページ・手順の項目）、引用照合率（完全一致の率も）、推定の数、確認事項の件数（重要度別。回答済みで残っているものも）、レビューの支持率、人が入れた処理時間の割合・処理時間の合計と基準の表の版
    - 読めなかった資料・ページと理由。重要度 高 の確認事項
    - 受けた指摘は `references/flow-rules.md` に1行足す
 

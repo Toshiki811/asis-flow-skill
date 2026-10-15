@@ -358,8 +358,8 @@ class CardChecks:
         for doc, by in self.shifted.items():
             for delta, at in by.items():
                 if len(at) >= SHIFT_MIN and len(at) >= SHIFT_SHARE * max(1, self.checked[doc]):
-                    self.rp.fails.insert(0, f"{doc}: 系統的なずれ — カードの引用 {len(at)} 件が、{abs(delta)} ページ{'後ろ' if delta > 0 else '前'}のページにある"
-                                            f"（{len(set(at))} ページ分）。ページ画像とカードの対応が1つずつずれている。その束を読み直す")
+                    self.rp.fail(f"{doc}: 系統的なずれ — カードの引用 {len(at)} 件が、{abs(delta)} ページ{'後ろ' if delta > 0 else '前'}のページにある"
+                                 f"（{len(set(at))} ページ分）。ページ画像とカードの対応が1つずつずれている。その束を読み直す", first=True)
 
     def number_jumps(self):
         """刷られた番号の並びが1枚だけ飛ぶ（スキャン資料は、カードの読みしか手がかりが無い）"""

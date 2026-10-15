@@ -908,7 +908,7 @@ def model(work, write=False):
 
 def baseline(work):
     """現状の処理時間の写し（BPR の比較の基準。納品の門が out/現状の処理時間.json に書く）。書き出したブックの、保存した計算の結果から取る。
-    処理時間の行の無いブックなら None"""
+    人の値か仮の値かは times.json で見る（門は、ブックにまだ取り込んでいない人の値があれば、先に書き出し直す）。処理時間の行の無いブックなら None"""
     from openpyxl import load_workbook
     book = pathlib.Path(work) / "out" / BOOK
     side = load(side_path(book), {}) or {}
@@ -918,7 +918,9 @@ def baseline(work):
     basis = {(r["id"], s["id"]): s["time"] for r in mx.rows for s in r["steps"]}
     names = {r["id"]: str(r["flow"].get("name") or "") for r in mx.rows}
     flows = {}
-    for row in load_workbook(book, data_only=True)[M].iter_rows():   # 時間・件数のセルは、コメントの札で見分ける（列の順・シートの名前はテンプレートが決める）
+    title = next((t for t, s in (side.get("sheets") or {}).items() if s.get("canon") == M), M)   # シートの名前はテンプレートが決める
+    num = lambda v: v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+    for row in load_workbook(book, data_only=True)[title].iter_rows():   # 時間・件数のセルは、コメントの札で見分ける（列の順もテンプレートが決める）
         for c in row:
             text = c.comment.text if c.comment is not None else ""
             m, k = TAG_TIME.match(text), TAG_COUNT.match(text)
@@ -927,11 +929,10 @@ def baseline(work):
                 act, vol, _why = basis.get((F, i), ("", "", ""))
                 lab = TAG_LABEL.search(text)
                 flows.setdefault(F, {"flow": F, "name": names.get(F, ""), "count": None, "cells": []})["cells"].append(
-                    {"node": i, "label": lab.group(1) if lab else "", "value": c.value if isinstance(c.value, (int, float)) else None,
+                    {"node": i, "label": lab.group(1) if lab else "", "value": num(c.value),
                      "by": "人" if (F, i) in mx.times.cells else "仮", "action": act, "volume": vol})
             elif k:
-                flows.setdefault(k.group(1), {"flow": k.group(1), "name": names.get(k.group(1), ""), "count": None, "cells": []})["count"] = \
-                    c.value if isinstance(c.value, (int, float)) else None
+                flows.setdefault(k.group(1), {"flow": k.group(1), "name": names.get(k.group(1), ""), "count": None, "cells": []})["count"] = num(c.value)
     for f in flows.values():
         f["total"] = sum(x["value"] or 0 for x in f["cells"])
     return {"version": 1, "date": datetime.date.today().isoformat(), "table_version": side.get("table_version", ""), "table": side.get("table") or [],
@@ -1047,7 +1048,7 @@ def main():
         t.save()
     elif a.keep or a.calibrate or a.accept or a.forget:
         said.append(f"テンプレートに、基準の表（名前「{TIME_NAME}」の範囲）が無いので、処理時間は扱わない")
-    was = (load(side_path(book), {}) or {}).get("table_version") if side_path(book).exists() else None
+    was = (load(side_path(book), {}) or {}).get("table_version")
     try:
         write(mx, book, tpl, kept=ans.kept(BOOK))
     except TemplateError as e:

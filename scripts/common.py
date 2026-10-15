@@ -103,7 +103,7 @@ REPORTS = ("確認事項一覧.md", "確認事項一覧.xlsx", "出典対応表.
 DELIVERABLES = (f"{FLOW_FIG}*.drawio", ACT_FIG, MATRIX_BOOK) + REPORTS
 NUMBERS_FILE = "納品の数"                                              # 納品の門が書く数（out/納品の数.md・.json）
 BASELINE_FILE = "現状の処理時間.json"                                    # 納品の門が書く、現状の処理時間の写し（BPR の比較の基準。表の版つき）
-RECORDS = ("チェック_*.txt", "照合シート_*.pdf", "原典照合レビュー_採否表.md", f"{NUMBERS_FILE}.md", f"{NUMBERS_FILE}.json", BASELINE_FILE)
+RECORDS = ("チェック_*.txt", "照合シート_*.pdf", "差分照合シート_*.pdf", "原典照合レビュー_採否表.md", f"{NUMBERS_FILE}.md", f"{NUMBERS_FILE}.json", BASELINE_FILE)
 REVIEW_MIN = 0.95                                                    # 原典照合の支持率の下限（業務フロー・アクティビティ図それぞれ）。下回れば、図を直して照合し直す
 MAX_STEPS, MAX_LANES = 25, 8                                         # 1 ページの図の目安（作業の箱の数・レーンの数）。超えたら分ける
 
@@ -483,7 +483,8 @@ def guarded(rp, what):
                 f"（python3 scripts/validate.py -w <作業フォルダ> で形だけを確かめられる）")
 
 
-FAIL_LOG = "ASIS_FAIL_LOG"                                            # これがあれば、Report.fail が、出した場所（ファイル:行）を、そのファイルに書き足す
+FAIL_LOG = "ASIS_FAIL_LOG"                                            # これがあれば、Report.fail・warn が、出した場所（ファイル:行）を、そのファイルに書き足す
+FAIL_HELPERS = ("shape_fails", "read_checked", "evidence_pages", "question_sources", "check_question_ids", "check_label_form")   # 点検の共通の部品（呼び元の行も控える）
 
 
 class Report:
@@ -494,14 +495,30 @@ class Report:
     def __init__(self, title, fold=10):
         self.title, self.fails, self.warns, self.infos, self.fold = title, [], [], [], fold
 
-    def fail(self, msg):
-        if FAIL_LOG in os.environ:                                    # 自己点検の被覆（evals/coverage.py）: FAIL を出した点検の場所を控える
-            at = sys._getframe(1)
-            with open(os.environ[FAIL_LOG], "a", encoding="utf-8") as fh:
-                fh.write(f"{os.path.basename(at.f_code.co_filename)}:{at.f_lineno}\n")
-        self.fails.append(msg)
+    @staticmethod
+    def _log(frame, at=None):
+        """自己点検の被覆（evals/coverage.py）: FAIL・WARN を出した点検の場所を控える。共通の部品の中なら、呼び元の行も"""
+        with open(os.environ[FAIL_LOG], "a", encoding="utf-8") as fh:
+            fh.write(f"{os.path.basename(frame.f_code.co_filename)}:{at or frame.f_lineno}\n")
+            while frame.f_code.co_name in FAIL_HELPERS and frame.f_back is not None:
+                frame = frame.f_back
+                fh.write(f"{os.path.basename(frame.f_code.co_filename)}:{frame.f_lineno}\n")
+
+    def fail(self, msg, first=False, at=None):
+        """first: 先頭に出す（系統的なずれ）。at: 出した場所の行（配置の点検のように、yield で返した点検の行）"""
+        if FAIL_LOG in os.environ:
+            self._log(sys._getframe(1), at)
+        self.fails.insert(0, msg) if first else self.fails.append(msg)
+
+    def fail_if(self, cond, msg):
+        """cond なら FAIL、でなければ WARN（段によって、同じ誤りの重さが変わる点検）"""
+        if FAIL_LOG in os.environ:
+            self._log(sys._getframe(1))
+        (self.fails if cond else self.warns).append(msg)
 
     def warn(self, msg):
+        if FAIL_LOG in os.environ:
+            self._log(sys._getframe(1))
         self.warns.append(msg)
 
     def info(self, msg):
@@ -1330,7 +1347,7 @@ def severity_of(q):
     if eff == "システム・帳票":
         return "low"
     if eff == "フローの範囲":
-        return "low" if ids and all(re.fullmatch(r"(start|end)[0-9]*", i) for i in ids) else "high"
+        return "low" if ids and all(re.fullmatch(r"(start|end)[0-9]*(-[0-9]+)?", i) for i in ids) else "high"
     return "high" if len(ids) >= 2 else "mid"
 
 

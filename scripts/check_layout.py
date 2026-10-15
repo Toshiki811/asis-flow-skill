@@ -111,7 +111,8 @@ def page_problems(pg):
                         n_cross += 1
             if j > i and e1["from"] != e2["from"] and e1["to"] != e2["to"] and any(runs_together(x[0], x[1], y[0], y[1]) for x in s1 for y in s2):
                 yield "fail", (f"線 {e1['from']}→{e1['to']} と {e2['from']}→{e2['to']} が、同じ所を重なって走る（別の箱へ進むように読める。"
-                               f"線の通り道が足りない。箱・分岐を減らす（畳む・まとめる・図を分ける）か、レーンの順・ノードの順を入れ替える）")
+                               f"線の通り道が足りない。箱・分岐を減らす（畳む・まとめる・図を分ける）か、レーンの順（直しの一覧のフローは lane_order、"
+                               f"JSON をまるごと書いたフローは lanes の順か renumber.py --lanes）・ノードの順を入れ替える）")
         if n_cross >= 4:
             yield "warn", f"線 {e1['from']}→{e1['to']} がほかの線と {n_cross} 回交わる（レーンの順を見直す。直しの一覧のフローは lane_order、JSON をまるごと書いたフローは lanes の順か renumber.py --lanes）"
 
@@ -156,8 +157,12 @@ def main():
         drawio = lp.with_name(lay["file"])
         for pg in lay["pages"]:
             where = f"{lay['file']}［{pg['name']}］"
-            for kind, text in page_problems(pg):
-                (rp.fail if kind == "fail" else rp.warn)(f"{where}: {text}")
+            found = page_problems(pg)
+            for kind, text in found:
+                if kind == "fail":
+                    rp.fail(f"{where}: {text}", at=found.gi_frame.f_lineno)   # 被覆は、yield した行で数える
+                else:
+                    rp.warn(f"{where}: {text}")
             if cli:
                 png = work / "out" / "png" / f"{drawio.stem}_p{pg['index']:02d}_{pg['id']}.png"
                 ok, msg = export_png(cli, drawio, pg["index"], png)

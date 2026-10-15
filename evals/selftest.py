@@ -845,7 +845,7 @@ CASES = [
      "が重なる"),
     ("出典の字（枠の外）に、ノードが重なる", "check_layout.py", ["--no-png"],
      lambda w: [edit(p, lambda l: l["pages"][1]["nodes"].update({"P-002": l["pages"][1]["captions"]["P-001"]})) for p in (w / "out").glob("*.layout.json")],
-     "の出典の字が、ノード"),
+     "の出典の字が、ノード P-002 と重なる"),
     ("線が、出典の字（枠の外）を通る", "check_layout.py", ["--no-png"],
      lambda w: [edit(p, lambda l: l["pages"][1]["edges"].append({"id": "x", "from": "start", "to": "end", "points": (
          lambda b: [[b[0] - 5, b[1] + b[3] / 2], [b[0] + b[2] + 5, b[1] + b[3] / 2]])(l["pages"][1]["captions"]["P-001"])})) for p in (w / "out").glob("*.layout.json")],
@@ -1116,9 +1116,11 @@ CASES += [
     ("マトリクス: 時間のセルの札が、隣の作業のもの（列を動かした）", "check_flow.py", ["--stage", "matrix"], lambda w: edit_book(w, _swap_time_tags),
      "が、その作業の時間のセルでない"),
     ("マトリクス: 件数のセルの札が、別のフローのもの（行を動かした）", "check_flow.py", ["--stage", "matrix"], lambda w: edit_book(w, _count_tag), "のコメントの札が、「件数 F01｜」で始まらない"),
-    ("報告書: 人が埋める欄の控え（answers.json）が読めない", "check_flow.py", ["--stage", "reports"], lambda w: (w / "answers.json").write_text("{", encoding="utf-8"), "answers.json（"),
-    ("マトリクス: 人が埋める欄の控え（answers.json）が読めない", "check_flow.py", ["--stage", "matrix"], lambda w: (w / "answers.json").write_text("{", encoding="utf-8"), "answers.json（"),
-    ("マトリクス: 人が入れた時間の控え（times.json）が読めない", "check_flow.py", ["--stage", "matrix"], lambda w: (w / "times.json").write_text("{", encoding="utf-8"), "times.json（"),
+    ("報告書: 人が埋める欄の控え（answers.json）が読めない", "check_flow.py", ["--stage", "reports"], lambda w: (w / "answers.json").write_text("{", encoding="utf-8"), "人が埋める欄の控え（answers.json）を読めない"),
+    ("マトリクス: 人が埋める欄の控え（answers.json）が読めない", "check_flow.py", ["--stage", "matrix"], lambda w: (w / "answers.json").write_text("{", encoding="utf-8"),
+     "人が埋める欄の控え（answers.json）を読めない"),
+    ("マトリクス: 人が入れた時間の控え（times.json）が読めない", "check_flow.py", ["--stage", "matrix"], lambda w: (w / "times.json").write_text("{", encoding="utf-8"),
+     "人が入れた時間の控え（times.json）を読めない"),
 ]
 
 
@@ -1152,6 +1154,82 @@ CASES += [
     ("マトリクス: 処理時間の基準の表に、数でない値", "check_flow.py", ["--stage", "matrix"], lambda w: edit_book(w, _bad_table), "処理時間の基準の表を読めない"),
     ("マトリクス: 基準の表の版の記録が無い（前の版の道具で書き出したブック）", "check_flow.py", ["--stage", "matrix"],
      lambda w: edit(w / "out/業務マトリクス一覧.columns.json", lambda s: s.pop("table_version")), "基準の表の版の記録が無い"),
+]
+
+def _one_off(s):
+    """引用を 1 字だけ変える（原文の連続した一部でなくなるが、一致の度合いは残る）"""
+    k = len(s) // 2
+    return s[:k] + ("ア" if s[k] != "ア" else "イ") + s[k + 1:]
+
+
+def _quote_off(w):
+    """カードの手順の引用（行で指していないもの）を 1 字だけ変える"""
+    for p in sorted((w / "cards").glob("*/p*.json")):
+        c = json.loads(p.read_text(encoding="utf-8"))
+        st = next((x for x in c.get("steps") or [] if len(str(x.get("quote") or "")) >= 15 and "lines" not in x and not x.get("from_image")), None)
+        if st is not None:
+            st["quote"] = _one_off(st["quote"])
+            p.write_text(json.dumps(c, ensure_ascii=False), encoding="utf-8")
+            return
+    raise AssertionError("行で指していない長い引用の手順が無い")
+
+
+def _cards_shift(w, doc="M01"):
+    """資料 1 つのカードを、全部 1 ページずつ後ろへずらす（ページ画像とカードの対応のずれ）"""
+    files = sorted((w / "cards" / doc).glob("p*.json"))
+    for p in reversed(files[:-1]):
+        c = json.loads(p.read_text(encoding="utf-8"))
+        n = int(p.stem[1:]) + 1
+        c["page"] = n
+        (p.parent / f"p{n:04d}.json").write_text(json.dumps(c, ensure_ascii=False), encoding="utf-8")
+    files[0].unlink()
+
+
+def _q(qid, page=1, doc="M01"):
+    return {"id": qid, "severity": "mid", "category": "用語", "effect": "システム・帳票", "question": "この語は、どの帳票を指すか。",
+            "assumption": "申請書を指すとした", "sources": [{"doc_id": doc, "page": page}], "ask": "経理部"}
+
+
+CASES += [
+    # ---- 2026-10-15 被覆の見直し: 共通の部品（形・読めない・確認事項の番号と出典・根拠のページ）を、ファイルの種類ごとに ----
+    ("用語の正本: 形が違う", "check_flow.py", ["--stage", "structure"], lambda w: edit(w / "glossary.json", lambda g: g["terms"][0].update(name=5)), "glossary.json: 形が違う"),
+    ("用語の正本: 確認事項の id が重複", "check_flow.py", ["--stage", "structure"], lambda w: edit(w / "glossary.json", lambda g: g.update(questions=[_q("g1"), _q("g1")])),
+     "glossary.json: 確認事項の id が重複: g1"),
+    ("用語の正本: 確認事項の出典が、無いページ", "check_flow.py", ["--stage", "structure"], lambda w: edit(w / "glossary.json", lambda g: g.update(questions=[_q("g1", 99)])),
+     "glossary.json: 確認事項 g1 の出典が、存在しないページ"),
+    ("業務分類: 確認事項の id が重複", "check_flow.py", ["--stage", "structure"], lambda w: edit(w / "taxonomy.json", lambda t: t.update(questions=[_q("t1"), _q("t1")])),
+     "taxonomy.json: 確認事項の id が重複: t1"),
+    ("業務分類: 確認事項の出典が、無いページ", "check_flow.py", ["--stage", "structure"], lambda w: edit(w / "taxonomy.json", lambda t: t.update(questions=[_q("t1", 99)])),
+     "taxonomy.json: 確認事項 t1 の出典が、存在しないページ"),
+    ("階層: JSON として読めない", "check_flow.py", ["--stage", "structure"], lambda w: (w / "structure/hierarchy.json").write_text("{", encoding="utf-8"),
+     "structure/hierarchy.json: JSON として読めない"),
+    ("階層: 形が違う", "check_flow.py", ["--stage", "structure"], lambda w: edit(w / "structure/hierarchy.json", lambda h: h.update(rationale=5)), "hierarchy.json: 形が違う"),
+    ("階層: 確認事項の id が重複", "check_flow.py", ["--stage", "structure"],
+     lambda w: edit(w / "structure/hierarchy.json", lambda h: h["questions"].append(dict(h["questions"][0]))), "hierarchy.json: 確認事項の id が重複"),
+    ("階層: 資料どうしの関係の根拠の出典が、無いページ", "check_flow.py", ["--stage", "structure"],
+     lambda w: edit(w / "structure/hierarchy.json", lambda h: h["doc_relations"][0].update(sources=[{"doc_id": "M04", "page": 99}])), "の関係: 根拠の出典が、存在しないページ"),
+    ("カード: 引用が、1 ページずつずれている（系統的なずれ）", "check_extract.py", [], _cards_shift, "系統的なずれ — カードの引用"),
+    ("配置: 出典の字どうしが重なる", "check_layout.py", ["--no-png"],
+     lambda w: [edit(p, lambda l: l["pages"][1]["captions"].update({"P-002": l["pages"][1]["captions"]["P-001"]})) for p in (w / "out").glob("*.layout.json")],
+     "の出典の字と重なる"),
+    # ---- 門が FAIL にする WARN（LLM・人が書くファイルを見るもの） ----
+    ("階層: 業務の木の結び付きの根拠が、出典のページに無い", "check_flow.py", ["--stage", "structure"],
+     lambda w: edit(w / "structure/hierarchy.json", lambda h: h["tree"][0]["children"][0]["refs"][1].update(evidence="どこにも書かれていない根拠の文である")),
+     "の結び付きの根拠「どこにも書かれていない根拠の文である」が、出典のページに見当たらない", "WARN"),
+    ("階層: 資料どうしの関係の根拠が、出典のページに無い", "check_flow.py", ["--stage", "structure"],
+     lambda w: edit(w / "structure/hierarchy.json", lambda h: h["doc_relations"][0].update(evidence="どこにも書かれていない関係の根拠")),
+     "の関係の根拠「どこにも書かれていない関係の根拠」が、出典のページに見当たらない", "WARN"),
+    ("階層: 「続く」の根拠が、出典のページに無い", "check_flow.py", ["--stage", "structure"],
+     lambda w: edit(w / "structure/hierarchy.json", lambda h: h["sequence"][0].update(evidence="どこにも書かれていない続きの根拠")),
+     "の根拠「どこにも書かれていない続きの根拠」が、出典のページに見当たらない", "WARN"),
+    ("フロー: 引用が原典と完全には一致しない（1 字違う）", "check_flow.py", ["--stage", "flow"],
+     lambda w: edit(w / "flows/F01.flow.json", lambda f: node(f, "P-001")["sources"][0].update(quote=_one_off(node(f, "P-001")["sources"][0]["quote"]))),
+     "P-001: 引用が原典", "WARN"),
+    ("カード: 引用が機械抽出の文字と完全には一致しない（1 字違う）", "check_extract.py", [], _quote_off, "引用が機械抽出の文字と完全には一致しない", "WARN"),
+    ("図: flow.json を消したのに、書き出した図にそのページが残る", "check_flow.py", ["--stage", "drawio"],
+     lambda w: (w / "flows/F02.flow.json").unlink(), "対応する flow.json（F02）が無い"),
+    ("フロー: JSON をまるごと書いたフローで、システムのレーンが右端に無い", "check_flow.py", ["--stage", "flow"],
+     lambda w: edit(w / "flows/F03.flow.json", lambda f: f["lanes"].insert(0, f["lanes"].pop())), "F03: システムのレーンが右端に無い", "WARN"),
 ]
 
 
@@ -1292,9 +1370,9 @@ def time_tests(tmp, good):
     c2, o2 = run("check_flow.py", w, "--stage", "matrix")
     wb, t, n = now()
     kept = ({("F01", "P-002"): 20, ("F02", "P-001"): 8, ("F02", "P-005"): 9, ("F03", "P-007"): 10}, {"F01": 120}, {("確認する", "中"): (6, "book")})
-    out.append(("処理時間: 人が入れた値（数・「8分」）・件数・基準の表の直しは、点検では FAIL にならず（まだ取り込んでいない、と知らせる）、書き出し直すと times.json に入り、ブックに戻る"
+    out.append(("処理時間: 人が入れた値（数・「8分」）・件数・基準の表の直しは、点検では FAIL にならず（まだ取り込んでいない、と WARN。門は書き出し直す）、書き出し直すと times.json に入り、ブックに戻る"
                 + ("" if c0 == 0 and c1 == 0 and c2 == 0 else o0[-400:] + o1[-400:] + o2[-400:]),
-                c0 == 0 and "値の違うセルが 5 個" in o0 and c1 == 0 and vals() == kept and c2 == 0 and "0 FAIL / 0 WARN" in o2
+                c0 == 0 and "まだ取り込んでいない人の値が 6 個" in o0 and c1 == 0 and vals() == kept and c2 == 0 and "0 FAIL / 0 WARN" in o2
                 and [t[k].value for k in sorted(kept[0])] == [20, 8, 9, 10] and sum(soft(c) for c in t.values()) == len(t) - 4 and n["F01"].value == 120 and n["F02"].value is None
                 and base(wb, "確認する", "中").value == 6 and base(wb, "確認する", "大").value == 15))
     from validate import validate
@@ -1738,8 +1816,10 @@ def tree_tests(tmp):
     tree = lambda x, fn: edit(x / "code/M01.tree.json", fn)
     tree_case("構造（struct.json）が無い", lambda x: (x / "code/M01.struct.json").unlink(), "code/M01.struct.json が無い（python3 scripts/code_struct.py", again=False)
     tree_case("木の誤り（手続きの範囲が重なる）を、点検が名指しする", lambda x: tree(x, lambda t: t["procedures"][1]["lines"].__setitem__(0, t["procedures"][0]["lines"][1])),
-              "code/M01.tree.json: ")
+              "と重なる")
     tree_case("手続きが 1 つも無い（読まない理由も無い）", lambda x: tree(x, lambda t: t.update(procedures=[], entries=[])), "手続きが1つも無い")
+    tree_case("木が JSON として読めない", lambda x: (x / "code/M01.tree.json").write_text("{", encoding="utf-8"), "code/M01.tree.json: JSON として読めない")
+    tree_case("木の形が違う", lambda x: tree(x, lambda t: t["procedures"][0].update(name=5)), "code/M01.tree.json: 形が違う")
     tree_case("起動点が 1 つも無い", lambda x: tree(x, lambda t: t.update(entries=[])), "起動点（entries）が1つも無い")
     return out
 
@@ -1948,16 +2028,18 @@ def review_gate_tests(tmp, good):
     import renumber as RN
     import terms as T
     out = []
+    import review as RV
     w = tmp / "gate_review"
     shutil.copytree(good, w)
     (w / "reports").mkdir(exist_ok=True)
+    sid = RV.record(w, {F: fig for F, fig in RV.figures(w).items() if F in ("F01", "F02", "F03")}, "全体")   # 照合に出す版を控える（make_compare と同じ）
 
     def report(F, verdict="支持", finding=True, rename=None):
         fl = json.loads((w / "flows" / f"{F}.flow.json").read_text(encoding="utf-8"))
         vs = [{"node": rename.get(n["id"], n["id"]) if rename else n["id"], "verdict": verdict, "evidence": f"「{n['label']}」とある"}
               for n in fl["nodes"] if n["type"] not in ("start", "end")]
         fs = [{"kind": "表記", "target": vs[0]["node"], "text": "箱の名前に、原典の語を使うとよい"}] if finding else []
-        (w / "reports" / f"review_{F}.json").write_text(json.dumps({"verdicts": vs, "findings": fs}, ensure_ascii=False), encoding="utf-8")
+        (w / "reports" / f"review_{F}.json").write_text(json.dumps({"sheet": sid[F], "verdicts": vs, "findings": fs}, ensure_ascii=False), encoding="utf-8")
     for F in ("F01", "F02", "F03"):
         report(F, finding=F == "F01")
     c0, o0 = run("review.py", w, "draft")
@@ -1987,9 +2069,17 @@ def review_gate_tests(tmp, good):
         out.append((f"照合の門: {name} → FAIL" + ("" if hit else f"（「{expect}」が出ない）\n" + text[-600:]), code == 1 and bool(hit)))
     gate("採否表の判定を、報告と違う文にした", lambda x: edit(x / "review/F02.review.json", lambda r: r["verdicts"][0].update(evidence="言い換えた根拠")), "照合の報告（reports/）と違う")
     gate("採用したのに、図を直していない", lambda x: edit(x / "review/F01.review.json", lambda r: r["findings"][0].update(decision="採用", action="箱の名前を直した")),
-         "その指摘の報告を受けたときのまま")
-    gate("採用したのに、図を直していない（照合した版の写しの無い、前の版の採否表）",
-         lambda x: (edit(x / "review/F01.review.json", lambda r: (r["findings"][0].update(decision="採用", action="箱の名前を直した"), r.pop("reviewed"))),
+         "その指摘を受けたシートのときのまま")
+
+    def legacy(x):
+        """前の版の採否表にする（報告に sheet が無い・採否表に sheets が無い・照合に出した版の記録が無い）"""
+        for p in (x / "reports").glob("review_*.json"):
+            edit(p, lambda d: d.pop("sheet", None))
+        for p in (x / "review").glob("*.review.json"):
+            edit(p, lambda r: (r.pop("sheets", None), [f.pop("sheet", None) for f in r["findings"]]))
+        (x / "review/sheets.json").unlink()
+    gate("採用したのに、図を直していない（照合に出した版の記録の無い、前の版の採否表）",
+         lambda x: (legacy(x), edit(x / "review/F01.review.json", lambda r: r["findings"][0].update(decision="採用", action="箱の名前を直した")),
                     os.utime(x / "flows/F01.flow.json", (1, 1))), "採否表より古い")
     gate("支持率が 95% 未満", lambda x: [edit(x / f"review/{F}.review.json", lambda r: [v.update(verdict="一部支持") for v in r["verdicts"][:3]]) for F in ("F01", "F02", "F03")], "95% 未満")
     gate("採否表の flow_id が、ファイル名と違う", lambda x: edit(x / "review/F02.review.json", lambda r: r.update(flow_id="F03")), "flow_id が F03（ファイル名は F02）")
@@ -1997,14 +2087,18 @@ def review_gate_tests(tmp, good):
     gate("図の無い採否表", lambda x: (x / "review/F09.review.json").write_text(json.dumps({"flow_id": "F09", "verdicts": [], "findings": []}), encoding="utf-8"),
          "業務フローにもアクティビティ図にも無い")
     gate("採否表の無いフロー", lambda x: (x / "review/F02.review.json").unlink(), "採否表（review/F02.review.json）が無い")
+    gate("採否表が JSON として読めない", lambda x: (x / "review/F02.review.json").write_text("{", encoding="utf-8"), "review/F02.review.json: JSON として読めない")
+    gate("採否表の形が違う", lambda x: edit(x / "review/F02.review.json", lambda r: r["verdicts"][0].update(verdict="まあまあ")), "review/F02.review.json: 形が違う")
+    gate("照合に出した版の記録が崩れている", lambda x: (x / "review/sheets.json").write_text("{", encoding="utf-8"), "review/sheets.json（照合に出した版の記録）が JSON として読めない")
     gate("照合の報告が無い（採否表を手で書いた）", lambda x: (x / "reports/review_F02.json").unlink(), "照合の報告（reports/）が無い")
+    gate("照合の報告から、シートの番号（sheet）を消した（採否表は、照合に出した版の記録のある新しい版）",
+         lambda x: edit(x / "reports/review_F02.json", lambda d: d.pop("sheet")), "F02: 照合の報告に、照合したシートの番号（sheet）が無い")
     y = tmp / "gate_case_bad"
     shutil.copytree(w, y)
     edit(y / "review/F02.review.json", lambda r: r["verdicts"][0].update(verdict="まあまあ"))
     code, text = run("build_reports.py", y)
     out.append(("採否表の形が崩れていれば（採否の未記入のほか）、報告書を書かずに止まる", code != 0 and "形が違う" in text))
     # アクティビティ図の照合: 担当が突き合わせた箱（checked）だけを判定に数える。指摘のある箱は「不支持」
-    import review as RV
     a = tmp / "act_review"
     (a / "reports").mkdir(parents=True)
     (a / "reports/code_review_A-01-1.json").write_text(json.dumps({"activities": ["A-01-1"], "checked": {"A-01-1": ["P-001", "P-002"]}, "findings": [
@@ -2026,7 +2120,7 @@ def review_gate_tests(tmp, good):
     run("renumber.py", z, "--only", "F02")
     out.append(("開始条件が空のフローに、renumber.py が機械の問い（m-start）を付ける",
                 any(q.get("id") == "m-start" for q in json.loads((z / "flows/F02.flow.json").read_text(encoding="utf-8"))["questions"])))
-    gate("採用の無いまま、判定したノードの番号が変わった（前の版の採否表）", lambda x: (edit(x / "review/F02.review.json", lambda r: r.pop("reviewed")),
+    gate("採用の無いまま、判定したノードの番号が変わった（前の版の採否表）", lambda x: (legacy(x),
                                                                   edit(x / "flows/F02.flow.json", lambda f: RN.apply_ids(f, {f["nodes"][1]["id"]: "P-099"}))), "判定したノード")
     gate("照合のあとに、箱の番号を振り直した", lambda x: edit(x / "flows/F02.flow.json", lambda f: RN.apply_ids(f, {f["nodes"][1]["id"]: "P-099"})), "P-099 照合のあとに足した")
     out += diff_review_tests(tmp, w)
@@ -2070,26 +2164,39 @@ def review_gate_tests(tmp, good):
 
 
 def diff_review_tests(tmp, w):
-    """差分照合（2026-10-15）: 採否表に照合した版の写しを残し、照合のあとに変わった・足した箱だけを照合し直させる"""
+    """差分照合（2026-10-15）: 照合に出した版を記録に控え（make_compare・review.py record）、報告の sheet で結ぶ。照合のあとに変わった・足した箱だけを照合し直させる"""
     import review as RV
     from validate import validate
     out = []
     flow = lambda x, F="F02": json.loads((x / "flows" / f"{F}.flow.json").read_text(encoding="utf-8"))
     boxes = [n["id"] for n in flow(w)["nodes"] if n["type"] not in ("start", "end")]
-    P = boxes[1]
+    P, Q = boxes[1], boxes[2]
 
-    def case(name):
+    def case(name, base=None):
         x = tmp / f"diff_{name}"
-        shutil.copytree(w, x)
+        shutil.copytree(base or w, x)
         return x
 
     def fails(x):
         code, text = run("check_flow.py", x, "--stage", "review")
         return code, [ln for ln in text.splitlines() if ln.startswith("FAIL")], text
+
+    def put(x, name, d):
+        (x / "reports" / name).write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+    def decide(x, decision="不採用", action="原典の語のままでよい"):
+        edit(x / "review/F02.review.json", lambda r: [f.update(decision=decision, action=action) for f in r["findings"] if not f["decision"]])
+    rec = json.loads((w / "review/sheets.json").read_text(encoding="utf-8"))["sheets"]
     rv = json.loads((w / "review/F02.review.json").read_text(encoding="utf-8"))
-    out.append(("差分照合: 採否表の下書きに、照合した版の写し（箱ごとの要約・報告の印・報告を受けたときの図の印）が残り、形が正しい",
-                set(rv["reviewed"]["nodes"]) == set(boxes) and list(rv["reviewed"]["reports"]) == ["review_F02.json"]
-                and rv["reviewed"]["figures"] == {"review_F02.json": RV.figure_mark(RV.figures(w)["F02"])} and validate(rv, "review") == []))
+    mine = [e for e in rec if e["figure"] == "F02"]
+    out.append(("差分照合: 照合に出した版（箱ごとの要約・図の印）が記録に残り、採否表は報告とシートの番号を結ぶ。形が正しい",
+                len(mine) == 1 and mine[0]["kind"] == "全体" and set(mine[0]["nodes"]) == set(boxes) and mine[0]["mark"] == RV.figure_mark(RV.figures(w)["F02"])
+                and rv["sheets"] == {"review_F02.json": mine[0]["id"]} and validate(rv, "review") == []
+                and validate({"sheets": rec}, "sheets") == []))
+    S1 = mine[0]["id"]
+    c0, o0 = run("review.py", w, "record", "--only", "F02")
+    out.append(("差分照合: 図が同じなら、照合に出し直しても同じ番号（記録は増えない）",
+                c0 == 0 and f"シート {S1}" in o0 and len(json.loads((w / "review/sheets.json").read_text(encoding="utf-8"))["sheets"]) == len(rec)))
     x = case("label")
     edit(x / "flows/F02.flow.json", lambda f: node(f, P).update(label="照合のあとに直した名前を付ける"))
     code, hit, text = fails(x)
@@ -2101,69 +2208,136 @@ def diff_review_tests(tmp, w):
     code, hit, text = fails(y)
     out.append(("差分照合: 線のラベルを変えると、線の両端の箱を「線が変わった」と挙げる（開始・終了は照合しないので挙げない）",
                 code == 1 and all(f"{i} 線が変わった" in hit[0] for i in (e0["from"], e0["to"]) if i in boxes) and "start" not in hit[0]))
-    reports = x / "reports"
-    (reports / "review_F02_差分1.json").write_text(json.dumps({"verdicts": [{"node": P, "verdict": "支持", "evidence": "「直した名前」とある"}],
-                                                             "findings": [{"kind": "表記", "target": P, "text": "差分照合の指摘"}]}, ensure_ascii=False), encoding="utf-8")
+    t = case("table_deleted", x)                                     # 採否表を消して作り直しても、照合に出した版は変わらない
+    (t / "review/F02.review.json").unlink()
+    run("review.py", t, "draft", "--only", "F02")
+    decide(t)
+    code, hit, _t = fails(t)
+    out.append(("差分照合: 採否表を消して下書きを作り直しても、照合したあとに変わった箱は、照合済みにならない",
+                code == 1 and any(f"{P} 名前が変わった" in ln for ln in hit)))
+    c1, o1 = run("review.py", x, "record", "--only", "F02", "--nodes", P)
+    S2 = re.search(r"シート (S-\d+)", o1).group(1) if c1 == 0 and re.search(r"シート (S-\d+)", o1) else "?"
+    put(x, "review_F02_差分1.json", {"sheet": S2, "verdicts": [{"node": P, "verdict": "支持", "evidence": "「直した名前」とある"}],
+                                    "findings": [{"kind": "表記", "target": P, "text": "差分照合の指摘"}]})
     code, hit, text = fails(x)
-    out.append(("差分照合: 差分照合の報告を置いたまま、下書きを作り直していなければ FAIL（報告が採否表より新しい）",
-                code == 1 and any("照合の報告（reports/）と違う" in ln or "増えた・変わった" in ln for ln in hit)))
-    c1, o1 = run("review.py", x, "draft", "--only", "F02")
-    edit(x / "review/F02.review.json", lambda r: [f.update(decision="不採用", action="原典の語のままでよい") for f in r["findings"] if not f["decision"]])
-    x2 = tmp / "diff_report_rewritten"                                # 判定・指摘は同じで、報告のファイルだけが変わった（書き直した）
-    shutil.copytree(x, x2)
-    edit(x2 / "reports/review_F02_差分1.json", lambda d: d["verdicts"][0].update(node=P))
-    code_r, hit_r, _t = fails(x2)
-    out.append(("差分照合: 判定・指摘は同じでも、照合の報告が採否表を作ったあとに変わっていれば FAIL（下書きを作り直して、写しを取り直す）",
-                code_r == 1 and any("採否表を作ったあとに増えた・変わった" in ln for ln in hit_r)))
+    out.append(("差分照合: 差分照合の報告を置いたまま、下書きを作り直していなければ FAIL（報告と採否表が違う）",
+                code == 1 and any("照合の報告（reports/）と違う" in ln for ln in hit)))
+    c2, o2 = run("review.py", x, "draft", "--only", "F02")
+    decide(x)
     code, hit, text = fails(x)
     rv = json.loads((x / "review/F02.review.json").read_text(encoding="utf-8"))
-    out.append(("差分照合: 差分照合の報告から下書きを作り直すと、その箱の判定を置き換え、写しも取り直して、門が通る（指摘は足される）",
-                c1 == 0 and code == 0 and rv["reviewed"]["nodes"][P]["label"] == "照合のあとに直した名前を付ける"
-                and next(v for v in rv["verdicts"] if v["node"] == P)["evidence"] == "「直した名前」とある" and rv["findings"][-1]["text"] == "差分照合の指摘"
-                and "review_F02_差分1.json" in rv["reviewed"]["reports"]))
+    out.append(("差分照合: 差分照合のシート（記録に、照合し直す箱だけ）と報告から下書きを作り直すと、その箱の判定を置き換えて、門が通る（指摘は足され、シートの番号が付く）",
+                S2 != S1 and c2 == 0 and code == 0 and next(v for v in rv["verdicts"] if v["node"] == P)["evidence"] == "「直した名前」とある"
+                and rv["findings"][-1]["text"] == "差分照合の指摘" and rv["findings"][-1]["sheet"] == S2 and rv["sheets"]["review_F02_差分1.json"] == S2))
     edit(x / "review/F02.review.json", lambda r: r["findings"][-1].update(decision="採用", action="名前を直す"))
     code, hit, _t = fails(x)
-    out.append(("差分照合: 差分照合の指摘を採用して、図を直していなければ FAIL（その報告を受けたときの図のまま）",
-                code == 1 and any(f"{rv['findings'][-1]['id']}）があるのに" in ln and "報告を受けたときのまま" in ln for ln in hit)))
+    out.append(("差分照合: 差分照合の指摘を採用して、図を直していなければ FAIL（その指摘を受けたシートのときのまま）",
+                code == 1 and any(f"{rv['findings'][-1]['id']}）があるのに" in ln and "その指摘を受けたシートのときのまま" in ln for ln in hit)))
     edit(x / "flows/F02.flow.json", lambda f: node(f, P).update(label="差分照合の指摘で直した名前を付ける"))
     code, hit, _t = fails(x)
     out.append(("差分照合: 採用した指摘を図に反映すると、直した箱が、また照合していない箱になる（反映の FAIL は消える）",
                 code == 1 and len(hit) == 1 and f"{P} 名前が変わった" in hit[0]))
-    edit(reports / "review_F02_差分1.json", lambda d: d["verdicts"].append({"node": "P-999", "verdict": "支持", "evidence": "「無い」"}))
-    c2, o2 = run("review.py", x, "draft", "--only", "F02")
-    out.append(("差分照合: 差分照合の報告が、図に無い箱を判定していれば、下書きを作らずに止まる", c2 == 1 and "無い箱を判定している（P-999" in o2))
+    r = case("report_rewritten", x)                                  # 報告のファイルを書き直しても（中身は同じ）、照合した版も反映の点検も変わらない
+    d = json.loads((r / "reports/review_F02_差分1.json").read_text(encoding="utf-8"))
+    (r / "reports/review_F02_差分1.json").write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
+    run("review.py", r, "draft", "--only", "F02")
+    code_r, hit_r, _t = fails(r)
+    out.append(("差分照合: 報告のファイルを書き直しても（中身は同じ）、反映済みの指摘を「まだ反映していない」にしない",
+                code_r == 1 and len(hit_r) == 1 and f"{P} 名前が変わった" in hit_r[0]))
+    g = case("full_again", x)                                        # 差分照合のあとに、全体を照合し直した: 新しい全体の判定が、前の差分照合より勝つ
+    c3, o3 = run("review.py", g, "record", "--only", "F02")
+    S3 = re.search(r"シート (S-\d+)", o3).group(1) if re.search(r"シート (S-\d+)", o3) else "?"
+    put(g, "review_F02.json", {"sheet": S3, "verdicts": [{"node": n["id"], "verdict": "一部支持" if n["id"] == P else "支持", "evidence": "全体を照合し直した"}
+                                                     for n in flow(g)["nodes"] if n["type"] not in ("start", "end")], "findings": []})
+    c4, o4 = run("review.py", g, "draft", "--only", "F02")
+    rv = json.loads((g / "review/F02.review.json").read_text(encoding="utf-8"))
+    code, hit, _t = fails(g)
+    out.append(("差分照合: 差分照合のあとに全体を照合し直すと、新しい全体の判定が、前の差分照合の判定より勝ち、照合したあとに変わった箱は無くなる",
+                c3 == 0 and S3 not in (S1, S2) and c4 == 0 and next(v for v in rv["verdicts"] if v["node"] == P)["verdict"] == "一部支持"
+                and not any("照合したあとに変わった" in ln for ln in hit)))
+    k = case("box_deleted", x)                                       # 差分照合で判定した箱を、採用した指摘で消した: 行き止まりにしない
+    edit(k / "flows/F02.flow.json", lambda f: (f.update(nodes=[n for n in f["nodes"] if n["id"] != P]),
+                                               f.update(edges=[e for e in f["edges"] if P not in (e["from"], e["to"])] + [
+                                                   {"from": next(e["from"] for e in f["edges"] if e["to"] == P), "to": next(e["to"] for e in f["edges"] if e["from"] == P)}])))
+    c5, o5 = run("review.py", k, "draft", "--only", "F02")
+    _code, hit, text = fails(k)
+    out.append(("差分照合: 差分照合で判定した箱を、あとで消しても、下書きと点検は止まらない（消した箱の判定は、判定のあとに無くしたノードとして数える）",
+                c5 == 0 and not any("判定している" in ln for ln in hit) and "照合に出していない箱" not in o5))
+    bad = case("bad_reports", x)
+    put(bad, "review_F02_差分2.json", {"sheet": S2, "verdicts": [{"node": Q, "verdict": "支持", "evidence": "「別の箱」"}], "findings": []})
+    c6, o6 = run("review.py", bad, "draft", "--only", "F02")
+    put(bad, "review_F02_差分2.json", {"sheet": "S-99", "verdicts": [{"node": P, "verdict": "支持", "evidence": "「x」"}], "findings": []})
+    c7, o7 = run("review.py", bad, "draft", "--only", "F02")
+    put(bad, "review_F02_差分2.json", {"sheet": S1, "verdicts": [{"node": P, "verdict": "支持", "evidence": "「x」"}], "findings": []})
+    c8, o8 = run("review.py", bad, "draft", "--only", "F02")
+    (bad / "reports/review_F02_差分2.json").unlink()
+    put(bad, "review_F02_差分0.json", {"sheet": S2, "verdicts": [], "findings": []})
+    c9, o9 = run("review.py", bad, "draft", "--only", "F02")
+    (bad / "reports/review_F02_差分0.json").unlink()
+    put(bad, "review_F02_差分3.json", {"verdicts": [{"node": P, "verdict": "支持", "evidence": "「x」"}], "findings": []})
+    c10, o10 = run("review.py", bad, "draft", "--only", "F02")
+    out.append(("差分照合: 照合に出していない箱の判定・記録に無いシートの番号・全体のシートを差分照合の名前で・名前が決まりと違う（_差分0）・"
+                "シートの番号の無い報告は、下書きを作らずに止まる",
+                c6 == 1 and "照合に出していない箱を判定している" in o6 and c7 == 1 and "S-99 が" in o7 and c8 == 1 and "名前に _差分 を付けない" in o8
+                and c9 == 1 and "名前が決まりと違う" in o9 and c10 == 1 and "sheet）が無い" in o10))
+    (bad / "reports/review_F02_差分3.json").write_text("{", encoding="utf-8")
+    code, hit, text = fails(bad)
+    out.append(("差分照合: 読めない報告があっても、その図の FAIL にして、ほかの図と支持率の点検を続ける",
+                any(ln.startswith("FAIL  F02: reports/review_F02_差分3.json が JSON として読めない") for ln in hit) and "業務フローの支持率" in text
+                and "ここから先を点検できない" not in text))
+
+    def to_legacy(z):
+        """前の版の採否表にする（報告に sheet が無い・採否表に sheets が無い・照合に出した版の記録が無い）"""
+        for p in (z / "reports").glob("review_*.json"):
+            edit(p, lambda d: d.pop("sheet", None))
+        for p in (z / "review").glob("*.review.json"):
+            edit(p, lambda r: (r.pop("sheets", None), [f.pop("sheet", None) for f in r["findings"]]))
+        (z / "review/sheets.json").unlink()
     z = case("legacy")
-    edit(z / "review/F02.review.json", lambda r: r.pop("reviewed"))
+    to_legacy(z)
     code, _hit, text = fails(z)
-    c3, o3 = run("review.py", z, "snapshot", "--only", "F02")
-    c4, o4 = run("review.py", z, "snapshot", "--only", "F02", "--assume-current")
+    c11, o11 = run("review.py", z, "snapshot", "--only", "F01")
+    c12, o12 = run("review.py", z, "snapshot", "--only", "F01", "--assume-current")
     code2, _h, text2 = fails(z)
-    rv = json.loads((z / "review/F02.review.json").read_text(encoding="utf-8"))
-    out.append(("差分照合: 写しの無い前の版の採否表は WARN（FAIL にしない）。下書きを作り直しても、写しを勝手に作らない。"
-                "snapshot は --assume-current を付けたときだけ、いまの図を照合済みとして写し、日を残す",
-                code == 0 and "WARN  F02: 照合した版の写し（reviewed）が無い" in text and c3 != 0 and "--assume-current" in o3 and c4 == 0
-                and code2 == 0 and "照合した版の写し" not in text2 and rv["reviewed"]["figures"] == {} and rv["reviewed"].get("assumed")))
+    rv = json.loads((z / "review/F01.review.json").read_text(encoding="utf-8"))
+    rec2 = json.loads((z / "review/sheets.json").read_text(encoding="utf-8"))["sheets"] if (z / "review/sheets.json").exists() else []
+    c13, o13 = run("review.py", x, "snapshot", "--only", "F02", "--assume-current")
+    out.append(("差分照合: 前の版の採否表は WARN（FAIL にしない）。snapshot は --assume-current を付けたときだけ、いまの図を「認めた」版として控え（日が残り、点検の INFO に出る）、"
+                "採否表を写し直す（採否は引き継ぐ）。シートの番号のある報告のある図には使えない",
+                code == 0 and "WARN  F01: 照合に出した版の記録が無い" in text and c11 != 0 and "--assume-current" in o11 and c12 == 0
+                and code2 == 0 and "WARN  F01: 照合に出した版の記録が無い" not in text2 and "F01: 利用者が照合済みと認めた版" in text2
+                and [e["kind"] for e in rec2] == ["認めた"] and rv["sheets"] == {"review_F01.json": rec2[0]["id"]}
+                and rv["findings"] and all(f["decision"] == "不採用" for f in rv["findings"]) and "シートの番号（sheet）のある報告がある" in o13))
     v = case("legacy_draft")
-    edit(v / "review/F02.review.json", lambda r: r.pop("reviewed"))
+    to_legacy(v)
     run("review.py", v, "draft")
-    out.append(("差分照合: 前の版の採否表から下書きを作り直しても、照合した版の写しを勝手に作らない",
-                "reviewed" not in json.loads((v / "review/F02.review.json").read_text(encoding="utf-8"))))
-    # 重ね方: 業務フローは、差分照合の判定が、前の判定を置き換える（厳しいほうではない）。アクティビティ図は、差分照合で見た箱の判定を置き換える
+    out.append(("差分照合: 前の版の採否表から下書きを作り直しても、前の版のまま（照合に出した版を勝手に作らない）",
+                "sheets" not in json.loads((v / "review/F02.review.json").read_text(encoding="utf-8")) and not (v / "review/sheets.json").exists()))
+    # 重ね方: 照合に出した順。業務フローは、差分照合の判定が、前の判定を置き換える（厳しいほうではない）。アクティビティ図は、差分照合で見た箱の判定を置き換える
     a = tmp / "diff_merge"
     (a / "reports").mkdir(parents=True)
     fig = {"nodes": [{"id": "start", "type": "start"}] + [{"id": f"P-00{i}", "type": "process"} for i in (1, 2, 3)] + [{"id": "end", "type": "end"}]}
-    (a / "reports/review_F05.json").write_text(json.dumps({"verdicts": [{"node": f"P-00{i}", "verdict": "一部支持" if i == 2 else "支持", "evidence": "前"} for i in (1, 2, 3)],
-                                                        "findings": []}, ensure_ascii=False), encoding="utf-8")
-    (a / "reports/review_F05_差分1.json").write_text(json.dumps({"verdicts": [{"node": "P-002", "verdict": "支持", "evidence": "後"}], "findings": []}, ensure_ascii=False), encoding="utf-8")
-    (a / "reports/code_review_A-01-1.json").write_text(json.dumps({"activities": ["A-01-1"], "checked": {"A-01-1": ["P-001", "P-002"]}, "findings": [
+    s1 = RV.record(a, {"F05": fig, "A-01-1": fig}, "全体")
+    s2 = RV.record(a, {"F05": fig}, "差分", ["P-002"])
+    s3 = RV.record(a, {"A-01-1": fig}, "差分", ["P-002", "P-003"])
+    (a / "reports/review_F05.json").write_text(json.dumps({"sheet": s1["F05"], "verdicts": [{"node": f"P-00{i}", "verdict": "一部支持" if i == 2 else "支持", "evidence": "前"}
+                                                                                          for i in (1, 2, 3)], "findings": []}, ensure_ascii=False), encoding="utf-8")
+    (a / "reports/review_F05_差分1.json").write_text(json.dumps({"sheet": s2["F05"], "verdicts": [{"node": "P-002", "verdict": "支持", "evidence": "後"}], "findings": []},
+                                                             ensure_ascii=False), encoding="utf-8")
+    (a / "reports/code_review_A-01-1.json").write_text(json.dumps({"sheet": s1["A-01-1"], "activities": ["A-01-1"], "checked": {"A-01-1": ["P-001", "P-002"]}, "findings": [
         {"activity": "A-01-1", "kind": "条件・出口が逆", "node": "P-002", "what": "前の指摘"}]}, ensure_ascii=False), encoding="utf-8")
-    (a / "reports/code_review_A-01-1_差分1.json").write_text(json.dumps({"activities": ["A-01-1"], "checked": {"A-01-1": ["P-002", "P-003"]}, "findings": []},
-                                                                     ensure_ascii=False), encoding="utf-8")
+    (a / "reports/code_review_A-01-1_差分1.json").write_text(json.dumps({"sheet": s3["A-01-1"], "activities": ["A-01-1"], "checked": {"A-01-1": ["P-002", "P-003"]},
+                                                                      "findings": []}, ensure_ascii=False), encoding="utf-8")
     fv, _f = RV.from_reports(a, "F05", fig)
     av, af = RV.from_reports(a, "A-01-1", fig)
-    out.append(("差分照合: 差分照合の判定は、前の判定を置き換える（業務フロー: 一部支持 → 支持。アクティビティ図: 指摘のあった箱も、差分照合で見て指摘が無ければ支持。前の指摘は残る）",
-                {x["node"]: (x["verdict"], x["evidence"]) for x in fv} == {"P-001": ("支持", "前"), "P-002": ("支持", "後"), "P-003": ("支持", "前")}
-                and {x["node"]: x["verdict"] for x in av} == {"P-001": "支持", "P-002": "支持", "P-003": "支持"} and len(af) == 1))
+    fig2 = dict(fig, nodes=fig["nodes"][:2] + [dict(fig["nodes"][2], label="直した")] + fig["nodes"][3:])
+    gaps = RV.unreviewed(fig2, RV.mapped("A-01-1", RV.reports(a, "A-01-1"), RV.read_record(a)))
+    out.append(("差分照合: 判定は照合に出した順に重ね、差分照合の判定が前の判定を置き換える（業務フロー: 一部支持 → 支持。アクティビティ図: 指摘のあった箱も、"
+                "差分照合で見て指摘が無ければ支持。前の指摘は残る）。アクティビティ図も、照合に出した版と違う箱を挙げる",
+                s1["F05"] == s1["A-01-1"] and len({s1["F05"], s2["F05"], s3["A-01-1"]}) == 3
+                and {x["node"]: (x["verdict"], x["evidence"]) for x in fv} == {"P-001": ("支持", "前"), "P-002": ("支持", "後"), "P-003": ("支持", "前")}
+                and {x["node"]: x["verdict"] for x in av} == {"P-001": "支持", "P-002": "支持", "P-003": "支持"} and len(af) == 1 and af[0]["sheet"] == s1["A-01-1"]
+                and gaps == [("P-002", "名前が変わった")]))
     return out
 
 
@@ -2441,10 +2615,13 @@ def gate_tests(tmp, good):
     if drawio_cli() is None:
         return out + [("納品の門: draw.io が無いので、PNG の要る試験（門を通る・やり直す・写す）は飛ばした", None)]
     (w / "reports").mkdir(exist_ok=True)
+    import review as RV
+    sid = RV.record(w, RV.figures(w), "全体")
     for f in sorted((w / "flows").glob("*.flow.json")):
         fl = json.loads(f.read_text(encoding="utf-8"))
         vs = [{"node": n["id"], "verdict": "支持", "evidence": f"「{n['label']}」とある"} for n in fl["nodes"] if n["type"] not in ("start", "end")]
-        (w / "reports" / f"review_{fl['flow_id']}.json").write_text(json.dumps({"verdicts": vs, "findings": []}, ensure_ascii=False), encoding="utf-8")
+        (w / "reports" / f"review_{fl['flow_id']}.json").write_text(json.dumps({"sheet": sid[fl["flow_id"]], "verdicts": vs, "findings": []}, ensure_ascii=False),
+                                                                    encoding="utf-8")
     run("review.py", w, "draft")
     code, text = run("deliver.py", w, "--to", str(dest))
     files = {p.relative_to(dest).as_posix() for p in dest.rglob("*") if p.is_file()}
@@ -2465,16 +2642,21 @@ def gate_tests(tmp, good):
     f01 = json.loads((w / "flows/F01.flow.json").read_text(encoding="utf-8"))
     P = next(n for n in f01["nodes"] if n["type"] == "process" and n.get("sources"))
     cd, od = run("make_compare.py", w, "--only", "F01", "--nodes", P["id"])
-    diff = w / "out" / "差分照合シート_F01.pdf"
+    last = RV.read_record(w)[-1]
+    diff = w / "out" / f"差分照合シート_F01_{last['id']}.pdf"
     doc = fitz.open(str(diff)) if diff.exists() else None
     first, pages = (doc[0].get_text().replace("\u2012", "-"), doc.page_count) if doc else ("", 0)   # 取り出すと、- が ‒ になる
+    n_rec = len(RV.read_record(w))
     cb, _ob = run("make_compare.py", w, "--only", "F01,F02", "--nodes", P["id"])
     cc, oc = run("make_compare.py", w, "--only", "F01", "--nodes", "start")
+    stopped_quiet = len(RV.read_record(w)) == n_rec
     run("make_compare.py", w, "--only", "F01")
-    out.append(("差分照合のシート: 1 ページ目に照合し直す箱、続けて、その箱の出典ページだけ。フローを 2 本・開始の箱を指定すると止まる。全体を作り直すと消える。門が写す記録には入らない",
-                cd == 0 and pages == 1 + len({(s["doc_id"], s["page"]) for s in P["sources"]}) and "差分照合" in first and P["id"] in first
-                and cb != 0 and cc != 0 and "開始・終了は照合しない" in oc and not diff.exists()
-                and not any(fnmatch.fnmatch(diff.name, pat) for pat in RECORDS)))
+    out.append(("差分照合のシート: 1 ページ目に照合し直す箱（見出しにシートの番号）、続けて、その箱の出典ページだけ。シートの番号と照合し直す箱を、照合に出した版の記録に控える。"
+                "フローを 2 本・開始の箱を指定すると、控えずに止まる。全体を作り直しても残り（照合に出した記録）、門が作業の記録に写す",
+                cd == 0 and last["kind"] == "差分" and sorted(last["nodes"]) == [P["id"]] and pages == 1 + len({(s["doc_id"], s["page"]) for s in P["sources"]})
+                and "差分照合" in first and P["id"] in first and f"［{last['id']}］" in first
+                and cb != 0 and cc != 0 and "開始・終了は照合しない" in oc and stopped_quiet and diff.exists()
+                and any(fnmatch.fnmatch(diff.name, pat) for pat in RECORDS)))
     os.utime(w / "flows" / "F02.flow.json")
     (w / "out" / "~$業務マトリクス一覧.xlsx").write_bytes(b"")
     code, text = run("deliver.py", w, "--to", str(dest))
@@ -2624,6 +2806,20 @@ def mech_tests(tmp, good):
     c2, o2 = run("apply_edits.py", ln, "--flow", "F03")
     out.append(("レーンの順: 直しの一覧の lane_order のとおりに左から並ぶ（システムは右端のまま）。フローに無いレーンを書けば、何も書かずに止まる",
                 c1 == 0 and after[0] == pick and after[-1] == "会計システム" and sorted(after) == sorted(names) and c2 == 1 and "lane_order の「財務部」" in o2))
+    lanes_of = lambda: [x["name"] for x in json.loads((ln / "flows/F03.flow.json").read_text(encoding="utf-8"))["lanes"]]
+    (ln / "flows/F03.edits.json").write_text(json.dumps(dict(e, lane_order=["会計システム", pick]), ensure_ascii=False), encoding="utf-8")
+    c4, o4 = run("apply_edits.py", ln, "--flow", "F03")
+    sys_first = lanes_of()
+    _c, o4b = run("check_flow.py", ln, "--stage", "flow", "--only", "F03")
+    (ln / "flows/F03.edits.json").write_text(json.dumps(dict(e, lane_order=[pick, pick]), ensure_ascii=False), encoding="utf-8")
+    c5, o5 = run("apply_edits.py", ln, "--flow", "F03")
+    (ln / "flows/F03.edits.json").write_text(json.dumps(dict(e, lane_kinds={pick: "system"}), ensure_ascii=False), encoding="utf-8")
+    c6, _o = run("apply_edits.py", ln, "--flow", "F03")
+    kinds_right = lanes_of()
+    out.append(("レーンの順: lane_order に書いたシステムのレーンは、書いた位置に置き（知らせる）、システムの札を付けても動かさない。点検も止めない。"
+                "同じレーンを2回書けば止まる。lane_kinds で system にしたレーンは右端",
+                c4 == 0 and sys_first[:2] == ["会計システム", pick] and "書いた位置に置いた" in o4 and "右端に無い" not in o4b
+                and c5 == 1 and "同じレーンを2回以上" in o5 and c6 == 0 and set(kinds_right[-2:]) == {pick, "会計システム"}))
     before = [x["name"] for x in json.loads((ln / "flows/F02.flow.json").read_text(encoding="utf-8"))["lanes"]]
     run("renumber.py", ln, "--only", "F02")
     kept = [x["name"] for x in json.loads((ln / "flows/F02.flow.json").read_text(encoding="utf-8"))["lanes"]]
@@ -3508,6 +3704,7 @@ def io_fix_tests():
 def code_tests():
     """プログラムのソースの部品: 認証情報を伏せる・ページを手続きの切れ目で切る・構造を取り出す"""
     import code_struct as cs
+    import common as C
     out = []
     lines = CODE_SAMPLE.splitlines()
     masked, hit = cs.mask_secrets(lines)
@@ -3538,7 +3735,7 @@ def code_tests():
     out.append(("コード: 入出力（シートの読み書き・Set で束ねた変数・組み立てたファイル名・SQL のテーブル・接続先）",
                 {("シート", "メニュー", "in"), ("シート", "一覧", "out"), ("シート", "一覧", "in"), ("ファイル", "一覧_＜月＞.pdf", "out"),
                  ("テーブル", "入金", "out"), ("データベース", "hanbai", "in")} <= io))
-    out.append(("コード: 入出力の種類は、決まった語（common の io_kind。レポート・印刷は帳票）", {k for k, _n, _w in io} <= set(cs.IO_KINDS)))
+    out.append(("コード: 入出力の種類は、決まった語（common の io_kind。レポート・印刷は帳票）", {k for k, _n, _w in io} <= set(C.IO_KINDS)))
     out.append(("コード: 2か所から呼ばれる手続きは別の単位、1か所だけの小さな手続きは呼ぶ側に入れる",
                 [u["procedure"] for u in st["units"] if u["kind"] == "shared"] == ["集計.税額"] and st["inline"] == ["集計.保存する"] and st["unreached"] == []))
     out.append(("コード: 実行文の行が、どれも木のどこかに1回だけ入る", cs.tree_errors(st) == [] and procs["Main"]["exec"] == [8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 20, 21, 23]))
@@ -3729,6 +3926,13 @@ def code_pipeline_tests(tmp):
                 ui_ok and cs.touches({"a": {"calls": [], "io": [], "interactions": [], "dynamic": [], "ui": [5]}}, "a") == ["画面の部品への書き込み"]))
     case("台帳: プログラムの資料の一部が、システムに入っていない", "check_flow.py", ["--stage", "systems"], lambda w: edit(w / sysj, lambda s: s["systems"][0]["docs"].remove("M02")),
          "同じ1つのシステムの docs に入っていない")
+    case("台帳: JSON として読めない", "check_flow.py", ["--stage", "systems"], lambda w: (w / sysj).write_text("{", encoding="utf-8"), "systems.json: JSON として読めない")
+    case("台帳: 確認事項の id が重複", "check_flow.py", ["--stage", "systems"],
+         lambda w: edit(w / sysj, lambda s: s.update(questions=[dict(_q("s1"), category="システム"), dict(_q("s1"), category="システム")])), "確認事項の id が重複: s1")
+    case("アクティビティ図: 形が違う", "check_flow.py", ["--stage", "activity"], lambda w: edit(w / f"{a2}.activity.json", lambda a: a.update(summary=5)),
+         "activities/A-01-2.activity.json: 形が違う")
+    case("アクティビティ図の直しの一覧: 形が違う", "check_flow.py", ["--stage", "activity"], lambda w: edit(w / f"{a2}.edits.json", lambda e: e.update(summary=5)),
+         "activities/A-01-2.edits.json: 形が違う")
     case("フロー: 起動点の箱から、アクティビティ図の番号を消す", "check_flow.py", ["--stage", "flow"],
          lambda w: edit(w / "flows/F01.flow.json", lambda f: next(n for n in f["nodes"] if n.get("activity")).pop("activity")), "プログラムのソース")
     case("フロー: 推定の紐付けの確認事項を消す", "check_flow.py", ["--stage", "flow"],
@@ -3745,6 +3949,8 @@ def code_pipeline_tests(tmp):
     case("アクティビティ図: 直しの一覧を直したあと、作り直していない", "check_flow.py", ["--stage", "activity"],
          lambda w: edit(w / f"{a2}.edits.json", lambda e: e.update(name="集計する")), "作り直したものと違う")
     case("アクティビティ図: 図を1枚消す", "check_flow.py", ["--stage", "activity"], lambda w: (w / "activities/A-01-5.activity.json").unlink(), "アクティビティ図がまだ無い")
+    case("図: activity.json を消したのに、書き出した図にそのページが残る", "check_flow.py", ["--stage", "drawio"],
+         lambda w: (w / "activities/A-01-5.activity.json").unlink(), "対応する activity.json（A-01-5）が無い")
     case("直しの一覧: 決まっていない理由で畳む（スキーマの決まった語に無い）", "activity.py", ["apply", "--id", "A-01-2"],
          lambda w: edit(w / f"{a2}.edits.json", lambda e: e["ops"].append({"op": "fold", "item": "Main.32", "reason": "細かいから"})), "決まった語でない")
     case("直しの一覧: 対象外の理由で畳む（畳む理由の語でない）", "activity.py", ["apply", "--id", "A-01-2"],
@@ -4072,13 +4278,19 @@ def template_tests(tmp, good):
     ws, nl = got["業務一覧"] if "業務一覧" in got.sheetnames else got.worksheets[0], got["業務フローのノード一覧"]
     back = TT.read_back(w / "out" / BM.BOOK, BM.SPEC) if code == 0 else {"absent": {}}
     code2, text2 = run("check_flow.py", w, "--stage", "matrix")
-    out.append(("テンプレート（xlsx）: シートの名前・見出しの文字・列の順・判断の塗りを変え、任意の欄を人が埋める列に替えたテンプレートのとおりに出て、点検（--stage matrix）が通る"
-                + ("" if code == 0 and code2 == 0 else text[-300:] + text2[-500:]),
+    try:
+        bl, bl0 = BM.baseline(w), BM.baseline(good)
+    except Exception as e:
+        bl, bl0 = repr(e), None
+    out.append(("テンプレート（xlsx）: シートの名前・見出しの文字・列の順・判断の塗りを変え、任意の欄を人が埋める列に替えたテンプレートのとおりに出て、点検（--stage matrix）が通る。"
+                "現状の処理時間の写しも、名前を変えたシートから取れる"
+                + ("" if code == 0 and code2 == 0 and isinstance(bl, dict) else text[-300:] + text2[-500:] + str(bl)[:200]),
                 code == 0 and "業務マトリクス" not in got.sheetnames and ws["A1"].value == "業務領域" and ws.cell(1, a).value == ref.cell(1, b).value
                 and ws.cell(2, a).value == ref.cell(2, b).value and ws.cell(2, b).value == ref.cell(2, a).value and ws.max_row == ref.max_row
                 and nl.cell(1, mcol).value == "メモ（人が書く）" and all(nl.cell(i, mcol).value is None for i in range(2, nl.max_row + 1))
                 and any(str(x.fill.fgColor.rgb).endswith("FFD966") for row in ws.iter_rows(min_row=2) for x in row if x.fill.fill_type)
-                and "参考" in back["absent"].get("業務フローのノード一覧", ()) and code2 == 0 and "0 FAIL" in text2))
+                and "参考" in back["absent"].get("業務フローのノード一覧", ()) and code2 == 0 and "0 FAIL" in text2
+                and isinstance(bl, dict) and isinstance(bl0, dict) and bl["total"] == bl0["total"] > 0 and bl["table_version"] == bl0["table_version"]))
     # 確認事項一覧: 表題の行を足す・列を入れ替える・人が埋める列（選択式）を足す
     wb = load_workbook(assets / BR.Q_TEMPLATE)
     ws = wb[BR.Q_SHEET]
@@ -4859,6 +5071,13 @@ def unit_tests():
     stale = [f"{r['func']}「{r['part']}」" for r in rows if not any(CV.matches(r, s) for s in ss)]
     out.append(("被覆: 試験しない点検の一覧（evals/untested_checks.md）の行が、どれも、いまの点検に当たる。点検の場所を構文から拾える"
                 + (f"（当たらない行: {'・'.join(stale[:4])}）" if stale else ""), bool(rows) and not stale and len(ss) > 250))
+    from check_layout import page_problems
+    cross = lambda k: {"nodes": {}, "edges": [{"from": "P-001", "to": "P-009", "points": [[0, 50], [200, 50]]}]
+                       + [{"from": f"D-{i}", "to": f"P-{i}", "points": [[20 + 40 * i, 0], [20 + 40 * i, 100]]} for i in range(k)]}
+    four, three = list(page_problems(cross(4))), list(page_problems(cross(3)))
+    out.append(("配置の点検: ほかの線と 4 回以上交わる線は WARN（3 回までは出さない）。交わるだけでは FAIL にしない",
+                [x for x in four if x[0] == "warn" and "P-001→P-009 がほかの線と 4 回交わる" in x[1]] != [] and not [x for x in four if x[0] == "fail"]
+                and not three))
     return out
 
 
@@ -4981,16 +5200,17 @@ def main():
             keep = pathlib.Path(a.keep).expanduser().resolve()
             shutil.copytree(good, keep, dirs_exist_ok=True)
             print(f"正しいデータの一式 → {keep}")
-        for name, script, args, mutate, expect in CASES:
+        for name, script, args, mutate, expect, *level in CASES:     # level: WARN の試験なら "WARN"（門が FAIL にする WARN）
+            level = level[0] if level else "FAIL"
             w = tmp / "case"
             if w.exists():
                 shutil.rmtree(w)
             shutil.copytree(good, w)
             mutate(w)
             code, out = run(script, w, "--all-lines", *args)
-            hit = [ln for ln in out.splitlines() if ln.startswith("FAIL") and expect in ln]
-            passed = code == 1 and bool(hit)
-            print(f"{'OK  ' if passed else 'NG  '} {name}: " + (hit[0][:110] if hit else f"FAIL「{expect}」が出ない（終了コード {code}）"))
+            hit = [ln for ln in out.splitlines() if ln.startswith(level) and expect in ln]
+            passed = bool(hit) and (code == 1 if level == "FAIL" else True)
+            print(f"{'OK  ' if passed else 'NG  '} {name}: " + (hit[0][:110] if hit else f"{level}「{expect}」が出ない（終了コード {code}）"))
             if not passed:
                 ok = False
                 print("\n".join(ln for ln in out.splitlines() if ln.startswith(("FAIL", "WARN")))[:1200])

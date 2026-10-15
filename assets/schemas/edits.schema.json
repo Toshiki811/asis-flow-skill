@@ -15,7 +15,7 @@
    "additionalProperties": {"$ref": "flow#/$defs/lane/properties/kind"},
    "description": "書かなくてよい（図が見分けるのはシステムのレーンだけで、それは機械が用語の正本から決める）。レーンの種類を記録に残すときだけ（`{\"社外の委託先\": \"external\"}`）。`dept` 部門／`role` 役職・担当者／`system` システム／`external` 社外"
   },
-  "lane_order": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "書かなくてよい（レーンは機械が並べる。開始の担当が左端・システムが右端、残りは線がまたぐレーンの数が少ない順）。お客様の組織の順に合わせたいときだけ、左から並べたい順にレーンの名前を書く（一部だけでもよい。書かなかったレーンは、そのあとに機械が並べる）"},
+  "lane_order": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "書かなくてよい（レーンは機械が並べる。開始の担当が左端・システムが右端、残りは線がまたぐレーンの数が少ない順）。お客様の組織の順に合わせたいときだけ、左から並べたい順にレーンの名前を書く（一部だけでもよい。書かなかったレーンは、そのあとに機械が並べる。システムのレーンを書けば、書いた位置に置く。同じ名前を2回書けば止まる）"},
   "ops": {"type": "array", "items": {"$ref": "#/$defs/op"}, "description": "下書きへの直し。直すところが無ければ空"},
   "unused_pages": {
    "type": "array",

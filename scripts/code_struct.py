@@ -21,7 +21,7 @@ import re
 import sys
 
 import extract_access
-from common import IO_KINDS, MASK, io_kind, load, manifest, mask_secrets, page_json, load_page, save, work_dir  # noqa: F401（MASK は、ほかから cs.MASK で引く）
+from common import MASK, io_kind, load, manifest, mask_secrets, page_json, load_page, save, work_dir  # noqa: F401（MASK・mask_secrets は、ほかから cs. で引く）
 
 INLINE_MAX = 8                                                       # 呼ぶ所が1か所で、箱がこの数以下の手続きは、呼ぶ側の図に入れる
 CODE_KINDS = ("vba", "code")                                         # ページの種類（manifest の page_list[].kind）

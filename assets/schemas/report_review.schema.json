@@ -1,12 +1,13 @@
 {
  "title": "原典照合の報告（レビュー担当が書く）",
- "file": "reports/review_<フローID>[_<分冊>].json",
+ "file": "reports/review_<フローID>[_<分冊>].json・review_<フローID>_差分<N>.json",
  "description": "作り方を知らない別のエージェントが書く。親は、これを機械で採否表（review/<フローID>.review.json）の下書きに写し、採否と対応だけを書く",
  "type": "object",
  "additionalProperties": false,
  "required": ["verdicts", "findings"],
  "properties": {
-  "verdicts": {"type": "array", "items": {"$ref": "#/$defs/verdict"}, "description": "開始・終了を除く全ノードの判定"},
+  "sheet": {"$ref": "common#/$defs/sheet_id", "description": "照合したシートの番号（シートの見出しの［S-3］を写す）。どの版の図を照合したかは、この番号で決まる"},
+  "verdicts": {"type": "array", "items": {"$ref": "#/$defs/verdict"}, "description": "開始・終了を除く全ノードの判定（差分照合の報告は、シートに載った箱だけ）"},
   "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}, "description": "指摘。無ければ空"}
  },
  "$defs": {

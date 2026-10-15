@@ -75,10 +75,13 @@
   FAIL  納品物（図・業務マトリクス一覧・確認事項一覧・出典対応表・階層と業務分類）に、資料 ID（ページ・「」と並ぶ形）・内部の番号（業務の木の id・
         システムの番号・カードの項目のキー・ファイルの番号）・ファイルの場所（資料の表の「ファイル」の欄は除く）・スキーマの項目名・【下書き】が出ている
 [review]
-  FAIL  採否表の無い図（業務フロー・アクティビティ図）・図の無い採否表／形が違う・採否か対応の書かれていない指摘／
-        判定したノードが図に無い（採用した指摘が無いのに）／判定・指摘が照合の報告と違う／採用した指摘があるのに、図のデータが採否表より古い／
+  FAIL  採否表の無い図（業務フロー・アクティビティ図）・図の無い採否表／形が違う・採否か対応の書かれていない指摘／判定・指摘が照合の報告と違う／
+        照合したあとに変わった・足した箱（各箱をいちばん新しく照合に出した版（review/sheets.json）と、いまの図が違う。差分照合で照合し直す）／
+        報告の sheet が無い・記録に無い・照合に出していない箱を判定した・名前が決まりと違う・読めない（その図だけ止めて、次の図へ）／
+        採用した指摘があるのに、図のデータが、その指摘を受けたシートのときのまま／
         支持率（支持 ÷ 開始・終了を除く全ノード）が 95% 未満（業務フロー・アクティビティ図それぞれ）
-  WARN  保留の指摘／照合の報告が無い（写しを確かめられない）
+        報告に sheet の無い前の版の採否表は、前のとおり: 判定したノードが図に無い（採用した指摘が無いのに）／採用した指摘があるのに、図のデータが採否表より古い（ファイルの日時）
+  WARN  保留の指摘／照合に出した版の記録が無い（前の版の採否表）
 最後に 網羅率（ページ・項目）・補足由来の手順の反映数・引用照合率・推定の数・確認事項の件数を出す。
 終了コード: FAIL があれば 1。
 """
@@ -326,8 +329,8 @@ def glossary_names(cx):
     return (g if isinstance(g, dict) else None), names, alias
 
 
-def check_hierarchy(cx, rp, hier, late):
-    """階層の判定の中身。late は、読取の前には決めきれないものの出し方（階層だけの段階では WARN）"""
+def check_hierarchy(cx, rp, hier, final):
+    """階層の判定の中身。読取の前には決めきれないものは、final でなければ（階層だけの段階では）WARN"""
     seen, tied, detailed = set(), set(), set()
     toc = hier.get("toc_flow_list") if isinstance(hier.get("toc_flow_list"), dict) else {}
     axis = {x.get("doc_id") for x in toc.get("source") or [] if isinstance(x, dict)} if toc.get("found") else set()   # 縦軸にする目次のある資料
@@ -351,8 +354,8 @@ def check_hierarchy(cx, rp, hier, late):
                     rp.fail(f"hierarchy.json: {n.get('id')}「{n.get('title')}」に {r['doc_id']} を「詳しくしている」と結び付けたのに、"
                             f"根拠（evidence）が無い（根拠の文とページを書く。無ければ結び付けない）")
             elif axis and r["doc_id"] not in axis and n.get("source") == "toc" and blank(r.get("evidence")):
-                late(f"hierarchy.json: {n.get('id')}「{n.get('title')}」に、目次の資料でない {r['doc_id']} を結び付けたのに、根拠（evidence）が無い"
-                     f"（根拠の文とページを書く。書けなければ結び付けず、目次に無い業務として分類に足す。flow-rules.md 2.20）")
+                rp.fail_if(final, f"hierarchy.json: {n.get('id')}「{n.get('title')}」に、目次の資料でない {r['doc_id']} を結び付けたのに、根拠（evidence）が無い"
+                           f"（根拠の文とページを書く。書けなければ結び付けず、目次に無い業務として分類に足す。flow-rules.md 2.20）")
             evidence_pages(cx, rp, f"hierarchy.json: {n.get('id')} と {r['doc_id']} の結び付き", r)
             if not blank(r.get("evidence")) and not evidence_found(cx, r["evidence"], r.get("sources")):
                 rp.warn(f"hierarchy.json: {n.get('id')} と {r['doc_id']} の結び付きの根拠「{str(r['evidence'])[:30]}」が、出典のページに見当たらない"
@@ -364,7 +367,7 @@ def check_hierarchy(cx, rp, hier, late):
         if d not in roles:
             rp.fail(f"hierarchy.json: 資料 {d} の役割（docs[].role）が書かれていない")
         elif d not in tied and blank(roles[d].get("out_of_scope")):
-            late(f"hierarchy.json: 資料 {d} がどの業務にも結び付いていない（tree の refs に入れるか、docs の out_of_scope に対象外の理由を書く）")
+            rp.fail_if(final, f"hierarchy.json: 資料 {d} がどの業務にも結び付いていない（tree の refs に入れるか、docs の out_of_scope に対象外の理由を書く）")
     for d in roles:
         if d not in cx.docs:
             rp.fail(f"hierarchy.json: docs が存在しない資料を指す: {d}")
@@ -372,8 +375,8 @@ def check_hierarchy(cx, rp, hier, late):
         if r.get("from") not in cx.docs or r.get("to") not in cx.docs:
             rp.fail(f"hierarchy.json: 資料間の関係が存在しない資料を指す: {r.get('from')}→{r.get('to')}")
         elif r.get("type") == "parent_of" and r["to"] not in detailed:
-            late(f"hierarchy.json: {r['from']} が {r['to']} の上位、としたのに、{r['to']} が業務の木のどの節を詳しくしているか"
-                 f"（tree の refs に rel: details）が書かれていない。資料どうしの親子だけでは、フローの親子に落とせない")
+            rp.fail_if(final, f"hierarchy.json: {r['from']} が {r['to']} の上位、としたのに、{r['to']} が業務の木のどの節を詳しくしているか"
+                       f"（tree の refs に rel: details）が書かれていない。資料どうしの親子だけでは、フローの親子に落とせない")
         evidence_pages(cx, rp, f"hierarchy.json: {r.get('from')}→{r.get('to')} の関係", r)
         if not blank(r.get("evidence")) and not evidence_found(cx, r["evidence"], r.get("sources")):
             rp.warn(f"hierarchy.json: {r.get('from')}→{r.get('to')} の関係の根拠「{str(r['evidence'])[:30]}」が、出典のページに見当たらない"
@@ -606,7 +609,7 @@ def check_heading_page(cx, rp, c, mine):
         if name in cx.heading_text(k):
             msg = (f"taxonomy.json: {c.get('id')}「{c.get('name')}」の見出しが、割当の先頭（{cx.ref(mine[0])}）に無く、"
                    f"{abs(off)} ページ{'後ろ' if off > 0 else '前'}の {cx.ref(k)} にある（ページの割当が {abs(off)} ページずれている疑い）")
-            (rp.warn if k in mine else rp.fail)(msg)
+            rp.fail_if(k not in mine, msg)
             return mine[0][0], off
     return None
 
@@ -689,8 +692,8 @@ def check_taxonomy(cx, rp, tax, hier, cap):
     based = sum(1 for c in cats if c.get("basis") == "toc" and c.get("pages"))
     for (doc, off), n in shifts.items():                             # 1件ずつなら扉のページを含めただけかもしれない。そろってずれていれば番号の取り違え
         if n >= SHIFT_MIN and n >= SHIFT_SHARE * based:
-            rp.fails.insert(0, f"系統的なずれ — 目次に準拠した分類 {n} 件で、見出しが割当の先頭の {abs(off)} ページ{'後ろ' if off > 0 else '前'}にある（{doc}）。"
-                               f"目次の番号（刷られた番号）を、ファイルの番号としてそのまま割当に使っていないか。pages.py pagemap で対応を引く")
+            rp.fail(f"系統的なずれ — 目次に準拠した分類 {n} 件で、見出しが割当の先頭の {abs(off)} ページ{'後ろ' if off > 0 else '前'}にある（{doc}）。"
+                    f"目次の番号（刷られた番号）を、ファイルの番号としてそのまま割当に使っていないか。pages.py pagemap で対応を引く", first=True)
     toc = hier.get("toc_flow_list") or {}
     if toc.get("found"):
         check_toc_list(cx, rp, toc, tax, cats)
@@ -732,7 +735,7 @@ def check_structure(cx, rp, hierarchy_only=False, cap=MATERIAL_CAP):
         shape_fails(rp, "hierarchy.json", validate(hier, "hierarchy"), STRUCT_ERRORS, "python3 scripts/validate.py -w <作業フォルダ> --kind hierarchy")
         hier = {k: v for k, v in hier.items() if isinstance(v, (list, dict, str))}      # 形が違っても、読める所までは点検する
         with guarded(rp, "hierarchy.json"):
-            check_hierarchy(cx, rp, hier, rp.warn if hierarchy_only else rp.fail)
+            check_hierarchy(cx, rp, hier, not hierarchy_only)
             check_question_ids(rp, "hierarchy.json", hier.get("questions"))
             question_sources(cx, rp, "hierarchy.json", hier.get("questions"))
     toc = hier.get("toc_flow_list") if isinstance(hier.get("toc_flow_list"), dict) else {}
@@ -891,6 +894,11 @@ class FlowChecks:
             else:
                 rp.fail(f"{v.F}: レーン名「{l.get('name')}」が用語の正本（glossary.json）に無い。原典の呼び方から選ぶ。"
                         f"原典にある呼び方なら、親に知らせて glossary.json に足してもらう")
+        if (self.cx.work / "flows" / f"{v.F}.edits.json").exists():  # 直しの一覧のフローは、機械が並べる（lane_order で決めた並びは、そのまま）
+            return
+        kinds = [v.lanes[x].get("kind") == "system" for x in v.lanes]
+        if True in kinds and False in kinds[kinds.index(True):]:
+            rp.warn(f"{v.F}: システムのレーンが右端に無い（決まり 4.2）。lanes の順を入れ替えるか、python3 scripts/renumber.py -w <作業フォルダ> --only {v.F} --lanes で並べ直す")
 
     def node(self, v, n):
         rp, nid, t = self.rp, f"{v.F} {n.get('id')}", n.get("type")
@@ -1259,8 +1267,8 @@ class FlowChecks:
         """同じ資料の引用が、同じ向きに何件もずれているとき（出典を刷られた番号や目次の番号で書いた疑い）。先頭に出す"""
         for (doc, delta), who in self.shifted.items():
             if len(who) >= SHIFT_MIN and len(who) >= SHIFT_SHARE * max(1, self.n["checked"]):
-                self.rp.fails.insert(0, f"系統的なずれ — {doc} を出典にした引用 {len(who)} 件が、{abs(delta)} ページ{'後ろ' if delta > 0 else '前'}のページにある。"
-                                        f"出典の page を、刷られたページ番号や目次の番号で書いていないか（page はファイル名 pNNNN の番号）。{', '.join(who[:6])} …")
+                self.rp.fail(f"系統的なずれ — {doc} を出典にした引用 {len(who)} 件が、{abs(delta)} ページ{'後ろ' if delta > 0 else '前'}のページにある。"
+                             f"出典の page を、刷られたページ番号や目次の番号で書いていないか（page はファイル名 pNNNN の番号）。{', '.join(who[:6])} …", first=True)
 
     def unasked_pages(self):
         for k in sorted(self.cited):
@@ -1923,10 +1931,15 @@ def check_activity(cx, rp):
 # ---------- 業務マトリクス一覧 ----------
 
 def check_review(cx, rp):
-    """原典照合（工程 8）: 全部の図に採否表がある／形・全部の指摘の採否／照合したあとに変わった箱が無い（照合した版の写しと、いまの図）／
+    """原典照合（工程 8）: 全部の図に採否表がある／形・全部の指摘の採否／照合したあとに変わった箱が無い（照合に出した版の記録と、いまの図）／
     照合の報告と同じ／採用した指摘の反映／支持率"""
     import review as RV
     figs = RV.figures(cx.work)
+    try:
+        rec = RV.read_record(cx.work)
+    except ValueError as e:
+        rp.fail(f"{e}。消さずに、ファイルを前の版に戻す（照合に出した版の記録は、作り直せない）")
+        rec = []
     rdir = cx.work / "review"
     have = {f.name.split(".")[0]: f for f in sorted(rdir.glob("*.review.json"))} if rdir.exists() else {}
     for F in sorted(set(figs) - set(have)):
@@ -1954,50 +1967,57 @@ def check_review(cx, rp):
         if held:
             rp.warn(f"{F}: 保留の指摘 {len(held)} 件（原典の読みが割れるなら、確認事項に足したか）")
         adopted = any(isinstance(x, dict) and x.get("decision") == "採用" for x in rv.get("findings") or [])
-        ids = {n.get("id") for n in figs[F].get("nodes") or [] if isinstance(n, dict)}
-        gone = [str(v.get("node")) for v in rv.get("verdicts") or [] if isinstance(v, dict) and v.get("node") not in ids]
-        gaps = RV.unreviewed(rv, figs[F])
         act = F.startswith("A-")
-        if gaps is None:
-            rp.warn(f"{F}: 照合した版の写し（reviewed）が無い（前の版の採否表）。照合のあとに図を直していても、気づけない。"
-                    f"いまの図を照合済みと認めるなら python3 scripts/review.py snapshot -w <作業フォルダ> --only {F} --assume-current（利用者が決める）。"
-                    "全体を照合し直してもよい")
-            if gone and not adopted:
-                rp.fail(f"{F}: 判定したノード（{'・'.join(gone[:8])}）が図に無い。採用した指摘が無いのに番号が変わっている（照合のあとに番号を振り直した・別の図の判定を写した疑い）")
-        elif gaps:
-            ids_ = ",".join(i for i, _w in gaps)
-            rp.fail(f"{F}: 照合したあとに変わった・足した箱 {len(gaps)} 個（{'／'.join(f'{i} {w}' for i, w in gaps[:8])}{' …' if len(gaps) > 8 else ''}）。"
-                    "採用した指摘の直しも含めて、その箱だけを照合し直す（差分照合）: "
-                    + (f"references/code-review-prompt.md の差分照合で、報告を reports/code_review_<先頭の番号>_差分<N>.json に書かせ"
-                       if act else f"python3 scripts/make_compare.py -w <作業フォルダ> --only {F} --nodes {ids_} → references/source-review-prompt.md の差分照合で、"
-                                   f"報告を reports/review_{F}_差分<N>.json に書かせ")
-                    + f" → python3 scripts/review.py draft -w <作業フォルダ> --only {F}")
-        try:
-            want = RV.from_reports(cx.work, F, figs[F])
+        data = cx.work / ("activities" if act else "flows") / f"{F}.{'activity' if act else 'flow'}.json"
+        try:                                                         # 報告と、照合に出した版（報告の sheet）。崩れていれば、この図だけ止めて次の図へ
+            reps = RV.reports(cx.work, F)
+            maps = RV.mapped(F, reps, rec) if reps else None
+            want = RV.from_reports(cx.work, F, figs[F], rec, reps, maps) if reps else None
         except ValueError as e:
             rp.fail(f"{F}: {e}")
-            want = False
+            continue
         if want is None:
             rp.fail(f"{F}: 照合の報告（reports/）が無い。採否表の判定と指摘は、作り方を知らない担当の報告から機械が写す（親が書いた採否表は、照合の代わりにならない）。"
                     f"照合させてから python3 scripts/review.py draft -w <作業フォルダ> --only {F}")
-        elif want:
-            got_v = {(v.get("node"), v.get("verdict"), v.get("evidence")) for v in rv.get("verdicts") or [] if isinstance(v, dict)}
-            got_f = collections.Counter(RV.key(x) for x in rv.get("findings") or [] if isinstance(x, dict))
-            if got_v != {(v["node"], v["verdict"], v["evidence"]) for v in want[0]} or got_f != collections.Counter(RV.key(x) for x in want[1]):
-                rp.fail(f"{F}: 採否表の判定・指摘が、照合の報告（reports/）と違う（写し違い・言い換え）。python3 scripts/review.py draft -w <作業フォルダ> --only {F} で写し直す（採否は引き継ぐ）")
-            elif gaps is not None and (rv.get("reviewed") or {}).get("reports") != RV.report_marks(cx.work, F):
-                rp.fail(f"{F}: 照合の報告（reports/）が、採否表を作ったあとに増えた・変わった（差分照合の報告など）。"
-                        f"python3 scripts/review.py draft -w <作業フォルダ> --only {F} で写し直す（照合した版の写しも取り直す）")
-        data = cx.work / ("activities" if act else "flows") / f"{F}.{'activity' if act else 'flow'}.json"
-        if gaps is None:                                             # 前の版の採否表: ファイルの日時で見る
+            continue
+        got_v = {(v.get("node"), v.get("verdict"), v.get("evidence")) for v in rv.get("verdicts") or [] if isinstance(v, dict)}
+        got_f = collections.Counter((RV.key(x), x.get("sheet")) for x in rv.get("findings") or [] if isinstance(x, dict))
+        if got_v != {(v["node"], v["verdict"], v["evidence"]) for v in want[0]} or got_f != collections.Counter((RV.key(x), x.get("sheet")) for x in want[1]):
+            rp.fail(f"{F}: 採否表の判定・指摘が、照合の報告（reports/）と違う（写し違い・言い換え・報告が増えた・変わった）。"
+                    f"python3 scripts/review.py draft -w <作業フォルダ> --only {F} で写し直す（採否は引き継ぐ）")
+        if maps is None and not RV.legacy(rv, maps):
+            rp.fail(f"{F}: 照合の報告に、照合したシートの番号（sheet）が無い。照合シートの見出しの［S-<n>］を、報告の sheet に写させる"
+                    "（アクティビティ図は、python3 scripts/review.py record で控えた番号）")
+        elif maps is None:                                           # 前の版の採否表: 前のとおり、番号と、ファイルの日時で見る
+            rp.warn(f"{F}: 照合に出した版の記録が無い（前の版の採否表。報告に sheet が無い）。照合のあとに図を直していても、気づけない。"
+                    f"いまの図を照合済みと認めるなら（全体を照合し直して、採用した指摘を図に反映したあとも）、"
+                    f"python3 scripts/review.py snapshot -w <作業フォルダ> --only {F} --assume-current（利用者が決める）")
+            ids = {n.get("id") for n in figs[F].get("nodes") or [] if isinstance(n, dict)}
+            gone = [str(v.get("node")) for v in rv.get("verdicts") or [] if isinstance(v, dict) and v.get("node") not in ids]
+            if gone and not adopted:
+                rp.fail(f"{F}: 判定したノード（{'・'.join(gone[:8])}）が図に無い。採用した指摘が無いのに番号が変わっている（照合のあとに番号を振り直した・別の図の判定を写した疑い）")
             if adopted and data.exists() and data.stat().st_mtime < f.stat().st_mtime:
                 rp.fail(f"{F}: 採用した指摘があるのに、図のデータ（{data.parent.name}/{data.name}）が採否表より古い（採用した指摘を、まだ図に反映していない）")
-        else:                                                        # 写しのある採否表: 指摘を書いた報告を受けたときの図と、いまの図を比べる
-            at, org, now = (rv.get("reviewed") or {}).get("figures") or {}, RV.origins(cx.work, F), RV.figure_mark(figs[F])
-            same = [str(x.get("id")) for x in rv.get("findings") or [] if isinstance(x, dict) and x.get("decision") == "採用" and at.get(org.get(RV.key(x))) == now]
+        else:
+            gaps = RV.unreviewed(figs[F], maps)
+            if gaps:
+                ids_ = ",".join(i for i, _w in gaps)
+                rp.fail(f"{F}: 照合したあとに変わった・足した箱 {len(gaps)} 個（{'／'.join(f'{i} {w}' for i, w in gaps[:8])}{' …' if len(gaps) > 8 else ''}）。"
+                        "採用した指摘の直しも含めて、その箱だけを照合し直す（差分照合）: "
+                        + (f"python3 scripts/review.py record -w <作業フォルダ> --only {F} --nodes {ids_} → references/code-review-prompt.md の差分照合で、"
+                           f"報告を reports/code_review_{F}_差分<N>.json に書かせ" if act else
+                           f"python3 scripts/make_compare.py -w <作業フォルダ> --only {F} --nodes {ids_} → references/source-review-prompt.md の差分照合で、"
+                           f"報告を reports/review_{F}_差分<N>.json に書かせ")
+                        + f" → python3 scripts/review.py draft -w <作業フォルダ> --only {F}")
+            at, now = {e["id"]: e for e in rec if e["figure"] == F}, RV.figure_mark(figs[F])
+            same = [str(x.get("id")) for x in rv.get("findings") or [] if isinstance(x, dict) and x.get("decision") == "採用"
+                    and (at.get(x.get("sheet")) or {}).get("kind") not in (None, RV.ASSUMED) and at[x["sheet"]]["mark"] == now]
             if same:
-                rp.fail(f"{F}: 採用した指摘（{'・'.join(same[:8])}）があるのに、図のデータ（{data.parent.name}/{data.name}）が、その指摘の報告を受けたときのまま"
+                rp.fail(f"{F}: 採用した指摘（{'・'.join(same[:8])}）があるのに、図のデータ（{data.parent.name}/{data.name}）が、その指摘を受けたシートのときのまま"
                         "（採用した指摘を、まだ図に反映していない）")
+            said = sorted({f"{e['id']}（{e['date']}）" for _f, _d, e in maps if e["kind"] == RV.ASSUMED})
+            if said:
+                rp.info(f"{F}: 利用者が照合済みと認めた版 {'・'.join(said)} の上で点検した（review.py snapshot --assume-current）")
     for kind, s in RV.tally(figs, reviews).items():
         if not s["figs"] or not s["judged"]:
             continue
@@ -2052,7 +2072,7 @@ def check_reports(cx, rp):
     try:                                                             # 回答（人が埋める欄）の引き継ぎ
         ans = Answers(cx.work)
     except BadJson as e:
-        rp.fail(str(e))
+        rp.fail(f"人が埋める欄の控え（answers.json）を読めない — {e}")
         return
     now = {q["id"]: q["question"] for q in r.qs}
     gone, changed = answer_gaps(ans, BR.Q_BOOK, BR.Q_SHEET, now)
@@ -2148,7 +2168,7 @@ def check_deliverables(cx, rp):
 def matrix_times(rp, where, F, fl, pairs, row, times, table, seen, again):
     """処理時間の行（作業の行のすぐ下）を、ブックだけを読んで確かめる。pairs は [(作業のセル, その真下のセル)]。返すのは [(ノード番号, 時間のセルの番地)]。
     真下のセルが、その作業の時間のセル（コメントの 1 行目の札）か／中身が、数（人が入れた値）か、基準の表を引く式（動作の種類・量が、いまのフローのとおり）か／
-    合計の式が、その行の時間のセルを足しているか。ブックと times.json の値が違う所は、数えるだけ（人がブックを直して、まだ書き出し直していない）"""
+    合計の式が、その行の時間のセルを足しているか。ブックと times.json の値が違う所は、数えて WARN（人がブックを直して、まだ書き出し直していない）"""
     from build_matrix import MATRIX_HEAD, OURS, TAG_COUNT, TAG_TIME, number
     node = {x.get("id"): x for x in fl.get("nodes") or [] if isinstance(x, dict)}
     held = seen_files(fl)
@@ -2319,7 +2339,7 @@ def check_matrix(cx, rp):
     try:                                                             # 人が入れた時間の控え。読めなければ、組み立て直しもできないので、ここで止める
         times = Times(cx.work)
     except BadJson as e:
-        rp.fail(f"times.json: {e}")
+        rp.fail(f"人が入れた時間の控え（times.json）を読めない — {e}")
         return
     try:
         back = tt.read_back(book, SPEC)                                # テンプレートが決めた列の順を、欄の決まった順に戻して読む
@@ -2407,6 +2427,9 @@ def check_matrix(cx, rp):
             rp.fail(f"{BOOK}: 処理時間の基準の表を読めない（{bad or '名前「' + SPEC['time']['name'] + '」の範囲が無い'}）。{again}")
         elif not back["side"].get("table_version"):                 # 版の記録の前の道具で書き出したブック（納品の門が、現状の処理時間の写しに版を書けない）
             rp.fail(f"{BOOK}: 基準の表の版の記録が無い（前の版の道具で書き出したブック）。{again}")
+        else:                                                        # 人がブックで直した基準の表（書き出し直すと取り込み、版が変わる）
+            put = {(a, v): x for a, v, x in back["side"].get("table") or []}
+            seen["pending"] += sum(1 for k, x in table["values"].items() if k in put and abs(float(x) - float(put[k])) > 0.005)
     questions = (try_load(cx.work / "questions.json")[0] or {}).get("questions") or []
     for k, F in enumerate(expect):
         fl, r = flows[F], rows[per * k]
@@ -2448,7 +2471,7 @@ def check_matrix(cx, rp):
     try:                                                             # 様式で足した、人が埋める欄の引き継ぎ
         ans = Answers(cx.work)
     except BadJson as e:
-        rp.fail(str(e))
+        rp.fail(f"人が埋める欄の控え（answers.json）を読めない — {e}")
         ans = None
     if ans is not None:
         from build_matrix import M, answer_rows
@@ -2476,8 +2499,8 @@ def check_matrix(cx, rp):
     misc = [f"{F} {s['id']}" for F, s in steps if s["node"].get("type") == "process" and s["time"][0] == ACTIONS[-1] and (F, s["id"]) not in times.cells]
     if misc:
         rp.info(f"動作の種類が「{ACTIONS[-1]}」で、人の値がまだ無い作業が {len(misc)} 箱（仮の値は、「{ACTIONS[-1]}」の行の決めの値）: {some(misc)}")
-    if seen["pending"]:
-        rp.info(f"ブックと times.json で、値の違うセルが {seen['pending']} 個（人がブックを直したあと、まだ書き出し直していない。{again}と、ブックの値を取り込む）")
+    if seen["pending"]:                                              # 納品の門は、書き出し直して取り込んでから、現状の処理時間の写しを作る
+        rp.warn(f"ブックに、まだ取り込んでいない人の値が {seen['pending']} 個（処理時間・件数・基準の表。人がブックを直したあと、まだ書き出し直していない。{again}と、取り込む）")
     for key, cnt, mid, cur in calibration(mx, (table or {}).get("values") or {}):
         if mid != cur:
             rp.info(f"基準の表「{key[0]} × {key[1]}」は {cur} 分・人が入れた {cnt} セルの中央値は {mid} 分（表を引き直すなら build_matrix.py --calibrate）")
@@ -2539,7 +2562,7 @@ def main():
     if a.stage == "deliverables" or (a.stage == "all" and files):
         with guarded(rp, "納品物の文字"):
             check_deliverables(cx, rp)
-    if a.stage == "review" or (a.stage == "all" and (work / "review").exists()):
+    if a.stage == "review" or (a.stage == "all" and any((work / "review").glob("*.review.json"))):   # 採否表ができてから（照合シートを作ると、review/ に記録だけができる）
         with guarded(rp, "原典照合"):
             check_review(cx, rp)
     if a.numbers:

@@ -2,7 +2,7 @@
 """deliver.py — 納品の門。書き出しと点検を決まった順に回し、全部通ったら、納品物と作業の記録を出力先に写す。
 
   python3 scripts/deliver.py -w <作業フォルダ> --to <出力先>     # 門を通して、出力先の 納品物/・作業の記録/ に写す
-  python3 scripts/deliver.py -w <作業フォルダ> --check            # 門を見るだけ（書き出し直さない・写さない）
+  python3 scripts/deliver.py -w <作業フォルダ> --check            # 門を見るだけ（書き出し直さない・写さない。納品の数と現状の処理時間の写しは out/ に書く）
 
 門の中身（全部通ったら写す）:
   1 書き出しのあとの点検が、全段で FAIL 0（check_flow の全段・check_layout・check_extract）。
@@ -41,7 +41,8 @@ PROMOTE = {"資料を ID で呼んでいる": "data", "計算の結果が保存�
            "が、出典のページに見当たらない": "data",                      # 紐付け・関係・「続く」の根拠の文が原典に無い（機械が写すので、言い換え・作った文）
            "を出典にした確認事項がどのフローにも無い": "data",              # 読めない・曖昧な所を、確認事項にしていない
            "の文字と完全には一致しない": "data",                          # 手で写した引用（行の番号から機械が入れていない）
-           "つのフローに描かれている": "data"}                            # 同じ手順を、上位と下位に重ねて描いている疑い
+           "つのフローに描かれている": "data",                            # 同じ手順を、上位と下位に重ねて描いている疑い
+           "まだ取り込んでいない人の値": "export"}                        # 人がブックに入れた値（書き出し直すと取り込む。現状の処理時間の写しの前に）
 CHECKS = (("check_flow.py", "チェック_フロー.txt", ["--stage", "all"]), ("check_layout.py", "チェック_配置.txt", ["--no-png"]),
           ("check_extract.py", "チェック_読取.txt", []))
 GOODS, LOG = "納品物", "作業の記録"
@@ -121,7 +122,7 @@ def look(work, numbers_path):
         probs.append(("data", "draw.io のコマンドが無いので、PNG を作れない（draw.io デスクトップを入れてから、もう一度）"))
     import review as RV
     figs = RV.figures(work)
-    if figs and not (work / "review").exists():                      # 採否表が 1 つも無い（check_flow は、照合の段を見ない）
+    if figs and not any((work / "review").glob("*.review.json")):    # 採否表が 1 つも無い（check_flow は、照合の段を見ない。照合シートの記録だけでは、照合は始まっていない）
         probs.append(("data", f"原典照合（工程 8）がまだ: 図 {len(figs)} 枚に採否表が無い"))
     warns = []
     has_cards = (work / "cards").exists() and any((work / "cards").glob("*/*.json"))
@@ -192,7 +193,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("-w", "--work", required=True)
     ap.add_argument("--to", help="出力先のフォルダ（中に 納品物/・作業の記録/ を作る）")
-    ap.add_argument("--check", action="store_true", help="門を見るだけ（書き出し直さない・写さない）")
+    ap.add_argument("--check", action="store_true", help="門を見るだけ（書き出し直さない・写さない。納品の数と現状の処理時間の写しは out/ に書く）")
     a = ap.parse_args()
     if not a.to and not a.check:
         ap.error("--to <出力先> か --check を指定する")

@@ -1,11 +1,12 @@
 {
  "title": "アクティビティ図の照合の報告（レビュー担当が書く）",
- "file": "reports/code_review_<先頭の番号>.json",
+ "file": "reports/code_review_<先頭の番号>.json・code_review_<図の番号>_差分<N>.json",
  "description": "作り方を知らない別のエージェントが書く。親は、これを機械で採否表（review/<図の番号>.review.json）の下書きに写す。支持率は、機械が図の箱と指摘から数える（見た箱 checked のうち、指摘の無い箱が支持。checked に無い箱は判定なしとして分母にだけ入る）",
  "type": "object",
  "additionalProperties": false,
  "required": ["activities", "checked", "findings"],
  "properties": {
+  "sheet": {"$ref": "common#/$defs/sheet_id", "description": "照合に出した版の番号（親が review.py record で控えて渡す S-3 を写す）"},
   "activities": {"type": "array", "minItems": 1, "items": {"$ref": "common#/$defs/activity_id"}, "description": "見た図の番号"},
   "checked": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}, "description": "図の番号 → ソースと突き合わせた箱の番号（開始・終了を除く）。ここに無い箱は、照合していない箱として数える"},
   "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
