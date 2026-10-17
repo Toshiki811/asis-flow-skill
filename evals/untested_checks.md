@@ -1,6 +1,6 @@
 # 発火を試験しない点検
 
-点検（`check_flow.py`・`check_layout.py`・`check_extract.py`）の FAIL のうち、自己点検で、誤りを仕込んで出すことをしないもの。
+点検（`check_flow.py`・`check_layout.py`・`check_extract.py`）の FAIL と、点検が中継する誤りの文（`apply_edits.py`・`activity.py`・`systems.py`）のうち、自己点検で、誤りを仕込んで出すことをしないもの。
 
 - LLM・人が書くファイル（カード・業務分類・フロー・台帳・直しの一覧・木・用語の対応・採否表・照合の報告）を見る点検は、ここに載せない。どれも、自己点検で発火を確かめる。
 - ここに載るのは、次の 3 種類だけ。
@@ -12,8 +12,14 @@
   - 表の行が、いまの点検のどれにも当たらない（点検の文を変えた・消した）
   - 表に載っているのに、自己点検で出た（試験できたので、表から外す）
   - 自己点検に NG がある
-- 数える所: `Report.fail`・`fail_if`・配置の点検の `yield "fail"`、納品の門が FAIL に上げる WARN（`deliver.PROMOTE` の語を含む `Report.warn`）。ほかの WARN は数えない。
-  点検の共通の部品（`common.FAIL_HELPERS`）は、部品の中でなく、呼ぶ所ごとに数える（どの点検から出たかを、呼んだ所の行で控える）。
+- 数える所: `Report.fail`・`fail_if`（FAIL になったときだけ控える。WARN の側だけ出ても、FAIL を確かめたことにしない）・配置の点検の `yield "fail"`、
+  納品の門が FAIL に上げる WARN（`deliver.PROMOTE` の語を含む `Report.warn`）。ほかの WARN は数えない。門の語が、どの WARN の文にも無くなれば、終了コード 1。
+  点検の共通の部品（`common.FAIL_HELPERS`）は、部品の中の FAIL と、呼ぶ所の両方を数える（呼ぶ所は、どの種類のファイルの点検から出たかを、呼んだ行で控える）。
+  点検が 1 行で中継する誤りの文のうち、直しの一覧（`apply_edits.py`）・アクティビティ図の直しの一覧（`activity.py`）・台帳の紐付けと図にしない起動点・手続き
+  （`systems.py` の `link_errors`・`excluded_errors`・`folded_errors`）は、内側の誤りの文ごとに数える（`common.site` で包んだ文と、`self.bad` の呼び出し。2026-10-17 から）。
+- 数えないもの:
+  - 落ちないための守り（`common.guarded` の「形が崩れていて、ここから先を点検できない」）。自己点検は、正しいデータと試験の写しで、これが出ないことを確かめている。
+  - 中継の内側のうち、`terms.py` の用語の対応の誤り・`code_struct.py`（`code_lang.py`）の木の誤り・`review.py` の報告の誤り。中継の行は 1 か所に数え、内側の文ごとには数えない。
 - 表の行は、ファイル・関数・文の一部で点検を指す（行の番号は書かない。点検の文を変えたら、ここも直す）。
 
 | ファイル | 関数 | 文の一部 | 試験しない理由 |
@@ -28,12 +34,12 @@
 | check_flow.py | `check_page_matches_flow` | レーンが flow.json と違う | 同上 |
 | check_flow.py | `check_drawio` | システムと起動点の一覧のページが無い | 同上 |
 | check_flow.py | `check_drawio` | mxGraphModel/root が無い | 同上 |
-| check_flow.py | `check_regenerated` | が無い（書き出していない） | 守り。書き出していない図は、図のページの点検（`check_drawio`。試験している）が先に止める |
+| check_flow.py | `check_regenerated` | が無い（書き出していない） | 守り。書き出していない図は、図のページの点検（`check_drawio` の「ページが無い」。試験している）と同時に出る |
 | check_flow.py | `check_drawio` | assets/activity_styles.json が無い・古い | 守り。スキルの部品（assets）を消さない限り起きない |
 | check_flow.py | `check_code` | 取り出した構造の誤り | 守り。機械の取り出し（`code_struct.py`）の誤り。LLM の木の誤りは、木を構造にする前に止める（「木の点検」の試験） |
 | check_flow.py | `matrix_results` | 保存した計算の結果が違う式のセルが、ほかに | 同じ種類の FAIL が多いときの、残りの数の行。1 つ目の行は試験している |
 | check_flow.py | `check_matrix` | のシートが無い（テンプレートに要る） | 守り。シートを消したブックは、読み戻し（`read_back`）が先に止める |
-| check_flow.py | `check_matrix` | の数が、いまのデータと違う: ブック | 業務マトリクス一覧は機械が書く。全セルの比べ（試験している）の内訳 |
 | check_flow.py | `check_matrix` | いまのデータと違うセルが、ほかに | 同じ種類の FAIL が多いときの、残りの数の行。1 つ目の行は試験している |
-| check_flow.py | `check_matrix` | のフローの並びが、業務分類の順でない | 業務マトリクス一覧は機械が書く。行を並べ替えたブックは、全セルの比べが先に止める |
+| check_flow.py | `check_matrix` | のフローの並びが、業務分類の順でない | 業務マトリクス一覧は機械が書く。行を並べ替えたブックは、全セルの比べ（試験している）と同時に出る（重ねて出るだけ） |
 | check_layout.py | `main` | PNG に書き出せない（ | 守り。draw.io の書き出しが失敗したとき（アプリが無い・壊れた）。試験の環境では作れない |
+| apply_edits.py | `fold` | のまとめ先が無い（対象外にした） | 守り。まとめ先を対象外にする直しは、`op_exclude` の「ほかの項目がまとめてある」が先に止め、対象外にした項目へは、まとめられない（`into` が下書きに無い）。直しの一覧からは作れない |

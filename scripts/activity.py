@@ -26,7 +26,7 @@ import sys
 
 import code_struct as cs
 import terms as T
-from common import EFFECTS, SEV_LABEL, load, load_page, page_json, page_units, save, severity_of, span_text, work_dir
+from common import EFFECTS, SEV_LABEL, load, load_page, page_json, page_units, save, severity_of, site, span_text, work_dir
 from renumber import renumber
 from systems import Ledger, has_ledger
 from validate import blocking, validate
@@ -245,7 +245,7 @@ class Builder:
         self.by = draft.by
 
     def bad(self, i, op, msg):
-        self.err.append(f"ops[{i}]（{op.get('op')}）: {msg}")
+        self.err.append(site(f"ops[{i}]（{op.get('op')}）: {msg}", 2))
 
     def need(self, i, op, key, kinds=None):
         it = self.by.get(key)
@@ -633,17 +633,17 @@ class Builder:
         for i, x in enumerate(y for y in self.e.get("questions") or [] if isinstance(y, dict)):
             qid = str(x.get("id") or "")
             if not qid or qid in seen:
-                self.err.append(f"questions[{i}]: id「{qid}」が空か、重なっている")
+                self.err.append(site(f"questions[{i}]: id「{qid}」が空か、重なっている"))
                 continue
             seen.add(qid)
             keys = [k for k in x.get("items") or []]
             nodes = [ren.get(k, k) for k in keys]
             if any(n not in ids for n in nodes):
-                self.err.append(f"questions[{i}]（{qid}）: items が指す項目が、図の箱になっていない（{'・'.join(k for k, n in zip(keys, nodes) if n not in ids)}）")
+                self.err.append(site(f"questions[{i}]（{qid}）: items が指す項目が、図の箱になっていない（{'・'.join(k for k, n in zip(keys, nodes) if n not in ids)}）"))
                 continue
             if x.get("effect") not in EFFECTS:
-                self.err.append(f"questions[{i}]（{qid}）: effect（答えで、図のどこが変わるか）が無い・決まった語でない（{'／'.join(EFFECTS)}）。"
-                                "どれにも当たらない問い（値だけ・いまも同じかの確かめ・名前だけ）は、確認事項にしない")
+                self.err.append(site(f"questions[{i}]（{qid}）: effect（答えで、図のどこが変わるか）が無い・決まった語でない（{'／'.join(EFFECTS)}）。"
+                                "どれにも当たらない問い（値だけ・いまも同じかの確かめ・名前だけ）は、確認事項にしない"))
                 continue
             q = {"id": qid, "severity": "", "category": x.get("category", "プログラム"), "effect": x["effect"]}
             if len(nodes) == 1:

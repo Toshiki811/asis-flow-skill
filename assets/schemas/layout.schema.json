@@ -22,7 +22,8 @@
     "bounds": {"type": "array", "minItems": 4, "maxItems": 4},
     "nodes": {"type": "object", "additionalProperties": {"type": "array", "minItems": 4, "maxItems": 4}},
     "edges": {"type": "array", "items": {"type": "object"}},
-    "captions": {"type": "object", "additionalProperties": {"type": "array", "minItems": 4, "maxItems": 4}}
+    "captions": {"type": "object", "additionalProperties": {"type": "array", "minItems": 4, "maxItems": 4}},
+    "mark": {"$ref": "common#/$defs/mark", "description": "描いた図のデータ（flow.json・activity.json）の印。照合シート・照合に出す版の控えが、書き出した図と同じデータかを見る"}
    }
   }
  }

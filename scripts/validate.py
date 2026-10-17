@@ -73,6 +73,18 @@ def type_name(v):
 def walk(v, sch, root, path, errs):
     sch, root = resolve(sch, root)
     at = path or "（全体）"
+    if "anyOf" in sch:                                               # どれか 1 つの形に合えばよい（動作の種類: 1 語か、2 語までの並び）
+        tries = []
+        for b in sch["anyOf"]:
+            e = []
+            walk(v, b, root, path, e)
+            if not e:
+                break
+            tries.append(e)
+        else:
+            fit = [e for e in tries if not e[0].startswith(f"{at}: 型が違う")]
+            errs.extend(fit[0] if fit else [f"{at}: 型が違う（{type_name(v)}。{' / '.join(type_text(b, root) for b in sch['anyOf'])} で書く）"])
+            return
     if "type" in sch:
         ts = sch["type"] if isinstance(sch["type"], list) else [sch["type"]]
         if not any(type_ok(v, t) for t in ts):
@@ -93,6 +105,8 @@ def walk(v, sch, root, path, errs):
             errs.append(f"{at}: {len(v)} 件（{sch['minItems']} 件以上要る）")
         if "maxItems" in sch and len(v) > sch["maxItems"]:
             errs.append(f"{at}: {len(v)} 件（{sch['maxItems']} 件まで）")
+        if sch.get("uniqueItems") and len({json.dumps(x, sort_keys=True, ensure_ascii=False) for x in v}) < len(v):
+            errs.append(f"{at}: 同じものが 2 回以上ある")
         if "items" in sch:
             for i, x in enumerate(v):
                 walk(x, sch["items"], root, f"{path}[{i}]", errs)
@@ -154,6 +168,8 @@ def files_of(work, kind):
 
 def type_text(sch, root):
     sch, root = resolve(sch, root)
+    if "anyOf" in sch:
+        return " / ".join(type_text(b, root) for b in sch["anyOf"])
     if "enum" in sch:
         return "決まった語"
     t = sch.get("type")
@@ -172,8 +188,9 @@ def table(sch, root):
     out = ["| 項目 | 必須 | 型 | 中身 |", "| --- | --- | --- | --- |"]
     for k, p in (sch.get("properties") or {}).items():
         d = p.get("description") or resolve(p, root)[0].get("description") or ""
-        r = resolve(p, root)[0]
-        enum = r.get("enum") or resolve(r.get("items") or {}, root)[0].get("enum") or []
+        r, rr = resolve(p, root)
+        enum = r.get("enum") or resolve(r.get("items") or {}, rr)[0].get("enum") or next(
+            (e for b in r.get("anyOf") or [] for e in [resolve(b, rr)[0].get("enum")] if e), [])
         words = [x for x in enum if isinstance(x, str) and f"`{x}`" not in d and f"「{x}」" not in d]
         if words:                                                    # 決まった語は、説明に出てこなければ表に並べる（表だけ見て書けるように）
             d = f"{d}（{'／'.join(f'`{x}`' for x in enum if isinstance(x, str))}）" if d else "／".join(f"`{x}`" for x in enum if isinstance(x, str))

@@ -5,6 +5,8 @@
   python3 scripts/make_compare.py -w <作業フォルダ> --only F03
   python3 scripts/make_compare.py -w <作業フォルダ> --max-pages 8   # 1本の PDF に入れる出典ページの数（既定 12）。超えたら _1・_2… に分ける
   python3 scripts/make_compare.py -w <作業フォルダ> --only F03 --nodes P-003,P-007   # 差分照合のシート out/差分照合シート_F03_S-<n>.pdf
+                                                                                   # （図全体の項目を照合し直すときは、番号に「図の項目」も並べる）
+  python3 scripts/make_compare.py -w <作業フォルダ> --skip-reviewed   # 照合に出した図（採否表のある図）のシートは作らない（納品の門の書き出し直し）
 
 1ページ＝出典の1ページ。左にフロー図（そのページを出典にしたノードを赤枠で囲む）とノードの一覧（引用つき）、
 右に出典ページの画像。「このページに本当にそう書いてあるか」「このページの手順でフローに無いものはないか」を、
@@ -12,7 +14,8 @@
 最後に、このフローに割り当てたのに使わなかったページと理由、カードにあるのにフローに入れなかった手順と理由を載せる。
 見出しのページ番号は、資料に刷られた番号（Excel はシート名）。出典ページが多いフローは、レビュー担当が1回で読み切れるように PDF を分ける。
 作るたびに、照合に出す版（箱ごとの要約と図の印）を review/sheets.json に控え（review.record）、見出しの頭にシートの番号［S-<n>］を出す。
-レビュー担当は、この番号を報告の sheet に写す（どの版の図を照合したかは、この番号で決まる）。図が同じなら、前と同じ番号（作り直しでは増やさない）。
+レビュー担当は、この番号を報告の sheet に写す（どの版の図を照合したかは、この番号で決まる）。図・種類・箱が、その図の最後の控えと同じなら、
+前と同じ番号（作り直しでは増やさない）。書き出したあとに flow.json を直していれば、作らずに止まる（シートの図と、控える版をそろえる）。
 差分照合（--nodes）: 照合のあとに変わった・足した箱（check_flow.py --stage review が挙げる）だけを照合し直すためのシート。
 1ページ目に、照合し直す箱の一覧（図の中で赤枠）。続けて、その箱の出典ページだけ（赤枠と一覧も、その箱だけ）。使わなかったページの一覧は付けない。
 差分照合のシートは、番号ごとに残す（照合した記録として、納品の門が作業の記録に写す）。
@@ -25,6 +28,7 @@ import re
 
 from common import (NODE_LABEL, CardItems, cited_pages, docs_by_id, item_reasons, load, load_card, load_flows, load_page, manifest, page_json,
                     page_png, question_ids, src_label, unused_reasons, why_unused, work_dir)
+from review import FIG
 
 W, H = 1190, 842           # A3 横（pt）
 MARGIN, TOP = 24, 44       # 余白と、見出しの下の y
@@ -198,6 +202,11 @@ class Sheets:
         put(page, x, y + 6, "次のページから、この箱の出典ページ（赤枠と一覧も、この箱だけ）。箱の前後の線（つなぎ）も、原典どおりかを見る。出典の無い箱（推定）は、図とフローの定義で見る。",
             size=10, width=W - x - MARGIN, max_lines=4)
         y = TOP + FLOW_H + 22
+        if FIG in targets:
+            fl = self.fl
+            y = put(page, MARGIN, y, f"{FIG}（図全体）: 開始条件「{fl.get('start_condition') or '（空）'}」／終了条件「{fl.get('end_condition') or '（空）'}」。"
+                    "使わないページ・対象外にした手順の理由は、最後のページ。原典どおりかを見る（間違いは、報告の findings に書く）",
+                    size=9, width=W - 2 * MARGIN, max_lines=3) + 4
         for n in nodes:
             if y > H - 30:
                 put(page, MARGIN, y, "…（続きは、次のページからの一覧）", size=8, color=(0.4, 0.4, 0.4))
@@ -250,6 +259,7 @@ def write_sheets(work, sheets, assigned, max_pages, targets=None):
     targets（箱の番号）があれば、差分照合のシート（その箱と、その箱の出典ページだけ）"""
     import fitz
     F, by_page = sheets.F, nodes_by_page(sheets.fl)
+    full = set(by_page)
     if targets:
         by_page = {k: [(n, s) for n, s in uses if n["id"] in targets] for k, uses in by_page.items()}
         by_page = {k: uses for k, uses in by_page.items() if uses}
@@ -261,8 +271,8 @@ def write_sheets(work, sheets, assigned, max_pages, targets=None):
     for part, pdf in zip(parts, pdfs):
         for k in part:
             sheets.source_page(pdf.new_page(width=W, height=H), k, by_page[k])
-    if not targets:
-        sheets.leftover_page(pdfs[-1].new_page(width=W, height=H), [k for k in assigned if k not in by_page], pages=set(assigned) | set(by_page))
+    if not targets or FIG in targets:                                # 図の項目（使わないページ・対象外の項目の理由）を照合し直すときも、最後のページに載せる
+        sheets.leftover_page(pdfs[-1].new_page(width=W, height=H), [k for k in assigned if k not in full], pages=set(assigned) | full)
     name = f"差分照合シート_{F}_{sheets.sheet}" if targets else f"照合シート_{F}"
     for old in (work / "out").glob(f"{name}*.pdf"):                  # 前に作った分（分け方が変わると名前が変わる）。下位フロー F03-1 の分・ほかの差分照合のシートは消さない
         if re.fullmatch(rf"{re.escape(name)}(_\d+)?", old.stem):
@@ -285,6 +295,8 @@ def main():
     ap.add_argument("--only")
     ap.add_argument("--max-pages", type=int, default=12, help="1本の PDF に入れる出典ページの数（レビュー担当が1回で読み切れる量）")
     ap.add_argument("--nodes", help="差分照合: 照合し直す箱の番号（カンマ区切り。--only に 1 本だけ）。out/差分照合シート_<フローID>_S-<n>.pdf を作る")
+    ap.add_argument("--skip-reviewed", action="store_true",
+                    help="照合に出した図（採否表のある図）のシートは作らない（作り直すと、照合していない版が控えられ、照合したシートが消える。納品の門が使う）")
     a = ap.parse_args()
     targets = [x.strip() for x in a.nodes.split(",") if x.strip()] if a.nodes else None
     if targets is not None and (not a.only or "," in a.only or not targets):
@@ -302,21 +314,30 @@ def main():
     flows, skipped = load_flows(work), []
     for fl in flows:
         F = fl["flow_id"]
-        if only and F not in only:
+        if (only and F not in only) or (a.skip_reviewed and (work / "review" / f"{F}.review.json").exists()):
             continue
         layout, png = images.get(f"flow-{F}", (None, None))
         if layout is None or not png.exists():
             print(f"{F}: フロー図の PNG が無い（build_drawio.py → check_layout.py を先に実行する）")
             skipped.append(F)
             continue
+        if layout.get("mark") != RV.figure_mark(fl):                 # 書き出したあとに flow.json を直した（シートの図と、控える版が食い違う）
+            print(f"{F}: 書き出した図が、いまの flow.json と違う（書き出したあとに直した）。build_drawio.py → check_layout.py で書き出し直す")
+            skipped.append(F)
+            continue
         if targets:
             have = {n["id"]: n for n in fl["nodes"]}
-            bad = [x for x in targets if x not in have or have[x]["type"] in ("start", "end")]
+            bad = [x for x in targets if x != FIG and (x not in have or have[x]["type"] in ("start", "end"))]
             if bad:
                 raise SystemExit(f"--nodes の番号が、{F} の箱に無い（開始・終了は照合しない）: {'・'.join(bad)}")
         sheets = Sheets(work, m, fl, layout, Image.open(png).convert("RGB"), questions, flows)
-        sheets.sheet = RV.record(work, {F: fl}, "差分" if targets else "全体", targets)[F]   # 照合に出す版を控える（報告の sheet と結ぶ）
+        try:
+            sheets.sheet = RV.record(work, {F: fl}, "差分" if targets else "全体", targets)[F]   # 照合に出す版を控える（報告の sheet と結ぶ）
+        except ValueError as e:
+            raise SystemExit(f"{e}。消さずに、ファイルを前の版に戻す（照合に出した版の記録は、作り直せない）")
         write_sheets(work, sheets, cat_pages.get(F, []), a.max_pages, targets)
+        if targets:
+            print(f"{F}: シート {sheets.sheet}。差分照合の報告の置き場は {RV.next_report(work, F)}（sheet に「{sheets.sheet}」と書かせる）")
     ids = {fl["flow_id"] for fl in flows}
     for old in sorted((work / "out").glob("*照合シート_*.pdf")) if not only else []:   # 消えた・番号を変えたフローのシート（残すと、照合に出してしまう）
         if re.sub(r"(_S-\d+)?(_\d+)?$", "", old.stem.split("照合シート_", 1)[1]) not in ids:

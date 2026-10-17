@@ -23,7 +23,7 @@ import pathlib
 import re
 
 import code_struct as cs
-from common import (SYSTEM_KIND, all_pages, schema_enum, file_stem, labels, flow_key, load, load_card, load_flows, load_page, load_systems, manifest, norm, page_json, page_units, save, span_text,
+from common import (SYSTEM_KIND, all_pages, schema_enum, file_stem, labels, flow_key, load, load_card, load_flows, load_page, load_systems, manifest, norm, page_json, page_units, save, site, span_text,
                     system_names, try_load, work_dir)
 
 SYS_ID = re.compile(r"^SYS-(\d{2,})$")
@@ -101,7 +101,7 @@ class Ledger:
                 continue
             key = str(x.get("procedure"))
             if key in seen:
-                out.append(f"「{key}」が、2回書かれている")
+                out.append(site(f"「{key}」が、2回書かれている"))
             seen.add(key)
             u = units.get(key)
             if u is None:
@@ -111,15 +111,15 @@ class Ledger:
                 if any(p["id"] == pid for p in st.get("procedures") or []):
                     why = "は、起動点の手続き（図にしない起動点は、excluded_entries に書く）" if any(e["procedure"] == pid for e in st.get("entries") or []) else \
                         "は、呼ぶ側の図に入っている（図にする単位でない。その図の中で、畳む・まとめる）" if pid in (st.get("inline") or []) else "は、図にする単位でない"
-                out.append(f"「{key}」{why}")
+                out.append(site(f"「{key}」{why}"))
                 continue
             procs = {p["id"]: p for p in self.structs[u["project"]]["procedures"]}
             hit = cs.touches(procs, u["procedure"])
             if hit:
-                out.append(f"「{key}」は、補助の候補でない（{'・'.join(hit[:4])} がある）。図のままにする")
+                out.append(site(f"「{key}」は、補助の候補でない（{'・'.join(hit[:4])} がある）。図のままにする"))
             more = [q for q in cs.reach(procs, u["procedure"])[1:] if f"{u['project']}.{q}" in units and f"{u['project']}.{q}" not in self.folded]
             if more:
-                out.append(f"「{key}」が呼ぶ {'・'.join(more[:4])} が、図のまま（そちらも図にしないとするか、「{key}」を図に戻す）")
+                out.append(site(f"「{key}」が呼ぶ {'・'.join(more[:4])} が、図のまま（そちらも図にしないとするか、「{key}」を図に戻す）"))
         return out
 
     def excluded_errors(self):
@@ -133,15 +133,15 @@ class Ledger:
             if why is None or p is None:
                 continue
             if why == "中身が空" and p.get("exec"):
-                out.append(f"「{e['key']}」の理由は「中身が空」なのに、実行文が {len(p['exec'])} 行ある（図にするか、理由を直す）")
+                out.append(site(f"「{e['key']}」の理由は「中身が空」なのに、実行文が {len(p['exec'])} 行ある（図にするか、理由を直す）"))
             elif why == "画面の表示の制御だけ" and cs.touches(procs, p["id"]):
-                out.append(f"「{e['key']}」の理由は「画面の表示の制御だけ」なのに、{'・'.join(cs.touches(procs, p['id'])[:3])} がある（図にする）")
+                out.append(site(f"「{e['key']}」の理由は「画面の表示の制御だけ」なのに、{'・'.join(cs.touches(procs, p['id'])[:3])} がある（図にする）"))
             elif why == "ほかの起動点と同じ処理を呼ぶだけ":
                 drawn = {q for x in all_e if x["project"] == e["project"] and x["key"] != e["key"] and x["key"] not in self.excluded for q in cs.reach(procs, x["procedure"])}
                 calls = {c.get("to") for c in p.get("calls") or []}
                 if not calls or None in calls or not calls <= drawn or len(p.get("exec") or []) > len(p.get("calls") or []):
-                    out.append(f"「{e['key']}」の理由は「ほかの起動点と同じ処理を呼ぶだけ」なのに、図にする起動点の処理を呼ぶ文のほかに、実行文がある"
-                               "か、呼ぶ先が図にする起動点の処理でない（図にする）")
+                    out.append(site(f"「{e['key']}」の理由は「ほかの起動点と同じ処理を呼ぶだけ」なのに、図にする起動点の処理を呼ぶ文のほかに、実行文がある"
+                               "か、呼ぶ先が図にする起動点の処理でない（図にする）"))
         return out
 
     def entries(self):
@@ -198,26 +198,26 @@ class Ledger:
         """紐付け1件の誤り（無ければ空）"""
         e, st = self.entry(x.get("entry")), self.step(x.get("step"))
         if e is None:
-            return [f"起動点「{x.get('entry')}」が無い（python3 scripts/systems.py entries で一覧を見る）"]
+            return [site(f"起動点「{x.get('entry')}」が無い（python3 scripts/systems.py entries で一覧を見る）")]
         if st is None:
-            return [f"手順「{x.get('step')}」が無い（書き方は 資料.ページ.項目。例 M02.3.s4。カードの手順だけを指せる）"]
+            return [site(f"手順「{x.get('step')}」が無い（書き方は 資料.ページ.項目。例 M02.3.s4。カードの手順だけを指せる）")]
         if e["excluded"] is not None:
-            return [f"起動点 {e['key']} は、図にしない（excluded_entries）としているのに、紐付けがある"]
+            return [site(f"起動点 {e['key']} は、図にしない（excluded_entries）としているのに、紐付けがある")]
         if e["system"] is None:
-            return [f"起動点 {e['key']} のプログラムの資料が、どのシステムにも入っていない（systems[].docs）"]
+            return [site(f"起動点 {e['key']} のプログラムの資料が、どのシステムにも入っていない（systems[].docs）")]
         basis, ev = x.get("basis"), norm(x.get("evidence", ""))
         if basis not in BASIS:
-            return [f"basis「{basis}」は決まった語でない（named 名指し／io 入出力の一致／inferred 推定）"]
+            return [site(f"basis「{basis}」は決まった語でない（named 名指し／io 入出力の一致／inferred 推定）")]
         if basis == "inferred":
             return []
         if len(ev) < 2:
-            return ["evidence（両方に出てくる文字）が空か、短すぎる"]
+            return [site("evidence（両方に出てくる文字）が空か、短すぎる")]
         names = self.code_names(e)[basis]
         if not any(ev in norm(n) or (len(norm(n)) >= 2 and norm(n) in ev) for n in names):
-            return [f"evidence「{x.get('evidence')}」が、プログラムの側の{'名前（ボタン・手続き・ファイル・メッセージ）' if basis == 'named' else '入出力（シート・ファイル・テーブル）'}に無い"
-                    f"（あるのは {'・'.join(names[:8]) or 'なし'}）。根拠が無ければ basis を inferred にする"]
+            return [site(f"evidence「{x.get('evidence')}」が、プログラムの側の{'名前（ボタン・手続き・ファイル・メッセージ）' if basis == 'named' else '入出力（シート・ファイル・テーブル）'}に無い"
+                    f"（あるのは {'・'.join(names[:8]) or 'なし'}）。根拠が無ければ basis を inferred にする")]
         if ev not in norm(self.step_text(*st[:2], st[3])):
-            return [f"evidence「{x.get('evidence')}」が、マニュアルの手順 {x.get('step')} の文・帳票に無い。根拠が無ければ basis を inferred にする"]
+            return [site(f"evidence「{x.get('evidence')}」が、マニュアルの手順 {x.get('step')} の文・帳票に無い。根拠が無ければ basis を inferred にする")]
         return []
 
     def good_links(self):

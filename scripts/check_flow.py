@@ -48,6 +48,7 @@
   WARN  改善案らしい語（as-is に to-be を混ぜない）／採番の飛び（renumber.py で振り直す）
   WARN  引用が原典と完全には一致しない／文章の中にページ番号・ノードの番号がある／判断の出口が多い・線のラベルが長い
   WARN  直しの一覧の確認事項が、機械の確認事項（m-）と同じ所を指し、effect も同じ
+  WARN  JSON をまるごと書いたフローで、システムのレーンが右端に無い（決まり 4.2）／使うシステムの札が付いた作業で、動作の種類が「作成する」（決まり 3.22 では入力する）
 [code]
   FAIL  認証情報らしい文字が伏せられていない／構造（code/*.struct.json）が無い・いまのページと合わない／木の形の誤り（範囲・入れ子・実行文の抜けと重なり）
 [systems]
@@ -66,7 +67,8 @@
 [matrix]
   FAIL  業務マトリクス一覧が無い・読めない／いまのデータから組み立て直した中身と違うセルがある（フローを直したあと書き出し直していない・手で直した）
   FAIL  式のセルに保存した計算の結果が、式を計算し直した値と違う／フロー図の PNG へのリンクの先が無い・PNG があるのにリンクが無い
-  WARN  計算の結果が保存されていない式のセル（計算をしない表示では 0・空に見える）
+  WARN  計算の結果が保存されていない式のセル（計算をしない表示では 0・空に見える）／ブックに、まだ取り込んでいない人の値（書き出し直すと取り込む）
+  FAIL  人が入れた時間の控え（times.json）を読めない／基準の表の版の記録が無い（前の版の道具で書き出したブック）
   FAIL  行がフローを描く分類の順でない／作業のノードがセルに無い・重なっている／行き先から組み直した線がフローと合わない／確認事項の番号が行に出ていない
 [reports]
   FAIL  確認事項一覧・出典対応表・階層と業務分類・採否表が無い・いまのデータから作り直したものと違う／
@@ -76,11 +78,11 @@
         システムの番号・カードの項目のキー・ファイルの番号）・ファイルの場所（資料の表の「ファイル」の欄は除く）・スキーマの項目名・【下書き】が出ている
 [review]
   FAIL  採否表の無い図（業務フロー・アクティビティ図）・図の無い採否表／形が違う・採否か対応の書かれていない指摘／判定・指摘が照合の報告と違う／
-        照合したあとに変わった・足した箱（各箱をいちばん新しく照合に出した版（review/sheets.json）と、いまの図が違う。差分照合で照合し直す）／
-        報告の sheet が無い・記録に無い・照合に出していない箱を判定した・名前が決まりと違う・読めない（その図だけ止めて、次の図へ）／
+        照合したあとに変わった・足した箱（報告が実際に判定した版（review/sheets.json の控え）のどれとも、いまの図が違う。差分照合で照合し直す）／
+        報告の sheet が無い・記録に無い・照合に出していない箱を判定した・名前が決まりと違う・形が崩れている・読めない（その図だけ止めて、次の図へ）／
         採用した指摘があるのに、図のデータが、その指摘を受けたシートのときのまま／
         支持率（支持 ÷ 開始・終了を除く全ノード）が 95% 未満（業務フロー・アクティビティ図それぞれ）
-        報告に sheet の無い前の版の採否表は、前のとおり: 判定したノードが図に無い（採用した指摘が無いのに）／採用した指摘があるのに、図のデータが採否表より古い（ファイルの日時）
+        sheet の無い前の版の報告だけの採否表は、前のとおり: 判定したノードが図に無い（採用した指摘が無いのに）／採用した指摘があるのに、図のデータが採否表より古い（ファイルの日時）
   WARN  保留の指摘／照合に出した版の記録が無い（前の版の採否表）
 最後に 網羅率（ページ・項目）・補足由来の手順の反映数・引用照合率・推定の数・確認事項の件数を出す。
 終了コード: FAIL があれば 1。
@@ -96,7 +98,7 @@ import xml.etree.ElementTree as ET
 from common import order_of  # noqa: E402
 from common import (ASSETS, BadJson, MATERIAL_CAP, MAX_LANES, MAX_STEPS, NODE_TYPES, QUOTE_OK, SHIFT_MIN, SHIFT_SHARE, NON_CONTENT_TYPES, SOURCED_TYPES, STEP_TYPES, WORK_TYPES, CardItems, Report,
                     all_pages, card_items, card_json, flow_key, guarded, is_code_page, labels, load_card, load_flows, load_page, manifest, node_systems, norm, page_json,
-                    page_text, page_units, q_targets, quote_match, same_text, severity_of, span_text, style_dict, system_names, tree_nodes, try_load, work_dir, flow_heads, ends_as_question, ends_with_verb, Times, seen_files, time_basis, ACTIONS, DELIVERABLES, REVIEW_MIN, VOLUME_SPARE, Answers, answer_gaps, save, FLOW_FIG, ACT_FIG, MATRIX_BOOK, split_figs, ENDS_ASKED, LABEL_LONG)
+                    page_text, page_units, q_targets, quote_match, same_text, severity_of, span_text, style_dict, system_names, tree_nodes, try_load, work_dir, flow_heads, ends_as_question, ends_with_verb, Times, seen_files, time_basis, actions_of, soft_formula, ACTIONS, DELIVERABLES, REVIEW_MIN, VOLUME_SPARE, Answers, answer_gaps, save, FLOW_FIG, ACT_FIG, MATRIX_BOOK, split_figs, ENDS_ASKED, LABEL_LONG)
 from validate import validate
 
 TECH_WORD = re.compile(r"配列|可変長|状態コード|ステータスコード|パラメータ|パラメーター|引数|戻り値|変数|フラグ|インデックス|レコードセット|オブジェクト|URL|例外")   # 箱に書かない技術の用語
@@ -1253,7 +1255,7 @@ class FlowChecks:
         if bare:
             self.rp.warn(f"{v.F}: 動作の種類（action）の無い作業が {len(bare)} 個（{'・'.join(bare[:6])}{' …' if len(bare) > 6 else ''}）。"
                          "業務マトリクス一覧の処理時間の仮の値が、「その他」の行になる。直しの一覧の op time で、動作の種類を選ぶ（flow-edits-guide.md）")
-        made = [n["id"] for n in v.nodes if n.get("type") == "process" and n.get("action") == "作成する" and n.get("systems")]
+        made = [n["id"] for n in v.nodes if n.get("type") == "process" and "作成する" in actions_of(n.get("action")) and n.get("systems")]
         if made:
             self.rp.warn(f"{v.F}: 使うシステムの札が付いた作業で、動作の種類が「作成する」の箱が {len(made)} 個（{'・'.join(made[:6])}{' …' if len(made) > 6 else ''}）。"
                          "システムの画面で作る（入力して登録する）作業は「入力する」。紙・ファイルを一から作る作業なら、そのままでよい（flow-rules.md 3.22）")
@@ -1685,8 +1687,8 @@ def check_code(cx, rp):
                 n[st.get("tier")] += 1
                 rp.fail(f"{tree_name} が無い（機械で構文を読めない言語。LLM がソースを読んで、ブロックの木を書く。読まないと決めたなら、木に skip と理由を書く。references/code-guide.md）")
                 continue
-            shape_fails(rp, tree_name, validate(read_checked(rp, cx.work / tree_name, tree_name, "") or {}, "code_tree"), STRUCT_ERRORS,
-                        "python3 scripts/validate.py -w <作業フォルダ> --kind code_tree")
+            tree = read_checked(rp, cx.work / tree_name, tree_name, "") or {}   # 呼び元を 1 行に 1 つ（被覆の控えが、どちらの部品かを見分けられるように）
+            shape_fails(rp, tree_name, validate(tree, "code_tree"), STRUCT_ERRORS, "python3 scripts/validate.py -w <作業フォルダ> --kind code_tree")
             for e in (rd.get("errors") or [])[:STRUCT_ERRORS]:
                 rp.fail(f"{tree_name}: {e}")
             if not rd.get("errors") and not st["procedures"] and not rd.get("skip"):
@@ -1982,16 +1984,17 @@ def check_review(cx, rp):
             continue
         got_v = {(v.get("node"), v.get("verdict"), v.get("evidence")) for v in rv.get("verdicts") or [] if isinstance(v, dict)}
         got_f = collections.Counter((RV.key(x), x.get("sheet")) for x in rv.get("findings") or [] if isinstance(x, dict))
-        if got_v != {(v["node"], v["verdict"], v["evidence"]) for v in want[0]} or got_f != collections.Counter((RV.key(x), x.get("sheet")) for x in want[1]):
+        if got_v != {(v["node"], v["verdict"], v["evidence"]) for v in want[0]} or got_f != collections.Counter((RV.key(x), x.get("sheet")) for x in want[1]) \
+                or (maps is not None and rv.get("sheets") != {f.name: e["id"] for f, _d, e in maps}):
             rp.fail(f"{F}: 採否表の判定・指摘が、照合の報告（reports/）と違う（写し違い・言い換え・報告が増えた・変わった）。"
                     f"python3 scripts/review.py draft -w <作業フォルダ> --only {F} で写し直す（採否は引き継ぐ）")
-        if maps is None and not RV.legacy(rv, maps):
+        if maps is None and not RV.legacy(rv, F, reps, rec):
             rp.fail(f"{F}: 照合の報告に、照合したシートの番号（sheet）が無い。照合シートの見出しの［S-<n>］を、報告の sheet に写させる"
-                    "（アクティビティ図は、python3 scripts/review.py record で控えた番号）")
+                    "（アクティビティ図は、python3 scripts/review.py record で控えた番号。照合に出す前からあった前の版の報告には、書き足さない）")
         elif maps is None:                                           # 前の版の採否表: 前のとおり、番号と、ファイルの日時で見る
             rp.warn(f"{F}: 照合に出した版の記録が無い（前の版の採否表。報告に sheet が無い）。照合のあとに図を直していても、気づけない。"
-                    f"いまの図を照合済みと認めるなら（全体を照合し直して、採用した指摘を図に反映したあとも）、"
-                    f"python3 scripts/review.py snapshot -w <作業フォルダ> --only {F} --assume-current（利用者が決める）")
+                    f"前の版の報告のまま、いまの図を照合済みと認めるなら、"
+                    f"python3 scripts/review.py snapshot -w <作業フォルダ> --only {F} --assume-current（利用者が決める）。認めないなら、全体を照合し直す")
             ids = {n.get("id") for n in figs[F].get("nodes") or [] if isinstance(n, dict)}
             gone = [str(v.get("node")) for v in rv.get("verdicts") or [] if isinstance(v, dict) and v.get("node") not in ids]
             if gone and not adopted:
@@ -1999,7 +2002,7 @@ def check_review(cx, rp):
             if adopted and data.exists() and data.stat().st_mtime < f.stat().st_mtime:
                 rp.fail(f"{F}: 採用した指摘があるのに、図のデータ（{data.parent.name}/{data.name}）が採否表より古い（採用した指摘を、まだ図に反映していない）")
         else:
-            gaps = RV.unreviewed(figs[F], maps)
+            gaps = RV.unreviewed(F, figs[F], maps)
             if gaps:
                 ids_ = ",".join(i for i, _w in gaps)
                 rp.fail(f"{F}: 照合したあとに変わった・足した箱 {len(gaps)} 個（{'／'.join(f'{i} {w}' for i, w in gaps[:8])}{' …' if len(gaps) > 8 else ''}）。"
@@ -2009,12 +2012,19 @@ def check_review(cx, rp):
                            f"python3 scripts/make_compare.py -w <作業フォルダ> --only {F} --nodes {ids_} → references/source-review-prompt.md の差分照合で、"
                            f"報告を reports/review_{F}_差分<N>.json に書かせ")
                         + f" → python3 scripts/review.py draft -w <作業フォルダ> --only {F}")
-            at, now = {e["id"]: e for e in rec if e["figure"] == F}, RV.figure_mark(figs[F])
-            same = [str(x.get("id")) for x in rv.get("findings") or [] if isinstance(x, dict) and x.get("decision") == "採用"
-                    and (at.get(x.get("sheet")) or {}).get("kind") not in (None, RV.ASSUMED) and at[x["sheet"]]["mark"] == now]
+            at, now, cur = {e["id"]: e for e in rec if e["figure"] == F}, RV.figure_mark(figs[F]), RV.summaries(figs[F])
+
+            def kept(x):
+                """採用した指摘を、まだ反映していないか。箱を指す指摘は、その箱がそのシートのときのまま（消していない）。ページ・線・図全体を指す指摘は、図のデータがそのときのまま"""
+                e = at.get(x.get("sheet"))
+                if e is None or e["kind"] == RV.ASSUMED:
+                    return False
+                t = str(x.get("target") or "")
+                return cur.get(t) == e["nodes"][t] if t in e["nodes"] else e["mark"] == now
+            same = [str(x.get("id")) for x in rv.get("findings") or [] if isinstance(x, dict) and x.get("decision") == "採用" and kept(x)]
             if same:
-                rp.fail(f"{F}: 採用した指摘（{'・'.join(same[:8])}）があるのに、図のデータ（{data.parent.name}/{data.name}）が、その指摘を受けたシートのときのまま"
-                        "（採用した指摘を、まだ図に反映していない）")
+                rp.fail(f"{F}: 採用した指摘（{'・'.join(same[:8])}）があるのに、指摘の箱（箱でない指摘は、図のデータ {data.parent.name}/{data.name}）が、"
+                        "その指摘を受けたシートのときのまま（採用した指摘を、まだ図に反映していない）")
             said = sorted({f"{e['id']}（{e['date']}）" for _f, _d, e in maps if e["kind"] == RV.ASSUMED})
             if said:
                 rp.info(f"{F}: 利用者が照合済みと認めた版 {'・'.join(said)} の上で点検した（review.py snapshot --assume-current）")
@@ -2205,10 +2215,9 @@ def matrix_times(rp, where, F, fl, pairs, row, times, table, seen, again):
         v, mine = c.value, times.cells.get((F, i), {}).get("value")
         if isinstance(v, str) and OURS.match(v):                     # 仮の値（基準の表を引く式）
             act, vol, _why = time_basis(node.get(i) or {}, held[i])
-            f = re.fullmatch(r'=VLOOKUP\("([^"]*)",(.+),(\d+),FALSE\)', v)
-            plain = lambda ref: ref.replace("'", "")                    # Excel は、保存のとき、要らない引用符を外す（'処理時間の基準'!$A$2 → 処理時間の基準!$A$2）
+            plain = lambda f: f.replace("'", "")                        # Excel は、保存のとき、要らない引用符を外す（'処理時間の基準'!$A$2 → 処理時間の基準!$A$2）
             col = table is not None and (table["cols"].get(vol) or table["cols"][VOLUME_SPARE[vol]])
-            if table is not None and (f is None or (f.group(1), plain(f.group(2)), int(f.group(3))) != (act, plain(table["ref"]), col)):
+            if table is not None and plain(v) != plain("=" + soft_formula(act, table["ref"], col)):
                 rp.fail(f"{where}: 作業 {i} の仮の値の式が、基準の表の「{act} × {vol}」を引いていない（{v[:70]}）。{again}")
             seen["soft"] += 1
             seen["pending"] += mine is not None
@@ -2239,7 +2248,7 @@ CELL_REF = re.compile(r"^(?:'((?:[^']|'')+)'!)?\$?([A-Z]{1,3})\$?(\d+)$")
 
 def matrix_results(rp, book, again):
     """式のセルに保存した計算の結果（計算をしない表示・プレビューが見る値）が、ブックの中の値で式を計算し直したものと同じか。
-    書き出す式は 4 つの形（基準の表を引く VLOOKUP・合計の SUM・別のシートのセル・仮か人かの IF）。人が書き足した式は、計算せずに数える"""
+    書き出す式は 5 つの形（基準の表を引く VLOOKUP・2 つを引いて大きいほうの MAX・合計の SUM・別のシートのセル・仮か人かの IF）。人が書き足した式は、計算せずに数える"""
     from openpyxl import load_workbook
     from openpyxl.utils import range_boundaries
     wf, wv = load_workbook(book), load_workbook(book, data_only=True)
@@ -2262,6 +2271,13 @@ def matrix_results(rp, book, again):
         return memo[(title, at)]
 
     def calc(here, f):
+        m = re.fullmatch(r"=MAX\((.+)\)", f)
+        if m:
+            one = re.findall(r'VLOOKUP\("[^"]*",.+?,\d+,FALSE\)', m.group(1))
+            if ",".join(one) != m.group(1):
+                raise KeyError(f)
+            got = [calc(here, "=" + x) for x in one]
+            return max(got) if all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in got) else None
         m = re.fullmatch(r'=VLOOKUP\("([^"]*)",(.+),(\d+),FALSE\)', f)
         if m:
             row = next((r for r in area(m.group(2), here) if value(*r[0]) == m.group(1)), None)

@@ -20,7 +20,7 @@ import pathlib
 import re
 import sys
 
-from common import (ACTIONS, EFFECTS, ELSE, ENDS_ASKED, LABEL_LONG, SEV_LABEL, VOLUMES, CardItems, ask_form, flow_heads, infer_nodes, load, load_page, norm, opposite, order_lanes, page_json, page_units, same_text,
+from common import (ACTIONS, EFFECTS, ELSE, ENDS_ASKED, LABEL_LONG, SEV_LABEL, VOLUMES, CardItems, ask_form, flow_heads, infer_nodes, load, load_page, norm, opposite, order_lanes, page_json, page_units, same_text, site,
                     save, settle_flow, severity_of, span_text, system_names, tag_systems, try_load, work_dir)
 from draft_flow import PAGE_TYPE_JA, Draft
 from renumber import PREFIX, apply_ids, renumber
@@ -58,7 +58,7 @@ class Builder:
     # ---- 直しを当てる ----
 
     def bad(self, i, op, msg):
-        self.err.append(f"ops[{i}]（{op.get('op')}）: {msg}")
+        self.err.append(site(f"ops[{i}]（{op.get('op')}）: {msg}", 2))
 
     def res(self, key):
         """キー → いまのノードのキー（まとめた項目は、まとめ先）。無ければ None"""
@@ -137,7 +137,7 @@ class Builder:
         for a in [k for k in self.seq if k in self.merged]:
             b = self.res(a)
             if b is None:                                            # まとめ先が対象外になった
-                self.err.append(f"「{a}」のまとめ先が無い（対象外にした）。unmerge するか、まとめ先を変える")
+                self.err.append(site(f"「{a}」のまとめ先が無い（対象外にした）。unmerge するか、まとめ先を変える"))
                 continue
             A, B = self.nodes[a], self.nodes[b]
             B["sources"] += A["sources"]
@@ -180,10 +180,12 @@ class Builder:
                     self.nodes[k][f] = str(op[f]).strip()
 
     def timing(self, i, op, src):
-        """動作の種類・量（処理時間の仮の値を引く鍵）。決まった語だけ。量を変えるなら、理由が要る"""
+        """動作の種類・量（処理時間の仮の値を引く鍵）。決まった語だけ（動作の種類は、2 つの動きのある箱だけ、違う語を 2 つまで）。量を変えるなら、理由が要る"""
         act, vol, why = src.get("action"), src.get("volume"), str(op.get("reason") or "").strip()
-        if act is not None and act not in ACTIONS:
-            return self.bad(i, op, f"action「{act}」は、決まった語でない（{'・'.join(ACTIONS)}）")
+        acts = act if isinstance(act, list) else [act]
+        if act is not None and (not 1 <= len(acts) <= 2 or any(a not in ACTIONS for a in acts) or len(set(map(str, acts))) < len(acts)):
+            return self.bad(i, op, f"action「{'・'.join(map(str, acts))}」は、決まった語でないか、2 語を超える・同じ語が 2 回（{'・'.join(ACTIONS)}。2 つの動きのある箱だけ、違う語を 2 つ）")
+        act = acts[0] if len(acts) == 1 else act
         if vol is not None and vol not in VOLUMES:
             return self.bad(i, op, f"volume「{vol}」は、決まった語でない（{'・'.join(VOLUMES)}）")
         if vol is not None and not why:
@@ -309,7 +311,7 @@ class Builder:
         if src.get("lines"):
             text = span_text(page_units(load_page(page_json(self.d.work, src["doc_id"], src["page"]))), src["lines"])
             if text is None:
-                self.err.append(f"出典の行の番号 {src['lines']} が、{src['doc_id']} p{src['page']:04d} の範囲の外")
+                self.err.append(site(f"出典の行の番号 {src['lines']} が、{src['doc_id']} p{src['page']:04d} の範囲の外"))
             out.update(lines=src["lines"], quote=text or "")
         return out
 
@@ -361,7 +363,7 @@ class Builder:
         self.mark_targets()
         order = self.expand()
         if not order:
-            self.err.append("フローに入れる手順が1つも無い")
+            self.err.append(site("フローに入れる手順が1つも無い"))
             return None
         for n in order:                                              # 判断の名前は「〜か」（「？」で終わる名前を直す）
             if n["type"] == "decision":
@@ -374,11 +376,11 @@ class Builder:
         # レーン
         default = d.terms.name(e.get("default_lane", ""), ("actor", "system")) if e.get("default_lane") else ""
         if e.get("default_lane") and not default:
-            self.err.append(f"default_lane「{e['default_lane']}」が、用語の正本（glossary.json）に無い")
+            self.err.append(site(f"default_lane「{e['default_lane']}」が、用語の正本（glossary.json）に無い"))
         used = [n["lane"] for n in order if n["lane"]]
         fallback = default or (max(used, key=lambda x: (used.count(x), -used.index(x))) if used else (d.actors[0] if d.actors else ""))
         if not fallback:
-            self.err.append("レーンが1つも決まらない（カードに担当が無い）。default_lane を書く")
+            self.err.append(site("レーンが1つも決まらない（カードに担当が無い）。default_lane を書く"))
         for i, n in enumerate(order):
             if n["type"] == "decision" and not n["lane"]:            # 判断は、その先の手順のレーン
                 nxt = next((x for x in order[i + 1:] if x["type"] != "decision"), None)
@@ -422,7 +424,7 @@ class Builder:
             elif n.get("fork"):                                      # 足した判断: 進む側は次の項目、進まない側は no_to（どちらも線は推定にしない。ノードが推定）
                 g = n["fork"]
                 if i + 1 >= len(order):
-                    self.err.append(f"足した判断「{n['label'][:16]}」のあとに項目が無い")
+                    self.err.append(site(f"足した判断「{n['label'][:16]}」のあとに項目が無い"))
                     continue
                 add(n["id"], order[i + 1]["id"], g["yes"])
                 add(n["id"], self.exit(g["no_to"], last[order[i + 1]["key"]], order, first), g["no"])
@@ -462,10 +464,10 @@ class Builder:
                     todo.append(x["to"])
         lost = [n for n in order if n["id"] not in seen]
         if lost:
-            self.err.append("開始からたどり着けない項目がある（move・connect・disconnect で線が切れた）: " + "、".join(f"{n['key']}「{n['label'][:16]}」" for n in lost[:6]))
+            self.err.append(site("開始からたどり着けない項目がある（move・connect・disconnect で線が切れた）: " + "、".join(f"{n['key']}「{n['label'][:16]}」" for n in lost[:6])))
         for x in edges:
             if x["from"] in by and by[x["from"]]["type"] == "decision" and not x.get("label"):
-                self.err.append(f"分岐 {by[x['from']]['key']}「{by[x['from']]['label'][:16]}」から出る線に、ラベルの無いものがある（カードの行き先にラベルが無い。label の branches で書く）")
+                self.err.append(site(f"分岐 {by[x['from']]['key']}「{by[x['from']]['label'][:16]}」から出る線に、ラベルの無いものがある（カードの行き先にラベルが無い。label の branches で書く）"))
         # ほかの業務へ続く
         seqs = [x for x in (load(d.work / "structure" / "hierarchy.json", {}) or {}).get("sequence") or [] if isinstance(x, dict)]
         hid = {c.get("hierarchy_id"): c["id"] for c in d.cats.values() if c.get("make_flow")}
@@ -494,10 +496,10 @@ class Builder:
         want = [str(x).strip() for x in e.get("lane_order") or [] if str(x).strip()]
         lost = [x for x in want if x not in names]
         if lost:
-            self.err.append(f"lane_order の「{'・'.join(lost)}」は、このフローのレーンに無い（いまのレーン: {'・'.join(names)}）")
+            self.err.append(site(f"lane_order の「{'・'.join(lost)}」は、このフローのレーンに無い（いまのレーン: {'・'.join(names)}）"))
         twice = [x for x in dict.fromkeys(want) if want.count(x) > 1]
         if twice:
-            self.err.append(f"lane_order に、同じレーンを2回以上書いている: {'・'.join(twice)}（並べたい順に1回ずつ書く）")
+            self.err.append(site(f"lane_order に、同じレーンを2回以上書いている: {'・'.join(twice)}（並べたい順に1回ずつ書く）"))
         if [x for x in want if x in systems]:
             d.notes.append(f"lane_order に書いたシステムのレーン（{'・'.join(x for x in want if x in systems)}）は、書いた位置に置いた（決まり 4.2 では右端）")
         keep = want or ([] if order[0]["lane"] in systems else [order[0]["lane"]])
@@ -546,7 +548,7 @@ class Builder:
             return order[i + 1]["id"] if i + 1 < len(order) else "end"
         k = self.res(to)
         if k is None or k not in first:
-            self.err.append(f"行き先「{to}」という項目が無い（\"next\"・\"end\"・項目のキーのどれか）")
+            self.err.append(site(f"行き先「{to}」という項目が無い（\"next\"・\"end\"・項目のキーのどれか）"))
             return "end"
         return first[k]
 
@@ -671,18 +673,18 @@ class Builder:
         for i, x in enumerate(y for y in e.get("questions") or [] if isinstance(y, dict)):
             qid = str(x.get("id") or "")
             if not qid or qid in seen or qid.startswith("m-"):
-                self.err.append(f"questions[{i}]: id「{qid}」が空か、重なっている（m- で始まる名前は、機械が作る確認事項のもの）")
+                self.err.append(site(f"questions[{i}]: id「{qid}」が空か、重なっている（m- で始まる名前は、機械が作る確認事項のもの）"))
                 continue
             seen.add(qid)
             if x.get("effect") not in EFFECTS:
-                self.err.append(f"questions[{i}]（{qid}）: effect（答えで、図のどこが変わるか）が無い・決まった語でない（{'／'.join(EFFECTS)}）。"
-                                "どれにも当たらない問い（値だけ・いまも同じかの確かめ・名前だけ）は、確認事項にしない")
+                self.err.append(site(f"questions[{i}]（{qid}）: effect（答えで、図のどこが変わるか）が無い・決まった語でない（{'／'.join(EFFECTS)}）。"
+                                "どれにも当たらない問い（値だけ・いまも同じかの確かめ・名前だけ）は、確認事項にしない"))
                 continue
             y = {"id": qid, "severity": "", "category": x.get("category", "記載なし"), "effect": x["effect"]}
             ids = [self.res(k) for k in x.get("items") or []]
             edge = [self.res(k) for k in x.get("edge") or []]
             if None in ids or None in edge or (edge and len(edge) != 2):
-                self.err.append(f"questions[{i}]（{qid}）: items・edge が指す項目が、下書きに無い")
+                self.err.append(site(f"questions[{i}]（{qid}）: items・edge が指す項目が、下書きに無い"))
                 continue
             ids = list(dict.fromkeys(first[k] for k in ids))
             if edge:

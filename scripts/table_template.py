@@ -28,7 +28,7 @@ import pathlib
 import re
 import sys
 
-from common import ASSETS, save
+from common import ACT_JOIN, ASSETS, save, soft_formula
 
 STYLE_SHEET = "書式の見本"
 TOKEN = re.compile(r"\{([^{}\n]+)\}")
@@ -79,15 +79,16 @@ class At:
         return at if canon == self.here else f"{quoted(plan['title'])}!{at}"
 
     def lookup(self, action, volume):
-        """基準の表から、動作の種類 × 量の分を引く式"""
+        """基準の表から、動作の種類 × 量の分を引く式（2 つの動きのある箱は、大きいほう）"""
         t = self.tpl.time
         col = t["cols"].get(volume) or t["cols"][(self.tpl.spec["time"].get("spare") or {})[volume]]     # 表に、その量の列が無い（前の形のテンプレート）: 代わりの列
-        return f'VLOOKUP("{action}",{t["ref"]},{col},FALSE)'
+        return soft_formula(action, t["ref"], col)
 
     def minutes(self, action, volume):
         """基準の表の、動作の種類 × 量の分（lookup の式の、計算の結果）"""
         spare = (self.tpl.spec["time"].get("spare") or {}).get(volume)
-        return self.table.get((action, volume), self.table.get((action, spare)))
+        got = [self.table.get((a, volume), self.table.get((a, spare))) for a in action.split(ACT_JOIN)]
+        return None if None in got else max(got)
 
 
 def quoted(title):

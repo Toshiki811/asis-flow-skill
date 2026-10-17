@@ -7,10 +7,11 @@
 門の中身（全部通ったら写す）:
   1 書き出しのあとの点検が、全段で FAIL 0（check_flow の全段・check_layout・check_extract）。
     門では、次の WARN も FAIL にする: 文章の中で資料を ID で呼んでいる／業務マトリクス一覧に計算の結果が保存されていない／
-    紐付け・関係・「続く」の根拠の文が出典のページに無い／読めない・曖昧な所の確認事項が無い／引用が原典と完全には一致しない／同じ手順を 2 つのフローに描いている
+    紐付け・関係・「続く」の根拠の文が出典のページに無い／読めない・曖昧な所の確認事項が無い／引用が原典と完全には一致しない／同じ手順を 2 つのフローに描いている／
+    業務マトリクス一覧に、まだ取り込んでいない人の値がある（書き出し直す。現状の処理時間の写しの前に取り込む）
   2 図・業務マトリクス一覧・報告書が、もとのデータ（人が入れた値・採否表を含む）より新しい
   3 PNG が、いまの図より新しく、全ページある（draw.io が無ければ作れないので、通らない）
-  4 照合シートが全フロー分あり、フロー・PNG より新しい
+  4 照合シートが全フロー分あり、フロー・PNG より新しい（採否表のある図は見ない。照合に出したシートは作り直さない。照合のあとの直しは差分照合）
   5 原典照合（工程 8）が、全部の図で済んでいる（採否表・採否の記入・支持率 95% 以上は check_flow --stage review）
 やり直し: 2〜4 と「書き出し直す」と言う FAIL は、門が書き出しをやり直して（連鎖の順: build_drawio → build_activity → check_layout（PNG）→
 build_matrix → build_reports → make_compare）、もう一度見る（2 回まで）。データを直す必要があるもの（ほかの FAIL・照合がまだ）は止めて、
@@ -94,6 +95,8 @@ def stale(work):
         said.append(f"PNG が無い・図より古い {len(bad)} 枚（{'・'.join(bad[:4])}{' …' if len(bad) > 4 else ''}）")
     for fl in flows:
         F = flow_key(fl)
+        if (work / "review" / f"{F}.review.json").exists():          # 照合に出したシートは作り直さない（作り直すと、照合していない版が控えられ、照合したシートが消える）
+            continue
         sheets = list(out.glob(f"照合シート_{F}.pdf")) + list(out.glob(f"照合シート_{F}_*.pdf"))
         made = min((p.stat().st_mtime for p in sheets), default=0)
         if not sheets or made < newest([work / "flows" / f"{F}.flow.json"] + list((out / "png").glob(f"*_flow-{F}.png"))):
@@ -105,7 +108,7 @@ def chain(work):
     """書き出しを、決まった順に回す。人が入れた値を守るために書き出しが止まったら、その理由を返す（門も止まる）"""
     flows, acts = load_flows(work), activities(work)
     steps = ([("build_drawio.py", ["--split"] if split_figs(work / "out") else [])] if flows else []) + ([("build_activity.py", [])] if acts else []) \
-        + [("check_layout.py", []), ("build_matrix.py", []), ("build_reports.py", [])] + ([("make_compare.py", [])] if flows else [])
+        + [("check_layout.py", []), ("build_matrix.py", []), ("build_reports.py", [])] + ([("make_compare.py", ["--skip-reviewed"])] if flows else [])   # 照合に出した図のシートは、作り直さない（stale と同じ）
     for script, args in steps:
         code, text = run(script, work, *args)
         print(f"    ▶ {script}" + ("" if code == 0 else f"（終了コード {code}）"))

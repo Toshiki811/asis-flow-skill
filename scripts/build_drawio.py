@@ -246,7 +246,7 @@ def tag(text, S):
 
 class Page:
     def __init__(self, did, name, model_attrs):
-        self.id, self.name = did, name
+        self.id, self.name, self.mark = did, name, None              # mark: 描いた図のデータの印（照合に出す版と、書き出した図をそろえる）
         self.diagram = ET.Element("diagram", {"name": name, "id": did})
         model = ET.SubElement(self.diagram, "mxGraphModel", model_attrs)
         self.root = ET.SubElement(model, "root")
@@ -667,12 +667,15 @@ class FlowDrawing:
     """フロー1本を1ページに描く。行を決め、大きさを測って置き場所を決めてから、レーン・ノード・帳票・線・確認事項の番号・凡例の順に置く"""
 
     def __init__(self, fl, ctx):
+        from review import figure_mark
+        mark = figure_mark(fl)                                       # 描く前の図のデータ（flow.json・activity.json の中身）の印
         self.fl, self.ctx = fl, ctx
         self.S = S = ctx["styles"]
         self.L, self.ext = S["lane"], S["extensions"]
         self.q_node, self.q_edge = question_ids(ctx["questions"], fl["flow_id"])
         self.title = f"{fl.get('number', '')} {fl['name']}".strip()
         self.page = Page(f"flow-{fl['flow_id']}", f"{fl['flow_id']} {fl['name']}"[:60], S["model"])
+        self.page.mark = mark
         self.lanes = fl.get("lanes") or [{"id": "L1", "name": "（担当不明）", "kind": "dept"}]
         self.li = {l["id"]: i for i, l in enumerate(self.lanes)}     # レーン → 左から何列目か
         self.pal = lane_palettes(self.lanes, S)
@@ -1234,7 +1237,8 @@ def render(name, pages):
         mx.append(copy.deepcopy(p.diagram))
     ET.indent(mx, space=" ")
     return ET.tostring(mx, encoding="unicode") + "\n", {"file": name, "pages": [
-        {"index": i + 1, "id": p.id, "name": p.name, "bounds": [round(v, 1) for v in p.b], "nodes": p.nodes, "edges": p.edges, "captions": p.captions}
+        dict({"index": i + 1, "id": p.id, "name": p.name, "bounds": [round(v, 1) for v in p.b], "nodes": p.nodes, "edges": p.edges, "captions": p.captions},
+             **({"mark": p.mark} if p.mark else {}))
         for i, p in enumerate(pages)]}
 
 

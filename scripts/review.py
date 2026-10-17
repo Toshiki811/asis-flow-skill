@@ -8,8 +8,10 @@
 
 照合に出した版の記録（review/sheets.json。機械だけが書く。手で直さない）: 照合に出すたびに、箱ごとの要約（種類・名前・レーン・補足・推定の印・
 リンク先・使うシステム・帳票の向きと付く箱・出典のページと行・前後の線 ほか）と、図全体の印を、シートの番号（S-<n>）で残す。
-業務フローは make_compare.py が照合シートを作るときに控える（シートの見出しに番号が出る）。アクティビティ図は、照合に出す前に record で控える。
-同じ図・同じ中身・同じ種類の最後の控えがあれば、その番号を使う（書き出し直しでは増やさない）。
+業務フローは make_compare.py が照合シートを作るときに控える（シートの見出しに番号が出る）。アクティビティ図は、照合に出す前に record で控える
+（1 回に出す図の組を --only に並べる。組は同じ番号）。どちらも、書き出した図（out/*.layout.json の印）が、いまのデータと違えば控えずに止まる。
+組の全部の図で、その図の最後の控えが同じ番号・同じ中身・同じ種類なら、その番号を使う（書き出し直しでは増やさない）。
+その図を初めて控えるときは、そのときもうある sheet の無い報告（前の版の報告）の印も控える。
 照合の報告には、照合したシートの番号を sheet に書かせる。どの報告がどの版の図を見たかは、この番号で決まる
 （採否表を消して作り直しても、報告を書き直しても、変わらない）。
 
@@ -21,11 +23,13 @@
                  checked に無い箱は判定なし。報告に無い図を指す指摘は、報告を直すまで止まる）
   差分照合       reports/review_<フローID>_差分<N>.json・code_review_<図の番号>_差分<N>.json（照合のあとに変わった箱だけを照合し直した報告。N は 1、2…）
 判定は、照合に出した順（記録の順）に重ね、あとのシートの判定が、前の判定を置き換える（全体を照合し直せば、前の差分照合より新しい）。
-照合に出していない箱を判定した報告・記録に無い番号の報告・名前が決まりと違う報告は、報告を直すまで止まる。
-点検（check_flow.py --stage review）は、いまの図と、各箱をいちばん新しく照合に出した版が違う箱を「照合したあとに変わった・足した箱」として FAIL にする
-（差分照合で、その箱だけを照合し直す）。採用した指摘は、その指摘を受けたシートの図と、いまの図が同じなら FAIL（まだ反映していない）。
-報告に sheet の無い前の版の採否表は、点検は WARN。いまの図を照合済みと認めるとき（全体を照合し直して、採用した指摘を図に反映したあとも）、
-利用者が snapshot --assume-current で「認めた」版を控える（sheet のある報告のある図には使えない）。
+形の崩れた報告・照合に出していない箱を判定した報告・記録に無い番号の報告・名前が決まりと違う報告は、報告を直すまで止まる。
+点検（check_flow.py --stage review）は、報告が実際に判定した版のどれとも、いまの図が違う箱を「照合したあとに変わった・足した箱」として FAIL にする
+（シートに載せても、報告が判定していなければ、照合済みにしない。差分照合で、その箱だけを照合し直す）。
+採用した指摘は、その指摘を受けたシートの図と、いまの図が同じなら FAIL（まだ反映していない）。
+sheet の無い前の版の報告だけの採否表は、点検は WARN。前の版の報告のまま、いまの図を照合済みと認めるときだけ、
+利用者が snapshot --assume-current で「認めた」版を控える（判定は、どのシートの報告よりも先に重ねる）。
+照合に出したあとに書いた報告に sheet が無ければ、止まる（前の報告に番号を書き足さない）。
 採否の書かれていない指摘があるうちは、点検が FAIL にする。
 """
 import argparse
@@ -43,6 +47,7 @@ ORDER = {"支持": 0, "一部支持": 1, "不支持": 2}
 NO_FINDING = "指摘なし（照合の報告で、この箱を見て、指摘が無い）"
 DIFF = re.compile(r"_差分([1-9][0-9]*)$")                            # 差分照合の報告（照合のあとに変わった箱だけを照合し直した）
 RECORD = "sheets.json"                                               # review/ の下。照合に出した版の記録
+FIG = "図の項目"                                                      # 箱でない、図全体の項目（開始・終了条件・対象外の項目と使わないページの理由）。要約では、箱と並べて 1 つの項目にする
 ASSUMED = "認めた"                                                    # 利用者が、いまの図を照合済みと認めた版（前の版の採否表）
 
 
@@ -98,11 +103,22 @@ def judged(d, fid):
 
 def summaries(fig):
     """図の箱ごとの要約（照合に出した版と、いまの図を比べる）: {番号: {種類・名前・レーン・補足・推定・リンク先・使うシステム・帳票の向きと付く箱・
-    出典のページと行・前後の線（推定の印も）・アクティビティ図の呼び出し・繰り返し・畳んだ手続き}}"""
+    出典のページと行・前後の線（推定の印も）・アクティビティ図へのリンク・付いている帳票・アクティビティ図の呼び出し・繰り返し・畳んだ手続き}}。
+    図全体の項目（開始・終了条件・対象外の項目と使わないページの理由。アクティビティ図は、箱にしない行・分岐の扱いと理由）は、FIG の 1 項目にする"""
     lanes = {x.get("id"): x.get("name") for x in fig.get("lanes") or [] if isinstance(x, dict)}
     edges = [e for e in fig.get("edges") or [] if isinstance(e, dict)]
     line = lambda e, end: f"{end}{(' ' + str(e.get('label'))) if e.get('label') else ''}{'（推定）' if e.get('inferred') else ''}"
-    out = {}
+    rows = lambda key: [x for x in fig.get(key) or [] if isinstance(x, dict)]
+    files = {}
+    for n in fig.get("nodes") or []:
+        if isinstance(n, dict) and n.get("type") == "file" and n.get("attach_to"):
+            files.setdefault(n["attach_to"], []).append(f"{n.get('label', '')}（{n.get('direction', '')}）")
+    out = {FIG: {"type": FIG, "label": str(fig.get("name") or ""), "lane": "", "detail": str(fig.get("summary") or ""), "inferred": False, "link": "",
+                 "pages": [], "edges": [], "start": str(fig.get("start_condition") or ""), "end": str(fig.get("end_condition") or ""),
+                 "excluded": sorted([f"{x.get('doc_id')} {x.get('page')} {x.get('item')}: {x.get('reason', '')}" for x in rows("excluded_items")]
+                                    + [f"{x.get('key')} {x.get('state')}: {x.get('reason', '')}" for x in rows("lines") + rows("branches")
+                                       if x.get("state") not in ("box", "decision")]),
+                 "unused": sorted(f"{x.get('doc_id')} {x.get('page')}: {x.get('reason', '')}" for x in rows("unused_pages"))}}
     for n in fig.get("nodes") or []:
         if not isinstance(n, dict) or n.get("type") in ("start", "end"):
             continue
@@ -112,15 +128,19 @@ def summaries(fig):
              "pages": sorted({f"{s.get('doc_id')} {s.get('page')}" + (f" {s['lines'][0]}-{s['lines'][-1]}" if isinstance(s.get("lines"), list) and s["lines"] else "")
                               for s in n.get("sources") or [] if isinstance(s, dict)}),
              "edges": sorted([line(e, f"→{e.get('to')}") for e in edges if e.get("from") == i] + [line(e, f"←{e.get('from')}") for e in edges if e.get("to") == i])}
-        for k in ("systems", "direction", "attach_to", "calls", "loop", "folded"):   # 種類によって無い項目は、写しにも入れない
+        for k in ("systems", "direction", "attach_to", "calls", "loop", "folded", "activity"):   # 種類によって無い項目は、写しにも入れない
             if n.get(k) not in (None, "", []):
                 s[k] = json.dumps(n[k], ensure_ascii=False, sort_keys=True) if isinstance(n[k], (dict, list)) else str(n[k])
+        if files.get(i):
+            s["files"] = sorted(files[i])                            # 付いている帳票（帳票の箱を消すと、付いていた箱が変わる）
         out[str(i)] = s
     return out
 
 
 SEEN_JA = {"type": "種類", "label": "名前", "lane": "レーン", "detail": "補足", "inferred": "推定の印", "link": "リンク先", "pages": "出典のページ", "edges": "線",
-           "systems": "使うシステム", "direction": "帳票の向き", "attach_to": "付く箱", "calls": "呼び出し", "loop": "繰り返し", "folded": "畳んだ手続き"}
+           "systems": "使うシステム", "direction": "帳票の向き", "attach_to": "付く箱", "calls": "呼び出し", "loop": "繰り返し", "folded": "畳んだ手続き",
+           "activity": "アクティビティ図へのリンク", "files": "付いている帳票", "start": "開始条件", "end": "終了条件", "excluded": "対象外の項目と理由",
+           "unused": "使わないページと理由"}
 
 
 def figure_mark(fig):
@@ -147,44 +167,114 @@ def read_record(work):
     return d["sheets"]
 
 
+def save_record(work, rec):
+    errs = validate({"sheets": rec}, "sheets")                         # 機械の不具合で崩れた記録を書かない（作り直せない）
+    if errs:
+        raise ValueError(f"review/{RECORD} に書く中身の形が崩れる（{'／'.join(errs[:3])}）")
+    save(pathlib.Path(work) / "review" / RECORD, {"sheets": rec})
+
+
 def record(work, figs, kind, targets=None):
-    """照合に出す版を控える。figs: {図の番号: 図}。→ {図の番号: シートの番号}。
-    同じ図で、最後の控え（認めた版を除く）が同じ種類・同じ図の印・同じ箱なら、その番号を使う（書き出し直しでは増やさない）"""
+    """照合に出す版を控える。figs: {図の番号: 図}（1 回に出す図の組）。→ {図の番号: シートの番号}（組の中は同じ番号）。
+    組の全部の図で、その図の最後の控え（認めた版も含む）が同じ番号・同じ種類・同じ図の印・同じ箱なら、その番号を使う（書き出し直しでは増やさない）。
+    1 枚でも違えば、組の全部に新しい番号を付ける（報告の sheet は 1 つ）。
+    その図を初めて控えるときは、sheet の無い報告（前の版の報告）の印も控える（あとから書いた sheet の無い報告と見分ける）"""
     work = pathlib.Path(work)
+    if not figs:
+        return {}
     rec = read_record(work)
-    nxt = 1 + max((int(e["id"][2:]) for e in rec), default=0)
-    out, new = {}, []
+    sid = f"S-{1 + max((int(e['id'][2:]) for e in rec), default=0)}"
+    new, same = [], set()
     for F, fig in figs.items():
         now = summaries(fig)
         nodes = {i: now[i] for i in targets} if targets else now
         mark = figure_mark(fig)
-        last = next((e for e in reversed(rec) if e["figure"] == F and e["kind"] != ASSUMED), None)
-        if last and last["kind"] == kind and last["mark"] == mark and last["nodes"] == nodes:
-            out[F] = last["id"]
-            continue
-        new.append({"id": f"S-{nxt}", "date": datetime.date.today().isoformat(), "kind": kind, "figure": F, "mark": mark, "nodes": nodes})
-        out[F] = f"S-{nxt}"
-    if new:
-        save(work / "review" / RECORD, {"sheets": rec + new})
+        last = next((e for e in reversed(rec) if e["figure"] == F), None)
+        same.add(last["id"] if last and last["kind"] == kind and last["mark"] == mark and last["nodes"] == nodes else None)
+        e = {"id": sid, "date": datetime.date.today().isoformat(), "kind": kind, "figure": F, "mark": mark, "nodes": nodes}
+        if last is None:
+            try:
+                old = {f.name: file_mark(f) for f, d in reports(work, F) if isinstance(d, dict) and not d.get("sheet")}
+            except ValueError:                                       # 名前の崩れた報告は、点検・下書きが止める
+                old = {}
+            if old:
+                e["before"] = old
+        new.append(e)
+    if len(same) == 1 and None not in same:
+        return {F: next(iter(same)) for F in figs}
+    save_record(work, rec + new)
+    return {F: sid for F in figs}
+
+
+def next_report(work, fid):
+    """差分照合の報告の置き場（reports/review_<フローID>_差分<N>.json・code_review_<図の番号>_差分<N>.json）。N は、まだ使っていない次の数
+    （前の報告を上書きしない。親が数えない）"""
+    stem = ("code_review_" if fid.startswith("A-") else "review_") + fid
+    used = [int(m.group(1)) for p in (pathlib.Path(work) / "reports").glob(f"{stem}_差分*.json") for m in [re.fullmatch(rf"{re.escape(stem)}_差分(\d+)", p.stem)] if m]
+    return f"reports/{stem}_差分{1 + max(used, default=0)}.json"
+
+
+def drawn_mark(work, fid):
+    """書き出した図（out/*.layout.json）の、そのページの図の印。無ければ None"""
+    page = ("act-" if fid.startswith("A-") else "flow-") + fid
+    for lp in sorted((pathlib.Path(work) / "out").glob("*.layout.json")):
+        lay = try_load(lp)[0]
+        for pg in (lay.get("pages") if isinstance(lay, dict) and isinstance(lay.get("pages"), list) else []):
+            if isinstance(pg, dict) and pg.get("id") == page:
+                return pg.get("mark")
+    return None
+
+
+def before_marks(rec, fid):
+    """前の版の報告（sheet の無い報告）の印: その図を初めて控えたときにあったもの・認めた版に入れたもの"""
+    mine = [e for e in rec if e["figure"] == fid]
+    out = dict(mine[0].get("before") or {}) if mine else {}
+    for e in mine:
+        if e["kind"] == ASSUMED:
+            out.update(e.get("reports") or {})
     return out
 
 
+def is_before(rec, fid, f):
+    """sheet の無い報告 f が、前の版の報告か（その図を一度も控えていない・控えたときにもうあった）"""
+    return not any(e["figure"] == fid for e in rec) or before_marks(rec, fid).get(f.name) == file_mark(f)
+
+
+def check_shapes(fid, reps):
+    """報告の形（中を読む前に）。崩れていれば ValueError（どのファイルの何が違うか）"""
+    for f, d in reps:
+        errs = validate(d, "report_code_review" if fid.startswith("A-") else "report_review")
+        if errs:
+            raise ValueError(f"reports/{f.name} の形が崩れている（{'／'.join(errs[:3])}）")
+
+
+def no_sheet(rec, fid, f):
+    """sheet の無い報告で止めるときの文。前の版の報告には、番号を書き足させない（書き足すと、照合していない直しまで照合済みになる）"""
+    if is_before(rec, fid, f):
+        return (f"reports/{f.name} は、前の版の報告（照合したシートの番号 sheet が無い）。前の報告に番号を書き足さない。"
+                f"いまの図を照合済みと認めるなら、利用者が python3 scripts/review.py snapshot -w <作業フォルダ> --only {fid} --assume-current で認める。"
+                "認めないなら、全体を照合し直す")
+    return f"reports/{f.name} に、照合したシートの番号（sheet）が無い（照合シートの見出しの［S-<n>］を写させる）"
+
+
 def mapped(fid, reps, rec):
-    """報告ごとの、照合に出した版: [(ファイル, 中身, 控え)]（記録の順・名前の順）。どの報告にも sheet が無く、認めた版も無ければ None（前の版）。
-    記録に無い番号・照合に出していない箱の判定・種類の違う名前は ValueError"""
+    """報告ごとの、照合に出した版: [(ファイル, 中身, 控え)]（認めた版を先に、あとは記録の順・名前の順）。
+    どの報告にも sheet が無く、認めた版も無ければ None（前の版の採否表か、sheet の書き忘れ。legacy で見分ける）。
+    形の崩れた報告・記録に無い番号・照合に出していない箱の判定・種類の違う名前・認めていない前の版の報告は ValueError"""
+    check_shapes(fid, reps)
     mine = [e for e in rec if e["figure"] == fid]
     assumed = [e for e in mine if e["kind"] == ASSUMED]
-    has = lambda f: any((e.get("reports") or {}).get(f.name) == file_mark(f) for e in assumed)
-    if not any(isinstance(d, dict) and d.get("sheet") for _f, d in reps) and not any(has(f) for f, _d in reps):
+    in_assumed = lambda f: next((e for e in reversed(assumed) if (e.get("reports") or {}).get(f.name) == file_mark(f)), None)
+    if not any(d.get("sheet") for _f, d in reps) and not any(in_assumed(f) for f, _d in reps):
         return None
     at = {e["id"]: k for k, e in enumerate(rec)}
     out = []
     for f, d in reps:
-        sid = d.get("sheet") if isinstance(d, dict) else None
+        sid = d.get("sheet")
         if not sid:
-            e = next((e for e in reversed(assumed) if (e.get("reports") or {}).get(f.name) == file_mark(f)), None)
+            e = in_assumed(f)
             if e is None:
-                raise ValueError(f"reports/{f.name} に、照合したシートの番号（sheet）が無い（照合シートの見出しの［S-<n>］を写させる）")
+                raise ValueError(no_sheet(rec, fid, f))
             out.append((f, d, e))
             continue
         e = next((e for e in mine if e["id"] == sid), None)
@@ -197,12 +287,13 @@ def mapped(fid, reps, rec):
         if lost:
             raise ValueError(f"reports/{f.name} が、照合に出していない箱を判定している（{'・'.join(lost[:8])}。シート {sid} に無い。箱の番号を直す）")
         out.append((f, d, e))
-    return sorted(out, key=lambda x: (at[x[2]["id"]], x[0].name))
+    return sorted(out, key=lambda x: (x[2]["kind"] != ASSUMED, at[x[2]["id"]], x[0].name))   # 認めた版は、前の版の報告（どのシートよりも前に照合した）
 
 
-def legacy(rv, maps):
-    """前の版の採否表か: 報告に sheet が無く（認めた版も無く）、採否表があって sheets が無い"""
-    return maps is None and isinstance(rv, dict) and "sheets" not in rv
+def legacy(rv, fid, reps, rec):
+    """前の版の採否表か: 採否表があって sheets が無く、報告がどれも前の版の報告（sheet が無く、その図を初めて控えたときにもうあった）。
+    mapped が None のときだけ呼ぶ"""
+    return isinstance(rv, dict) and "sheets" not in rv and all(is_before(rec, fid, f) for f, _d in reps)
 
 
 def from_reports(work, fid, fig, rec=None, reps=None, maps=False):
@@ -213,10 +304,7 @@ def from_reports(work, fid, fig, rec=None, reps=None, maps=False):
     reps = reports(work, fid) if reps is None else reps
     if not reps:
         return None
-    for f, d in reps:
-        errs = validate(d, "report_code_review" if act else "report_review")
-        if errs:
-            raise ValueError(f"reports/{f.name} の形が崩れている（{'／'.join(errs[:3])}）")
+    check_shapes(fid, reps)
     if maps is False:
         maps = mapped(fid, reps, read_record(work) if rec is None else rec)
     if not maps and act:                                             # 前の版の報告: 図に無い箱を指す指摘は、いまの図で見て止める
@@ -256,17 +344,32 @@ def from_reports(work, fid, fig, rec=None, reps=None, maps=False):
     return list(verdict.values()), findings
 
 
-def unreviewed(fig, maps):
-    """いまの図と、各箱をいちばん新しく照合に出した版（報告の届いた版）が違う箱: [(番号, 何が違うか)]"""
-    seen = {}
+def unreviewed(fid, fig, maps):
+    """照合していない箱: [(番号, 何が違うか)]。箱は、報告が実際に判定した版（シートに載せただけでは数えない。認めた版は全部の箱）の
+    どれかと、いまの図が同じなら照合済み。どの報告も判定していない箱は、最初の全体の照合のときから変わっていなければ、
+    照合し直さない（判定なしとして、支持率で数える）"""
+    looked = {}                                                      # 箱 → 報告が判定した版の要約（照合に出した順）
+    for _f, d, e in maps:
+        for b in (set(e["nodes"]) if e["kind"] == ASSUMED else (judged(d, fid) | {FIG}) & set(e["nodes"])):   # 図の項目は、判定の欄が無い。シートに載せて報告が届けば済み
+            looked.setdefault(b, []).append(e["nodes"][b])
+    first = next((e for _f, _d, e in maps if e["kind"] != "差分"), None)
+    last = {}                                                        # 箱 → いちばん新しく載せたシート
     for _f, _d, e in maps:
-        seen.update(e["nodes"])
+        for b in e["nodes"]:
+            last[b] = e
     out = []
     for i, now in summaries(fig).items():
-        was = seen.get(i)
-        if not isinstance(was, dict):
+        seen = looked.get(i) or []
+        if now in seen:
+            continue
+        was = seen[-1] if seen else (first or {}).get("nodes", {}).get(i)
+        if not seen and was == now:
+            continue
+        if i in last and last[i]["nodes"][i] == now:
+            out.append((i, f"シート {last[i]['id']} に載せたが、報告が判定していない"))
+        elif not isinstance(was, dict):
             out.append((i, "照合のあとに足した"))
-        elif was != now:
+        else:
             out.append((i, "・".join(SEEN_JA.get(k, k) for k in sorted(set(now) | set(was)) if was.get(k) != now.get(k)) + "が変わった"))
     return out
 
@@ -285,8 +388,8 @@ def draft(work, fid, fig, rec=None):
     old = try_load(path)[0]
     rec = read_record(work) if rec is None else rec
     maps = mapped(fid, reps, rec)
-    if maps is None and not legacy(old, maps):
-        raise ValueError(f"報告（{'・'.join(f.name for f, _d in reps[:4])}）に、照合したシートの番号（sheet）が無い（照合シートの見出しの［S-<n>］を写させる）")
+    if maps is None and not legacy(old, fid, reps, rec):
+        raise ValueError(no_sheet(rec, fid, next((f for f, _d in reps if not is_before(rec, fid, f)), reps[0][0])))
     verdicts, findings = from_reports(work, fid, fig, rec, reps, maps)
     kinds = {e["id"]: e["kind"] for e in rec}
     kept = {(x.get("sheet", ""), key(x)): x for x in (old.get("findings") or [] if isinstance(old, dict) else []) if isinstance(x, dict)}
@@ -376,9 +479,16 @@ def main():
             bad = [x for x in targets if x not in have]
             if bad:
                 raise SystemExit(f"--nodes の番号が、{only[0]} の箱に無い（開始・終了は照合しない）: {'・'.join(bad)}")
-        got = record(work, {F: figs[F] for F in only if F in figs}, "差分" if targets else "全体", targets)
+        stale = [F for F in only if F in figs and F.startswith("A-") and drawn_mark(work, F) != figure_mark(figs[F])]
+        if stale:
+            raise SystemExit(f"図（out/アクティビティ図.drawio）が、activity.json と違う: {'・'.join(stale)}（書き出したあとに直した）。"
+                             "python3 scripts/build_activity.py → check_layout.py で書き出し直してから、もう一度（照合に出す図と、控える版をそろえる）")
+        try:
+            got = record(work, {F: figs[F] for F in only if F in figs}, "差分" if targets else "全体", targets)
+        except ValueError as e:
+            raise SystemExit(str(e))
         for F, sid in got.items():
-            print(f"{F}: シート {sid}（照合の報告の sheet に「{sid}」と書かせる）")
+            print(f"{F}: シート {sid}（照合の報告の sheet に「{sid}」と書かせる）" + (f"。報告の置き場は {next_report(work, F)}" if targets else ""))
         return
     if a.cmd == "snapshot":
         if not a.assume_current:
@@ -396,16 +506,30 @@ def main():
                 continue
             if not reps:
                 continue
-            if any(isinstance(d, dict) and d.get("sheet") for _f, d in reps):
-                print(f"{fid}: シートの番号（sheet）のある報告がある（照合に出した版の記録がある）。認めずに、照合したあとに変わった箱を差分照合で照合し直す")
+            try:
+                check_shapes(fid, reps)
+            except ValueError as e:
+                print(f"{fid}: {e}。報告を直してから")
+                continue
+            old = [(f, d) for f, d in reps if not d.get("sheet")]
+            new = [f.name for f, _d in old if not is_before(rec, fid, f)]
+            if new:
+                print(f"{fid}: {'・'.join(new)} は、照合に出したあとに書いた報告なのに、シートの番号（sheet）が無い。認めずに、報告に、照合したシートの番号を書かせる")
+                continue
+            if not old:
+                print(f"{fid}: 前の版の報告（sheet の無い報告）が無い。認めずに、照合したあとに変わった箱を差分照合で照合し直す")
                 continue
             rec = rec + [{"id": f"S-{nxt}", "date": datetime.date.today().isoformat(), "kind": ASSUMED, "figure": fid, "mark": figure_mark(fig),
-                          "nodes": summaries(fig), "reports": {f.name: file_mark(f) for f, _d in reps}}]
-            print(f"{fid}: いまの図（箱 {len(rec[-1]['nodes'])}）を、照合済みと認めた版 S-{nxt} として控えた（報告 {len(reps)}）")
+                          "nodes": summaries(fig), "reports": {f.name: file_mark(f) for f, _d in old}}]
+            print(f"{fid}: いまの図（箱 {len(rec[-1]['nodes'])}）を、照合済みと認めた版 S-{nxt} として控えた（前の版の報告 {len(old)}。"
+                  f"判定は、どのシートの報告よりも先に重ねる）")
             nxt += 1
             made += 1
         if made:
-            save(work / "review" / RECORD, {"sheets": rec})
+            try:
+                save_record(work, rec)
+            except ValueError as e:
+                raise SystemExit(str(e))
             for fid in [e["figure"] for e in rec[-made:]]:
                 try:
                     write_draft(work, fid, figs[fid], rec)
@@ -429,7 +553,7 @@ def main():
         n = len(rv["verdicts"])
         sup = sum(v["verdict"] == "支持" for v in rv["verdicts"])
         maps = mapped(fid, reports(work, fid), rec)
-        gaps = unreviewed(fig, maps) if maps else None
+        gaps = unreviewed(fid, fig, maps) if maps else None
         print(f"{fid}: 判定 {n}（支持 {sup}）・指摘 {len(rv['findings'])}" + (f"・採否が未記入 {open_}" if open_ else "")
               + ("・照合に出した版の記録なし（前の版の採否表）" if gaps is None else
                  f"・照合したあとに変わった・足した箱 {len(gaps)}（{'・'.join(i for i, _w in gaps[:8])}）" if gaps else ""))

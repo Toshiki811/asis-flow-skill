@@ -259,20 +259,24 @@ class Status:
         sheets = {re.sub(r"_\d+$", "", f.stem.replace("照合シート_", "")) for f in out.glob("照合シート_*.pdf")} if out.exists() else set()
         reviews = {f.name.split(".")[0] for f in files_of(self.work, "review")}
         rc = self.check("check_flow.py", "--stage", "review") if reviews else None
-        old = sorted(F for F in flows & sheets if newest(list(out.glob(f"照合シート_{F}.pdf")) + list(out.glob(f"照合シート_{F}_*.pdf")))
+        old = sorted(F for F in (flows & sheets) - reviews if newest(list(out.glob(f"照合シート_{F}.pdf")) + list(out.glob(f"照合シート_{F}_*.pdf")))
                      < newest([self.work / "flows" / f"{F}.flow.json"] + list((out / "png").glob(f"*_flow-{F}.png"))))   # シートより、フロー・図の PNG のほうが新しい
         self.row(8, "原典照合", "未" if not reviews else "途中" if ids - reviews else "要直し" if rc and rc[0] else "済み",
                  f"照合シート {len(sheets & flows)}/{len(flows)}・採否表 {len(reviews & ids)}/{len(ids)}"
                  + (f"・残り {', '.join(sorted(ids - reviews)[:10])}" if reviews and ids - reviews else "")
-                 + (f"・古いシート {', '.join(old[:10])}" if old else "") + tally(rc))
+                 + (f"・古いシート {', '.join(old[:10])}" if old else "") + tally(rc))   # 照合に出した図（採否表のある図）のシートは、古くても作り直さない（差分照合で）
         if self.ready and self.drawio and not self.stale and ids - reviews:
             todo = sorted(ids - reviews)
             if flows - sheets or old:
                 self.todo.append(f"python3 scripts/make_compare.py -w {W}" + (f" --only {','.join(sorted((flows - sheets) | set(old)))}" if sheets else "")
                                  + "    # 照合シートを作る（フロー・図より古いものは作り直す）")
             else:
-                self.todo.append(f"# 残り {', '.join(todo[:10])} を、図ごとに別のエージェントに照合させ（報告は reports/）、python3 scripts/review.py draft -w {W} で"
-                                 f"採否表の下書きを作って、採否と対応を書く（references/source-review-prompt.md・code-review-prompt.md）")
+                acts = [x for x in todo if x.startswith("A-")]
+                if acts:
+                    self.todo.append(f"python3 scripts/review.py record -w {W} --only <組の図の番号>    # アクティビティ図（{', '.join(acts[:6])}{' …' if len(acts) > 6 else ''}）は、"
+                                     "照合に出す組ごとに版を控え、出たシートの番号を報告の sheet に書かせる（references/code-review-prompt.md）")
+                self.todo.append(f"# 残り {', '.join(todo[:10])} を、図ごとに別のエージェントに照合させ（報告は reports/。照合シートの見出しの［S-<n>］を、報告の sheet に写させる）、"
+                                 f"python3 scripts/review.py draft -w {W} で採否表の下書きを作って、採否と対応を書く（references/source-review-prompt.md・code-review-prompt.md）")
         elif old and self.ready and self.drawio and not self.stale:
             self.todo.append(f"python3 scripts/make_compare.py -w {W} --only {','.join(old)}    # 古い照合シートを作り直す（作業の記録として渡す）")
         if rc and rc[0]:

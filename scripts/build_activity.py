@@ -56,6 +56,8 @@ class ActivityDrawing(B.FlowDrawing):
     """アクティビティ図1枚。データの形と線の引き方は業務フローと同じ。形・題・凡例・情報欄を差し替え、分岐の先を横に並べる（レーンの中を列に分ける）"""
 
     def __init__(self, act, ctx, cap=COLS):
+        from review import figure_mark
+        mark = figure_mark(act)                                      # 描く前の activity.json の中身の印（照合に出す版と、書き出した図をそろえる）
         look = {"system": "role", "external": "system"}             # 色: プログラムのレーンは担当と同じ配色、外部は灰色（破線の箱）
         act = dict(act, lanes=[dict(l, kind=look.get(l.get("kind"), l.get("kind"))) for l in act["lanes"]])
         self.cap = cap                                               # 1レーンの列の数の上限（1 なら、列を分けない＝縦一列）
@@ -63,6 +65,7 @@ class ActivityDrawing(B.FlowDrawing):
         self.A = self.S                                              # アクティビティ図のテンプレートから抜いたスタイル一式（開始・終了・凡例の文も、ここ）
         self.draft = sum(1 for n in act["nodes"] if n.get("unnamed"))    # 名前の付いていない箱の数（あれば、下書き）
         self.page = B.Page(f"act-{act['flow_id']}", (DRAFT if self.draft else "") + f"{act['flow_id']} {act['name']}"[:60], self.S["model"])
+        self.page.mark = mark
 
     def split_cols(self):
         return B.assign_cols(self.main, self.E, self.cap) if self.cap > 1 else ({}, None)

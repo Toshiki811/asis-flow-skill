@@ -6,7 +6,7 @@
  "additionalProperties": false,
  "required": ["verdicts", "findings"],
  "properties": {
-  "sheet": {"$ref": "common#/$defs/sheet_id", "description": "照合したシートの番号（シートの見出しの［S-3］を写す）。どの版の図を照合したかは、この番号で決まる"},
+  "sheet": {"$ref": "common#/$defs/sheet_id", "description": "照合したシートの番号（シートの見出しの［S-3］を写す）。新しい報告には必ず書く（無ければ門が FAIL。無くてよいのは、前の版の報告だけ）。どの版の図を照合したかは、この番号で決まる"},
   "verdicts": {"type": "array", "items": {"$ref": "#/$defs/verdict"}, "description": "開始・終了を除く全ノードの判定（差分照合の報告は、シートに載った箱だけ）"},
   "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}, "description": "指摘。無ければ空"}
  },

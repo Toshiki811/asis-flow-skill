@@ -8,10 +8,15 @@
   FAIL       .fail( と .fail_if(（段によって WARN になる点検）の呼び出し、配置の点検の yield "fail", …
   門の WARN  .warn( のうち、納品の門が FAIL にする WARN（deliver.PROMOTE の語を含むもの）。ほかの WARN は数えない（門を止めない）
   呼び元     点検の共通の部品（common.FAIL_HELPERS: 形の点検・読めない・根拠のページ ほか）を呼ぶ所。ファイルの種類ごとに、部品の FAIL が出るかを見る
-控えは、環境変数 ASIS_FAIL_LOG があるとき、Report.fail・fail_if・warn が書き足す（共通の部品の中の FAIL なら、呼び元の行も）。
+  中継の内側 点検が 1 行で中継する、ほかのモジュールの誤りの文: 直しの一覧（apply_edits.py の self.bad・self.err）・アクティビティ図の直し（activity.py の同じ形）・
+             台帳の紐付け（systems.py の link_errors・excluded_errors・folded_errors）。誤りの文ごとに 1 か所（common.site で包んだ所と、self.bad の呼び出し）
+控えは、環境変数 ASIS_FAIL_LOG があるとき、Report.fail・fail_if（FAIL になったときだけ）・warn・common.site が書き足す（共通の部品の中なら、呼び元の行も）。
+部品の中の FAIL も、呼び元も、それぞれ 1 か所に数える。数えないもの: 落ちないための守り（common.guarded の FAIL）。
+用語の対応・木の誤りの中継は、中継の 1 か所に数える（内側の誤りの文ごとには数えない）。
 試験しない点検は、evals/untested_checks.md の表に、理由つきで並べる（ファイル・関数・文の一部で指す。行の番号は書かない）。
 終了コード 1: 一覧に無いのに一度も出ない点検がある（試験を足すか、試験しない理由を書いて一覧に足す）／一覧にあるのに出た点検・
-どの点検にも当たらない一覧の行がある（一覧を直す）／-w で回した自己点検が NG。
+どの点検にも当たらない一覧の行がある（一覧を直す）／門が FAIL にする語（deliver.PROMOTE）が、どの WARN の文にも無い（文を変えて語が外れた）／
+-w で回した自己点検が NG。
 """
 import argparse
 import ast
@@ -29,6 +34,7 @@ from common import FAIL_HELPERS, FAIL_LOG  # noqa: E402
 from deliver import PROMOTE  # noqa: E402
 
 FILES = ("check_flow.py", "check_layout.py", "check_extract.py")
+RELAYS = ("apply_edits.py", "activity.py", "systems.py")             # 中継の内側（誤りの文ごとに数える）
 LIST = SKILL / "evals" / "untested_checks.md"
 
 
@@ -67,14 +73,26 @@ def site_of(n):
     return None
 
 
+def relay_of(n, func):
+    """中継の内側の誤りの文なら ("relay", 文の節): common.site で包んだ文（誤りを溜める部品 bad の中は除く）と、self.bad の呼び出し"""
+    if isinstance(n, ast.Call):
+        f = n.func
+        if isinstance(f, ast.Name) and f.id == "site" and n.args and func != "bad":
+            return "relay", n.args[0]
+        if isinstance(f, ast.Attribute) and f.attr == "bad" and isinstance(f.value, ast.Name) and f.value.id == "self":
+            return "relay", n.args[2] if len(n.args) > 2 else None
+    return None
+
+
 def sites(root=SKILL):
     """点検の場所: [{file, func, line, end, kind, text}]。call の文は「部品の名前（呼び元が渡した名前）」"""
     out = []
-    for name in FILES:
+    for name in FILES + RELAYS:
         tree = ast.parse((root / "scripts" / name).read_text(encoding="utf-8"))
         funcs = [(n.lineno, n.end_lineno, n.name) for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+        within = lambda n: min((f for f in funcs if f[0] <= n.lineno <= f[1]), key=lambda f: f[1] - f[0], default=(0, 0, "（関数の外）"))[2]
         for n in ast.walk(tree):
-            hit = site_of(n)
+            hit = (relay_of(n, within(n)) if hasattr(n, "lineno") else None) if name in RELAYS else site_of(n)
             if hit is None:
                 continue
             kind, arg = hit
@@ -83,7 +101,7 @@ def sites(root=SKILL):
                 continue
             if kind == "call":
                 text = f"{n.func.attr if isinstance(n.func, ast.Attribute) else n.func.id}（{text}）"
-            func = min((f for f in funcs if f[0] <= n.lineno <= f[1]), key=lambda f: f[1] - f[0], default=(0, 0, "（関数の外）"))[2]
+            func = within(n)
             out.append({"file": name, "func": func, "line": n.lineno, "end": n.end_lineno, "kind": kind, "text": text})
     return sorted(out, key=lambda s: (s["file"], s["line"]))
 
@@ -93,7 +111,7 @@ def listed(path=LIST):
     out = []
     for ln in path.read_text(encoding="utf-8").splitlines() if path.exists() else []:
         cells = [c.strip() for c in ln.strip().strip("|").split("|")]
-        if len(cells) == 4 and cells[0].endswith(".py") and cells[0] in FILES:
+        if len(cells) == 4 and cells[0].endswith(".py") and cells[0] in FILES + RELAYS:
             out.append({"file": cells[0], "func": cells[1].strip("`"), "part": cells[2].strip("「」"), "why": cells[3]})
     return out
 
@@ -141,8 +159,9 @@ def main():
     else:
         log, broken = pathlib.Path(a.log), False
     ss, fired, rows, loose, noisy, stale = tally(read_log(log))
+    dead = [k for k in PROMOTE if not any(s["kind"] == "warn" and k in s["text"] for s in ss)]
     kinds = collections.Counter(s["kind"] for s in ss)
-    print(f"点検の場所 {len(ss)} か所（FAIL {kinds['fail']}・門の WARN {kinds['warn']}・共通の部品の呼び元 {kinds['call']}）: "
+    print(f"点検の場所 {len(ss)} か所（FAIL {kinds['fail']}・門の WARN {kinds['warn']}・共通の部品の呼び元 {kinds['call']}・中継の内側 {kinds['relay']}）: "
           f"自己点検で出た {len(fired)}・試験しない（{LIST.name}）{len(ss) - len(fired) - len(loose)}・出ないのに一覧に無い {len(loose)}")
     for s in loose:
         print(f"  出ない  {s['file']}:{s['line']} [{s['func']}] {s['text'][:110]}")
@@ -150,9 +169,11 @@ def main():
         print(f"  一覧にあるのに出た  {s['file']}:{s['line']} [{s['func']}] {s['text'][:80]}（一覧から外す）")
     for r in stale:
         print(f"  一覧の行が、どの点検にも当たらない  {r['file']} {r['func']}「{r['part']}」（点検の文・関数の名前が変わった。一覧を直す）")
+    for k in dead:
+        print(f"  門が FAIL にする語「{k}」が、どの WARN の文にも無い（点検の文を変えた。deliver.PROMOTE か点検の文を直す）")
     if broken:
         print("自己点検が NG（上の NG の行）")
-    sys.exit(1 if loose or stale or noisy or broken else 0)
+    sys.exit(1 if loose or stale or noisy or dead or broken else 0)
 
 
 if __name__ == "__main__":

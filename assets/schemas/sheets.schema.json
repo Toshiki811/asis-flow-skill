@@ -15,13 +15,14 @@
    "additionalProperties": false,
    "required": ["id", "date", "kind", "figure", "mark", "nodes"],
    "properties": {
-    "id": {"$ref": "common#/$defs/sheet_id", "description": "シートの番号（1 回に出した図は、同じ番号）"},
+    "id": {"$ref": "common#/$defs/sheet_id", "description": "シートの番号（1 回に出した図の組は、同じ番号）"},
     "date": {"type": "string", "description": "照合に出した日"},
     "kind": {"enum": ["全体", "差分", "認めた"], "description": "全体の照合／差分照合（照合のあとに変わった箱だけ）／利用者が、いまの図を照合済みと認めた（前の版の採否表）"},
     "figure": {"$ref": "common#/$defs/figure_id", "description": "図の番号"},
     "mark": {"$ref": "common#/$defs/mark", "description": "照合に出したときの図のデータの印。採用した指摘の図が、まだこの印のままなら、反映していない"},
-    "nodes": {"type": "object", "additionalProperties": {"$ref": "#/$defs/seen"}, "description": "箱の番号 → 照合に出したときの要約（差分照合は、照合し直す箱だけ）"},
-    "reports": {"type": "object", "additionalProperties": {"$ref": "common#/$defs/mark"}, "description": "認めた版だけ: 認めた前の版の報告（ファイル名 → 中身の印）"}
+    "nodes": {"type": "object", "additionalProperties": {"$ref": "#/$defs/seen"}, "description": "箱の番号 → 照合に出したときの要約（差分照合は、照合し直す箱だけ）。「図の項目」は、図全体の項目（開始・終了条件・対象外の項目と使わないページの理由）"},
+    "reports": {"type": "object", "additionalProperties": {"$ref": "common#/$defs/mark"}, "description": "認めた版だけ: 認めた前の版の報告（ファイル名 → 中身の印）"},
+    "before": {"type": "object", "additionalProperties": {"$ref": "common#/$defs/mark"}, "description": "その図を初めて控えたときだけ: そのときもうあった、シートの番号（sheet）の無い報告（前の版の報告。ファイル名 → 中身の印）。あとから書いた sheet の無い報告と見分ける"}
    }
   },
   "seen": {
@@ -43,7 +44,13 @@
     "attach_to": {"type": "string", "description": "帳票の付く箱"},
     "calls": {"type": "string", "description": "アクティビティ図: まとめた呼び出し"},
     "loop": {"type": "string", "description": "アクティビティ図: 繰り返し"},
-    "folded": {"type": "string", "description": "アクティビティ図: 畳んだ手続き"}
+    "folded": {"type": "string", "description": "アクティビティ図: 畳んだ手続き"},
+    "activity": {"type": "string", "description": "業務フロー: 箱からリンクするアクティビティ図"},
+    "files": {"type": "array", "items": {"type": "string"}, "description": "付いている帳票（名前と向き）"},
+    "start": {"type": "string", "description": "図の項目: 開始条件"},
+    "end": {"type": "string", "description": "図の項目: 終了条件"},
+    "excluded": {"type": "array", "items": {"type": "string"}, "description": "図の項目: 対象外の項目と理由（アクティビティ図は、箱にしない行・分岐の扱いと理由）"},
+    "unused": {"type": "array", "items": {"type": "string"}, "description": "図の項目: 使わないページと理由"}
    }
   }
  }

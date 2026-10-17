@@ -638,6 +638,9 @@ def draft_tests(tmp):
                 and any(q["id"] == "q1" and q.get("node") for q in f3["questions"]) and sum(1 for e in f3["edges"] if e.get("inferred")) == 4))
     c3, o3 = run("draft_flow.py", fx, "--flow", "F03")
     out.append(("下書きの表示: キー・担当・ラベル・原文が出る", c3 == 0 and "M02.1.s2  手順  [経理部]  支払データを作成し、経理課長の確認を受ける" in o3 and "原文（画像）" in o3))
+    src2 = {"doc_id": "M02", "page": 1, "quote": "支払データ"}                  # 足す作業・判断の出典（正しい形）
+    keys3 = ["M01.6.s1", "M02.1.s1", "M02.1.s2", "M02.1.s3", "M02.1.s4", "M02.2.s1", "M02.2.s2", "M02.2.s3", "M02.2.s4", "M03.1.s1", "M03.1.s2", "M03.1.s3", "M03.1.s4",
+             "M03.2.d1", "M04.3.s1"]                                   # 「支払処理」の下書きの項目
     for name, change, expect in [
             ("決まっていない種類の直し", lambda e: e["ops"].append({"op": "rewrite", "item": "M02.1.s1"}), "形の違反"),
             ("下書きに無い項目を指す", lambda e: e["ops"].append({"op": "label", "item": "M02.1.s9", "label": "x"}), "下書きに無い"),
@@ -654,10 +657,82 @@ def draft_tests(tmp):
             ("決まっていない動作の種類を書く", lambda e: e["ops"].append({"op": "time", "item": "M02.1.s1", "action": "打ち込む"}), "形の違反"),
             ("理由なしで、量を変える", lambda e: e["ops"].append({"op": "time", "item": "M02.1.s1", "volume": "大"}), "reason"),
             ("判断に、動作の種類を付ける", lambda e: e["ops"].append({"op": "time", "item": "M03.2.d1", "action": "確認する"}), "手順でない"),
+            ("動作の種類を 3 つ書く", lambda e: e["ops"].append({"op": "time", "item": "M03.1.s2", "action": ["確認する", "承認する", "連絡する"]}), "3 件（2 件まで）"),
+            ("同じ動作の種類を 2 回書く", lambda e: e["ops"].append({"op": "time", "item": "M03.1.s2", "action": ["確認する", "確認する"]}), "同じものが 2 回以上ある"),
             ("補足の直しに、補足も参考も無い", lambda e: e["ops"].append({"op": "detail", "item": "M02.1.s1"}), "detail か reference を書く"),
-            ("決まっていないレーンの種類", lambda e: e.update(lane_kinds={"経理部": "部門"}), "形の違反")]:
+            ("決まっていないレーンの種類", lambda e: e.update(lane_kinds={"経理部": "部門"}), "形の違反"),
+            # 中継の内側（2026-10-17）: 直しの一覧の誤りの文ごとに
+            ("まとめた候補に無い項目を unmerge する", lambda e: e["ops"].append({"op": "unmerge", "item": "M02.1.s1"}), "は、まとめた候補に無い"),
+            ("merge の items に、下書きに無い項目", lambda e: e["ops"].append({"op": "merge", "into": "M02.1.s1", "items": ["M09.9.s9"]}), "items の「M09.9.s9」という項目が、下書きに無い"),
+            ("手順に、分岐をまとめる", lambda e: e["ops"].append({"op": "merge", "into": "M02.1.s1", "items": ["M03.2.d1"]}), "種類が違う"),
+            ("merge の values に、まとめ先の値が無い", lambda e: e["ops"].append({"op": "merge", "into": "M02.2.s1", "items": ["M02.2.s2"], "values": {"M02.2.s2": "x"}}),
+             "values には、まとめ先"),
+            ("対象外の same_as が、下書きに無い", lambda e: e["ops"].append({"op": "exclude", "item": "M02.2.s3", "same_as": "M09.9.s9"}), "same_as「M09.9.s9」が、下書きに無い"),
+            ("対象外の flow が、業務分類に無い", lambda e: e["ops"].append({"op": "exclude", "item": "M02.2.s3", "flow": "F09"}), "flow「F09」が、業務分類に無い"),
+            ("まとめ先を対象外にする", lambda e: e["ops"].append({"op": "exclude", "item": "M02.1.s2", "reason": "試験"}), "ほかの項目がまとめてある"),
+            ("label が空", lambda e: e["ops"].append({"op": "label", "item": "M02.1.s1", "label": " "}), "label が空"),
+            ("分岐の線のラベルの数が違う", lambda e: e["ops"].append({"op": "label", "item": "M03.2.d1", "label": "不備があるか", "branches": ["あり", "なし", "不明"]}),
+             "branches は、分岐の行き先"),
+            ("time に、動作の種類も量も無い", lambda e: e["ops"].append({"op": "time", "item": "M02.1.s1"}), "action（動作の種類）か volume（量）を書く"),
+            ("付いていない帳票を外す", lambda e: e["ops"].append({"op": "drop_file", "item": "M02.1.s1", "name": "領収書"}), "帳票「領収書」は付いていない"),
+            ("分岐を分ける", lambda e: e["ops"].append({"op": "split", "item": "M03.2.d1", "parts": [{"label": "a", "lane": "経理部"}, {"label": "b", "lane": "経理課長"}]}),
+             "分けられるのは手順だけ"),
+            ("判断にする手順に、yes が無い", lambda e: e["ops"].append({"op": "decide", "item": "M02.2.s2", "question": "口座情報の誤りか"}), "question（何で分かれるか）・yes"),
+            ("手順に、分岐の行き先を書く", lambda e: e["ops"].append({"op": "branch", "item": "M02.1.s1", "to": "next"}), "は分岐でない"),
+            ("足す作業に label が無い", lambda e: e["ops"].append({"op": "add", "key": "x9", "type": "process", "after": "M02.1.s1", "lane": "経理部", "source": src2}),
+             "type（process か decision）と label を書く"),
+            ("足す作業の key が重なる", lambda e: e["ops"].append({"op": "add", "key": "x2", "type": "process", "after": "M02.1.s1", "label": "控えを取る", "lane": "経理部",
+                                                                "source": src2}), "key「x2」が、ほかの項目と重なっている"),
+            ("足す作業の出典に、場所が無い", lambda e: e["ops"].append({"op": "add", "key": "x9", "type": "process", "after": "M02.1.s1", "label": "控えを取る", "lane": "経理部",
+                                                                 "source": {"doc_id": "M02", "page": 1}}), "source（そう読める場所"),
+            ("足す作業に lane が無い", lambda e: e["ops"].append({"op": "add", "key": "x9", "type": "process", "after": "M02.1.s1", "label": "控えを取る", "source": src2}),
+             "足す作業の lane"),
+            ("足す判断に yes が無い", lambda e: e["ops"].append({"op": "add", "key": "x9", "type": "decision", "before": "M02.1.s1", "label": "誤りがあるか", "source": src2}),
+             "足す判断の yes"),
+            ("ほかの業務へ続く先の分類に、フローが無い", lambda e: e["ops"].append({"op": "link", "flow": "F00", "source": src2}), "flow「F00」という、フローを描く業務分類が無い"),
+            ("ほかの業務へ続く出典に、場所が無い", lambda e: e["ops"].append({"op": "link", "flow": "F01", "source": {"doc_id": "M02", "page": 1}}), "source（続くことが書かれた場所"),
+            ("足す作業の出典の行が、ページの外", lambda e: e["ops"].append({"op": "add", "key": "x9", "type": "process", "after": "M02.1.s1", "label": "控えを取る", "lane": "経理部",
+                                                                    "source": {"doc_id": "M02", "page": 1, "lines": [900, 901]}}), "出典の行の番号"),
+            ("手順を全部対象外にする", lambda e: e.update(ops=[{"op": "exclude", "item": k, "reason": "試験"} for k in keys3], questions=[]), "フローに入れる手順が1つも無い"),
+            ("default_lane が、用語の正本に無い", lambda e: e.update(default_lane="財務部"), "default_lane「財務部」が、用語の正本"),
+            ("足した判断を、並びの最後にする", lambda e: e["ops"].extend([{"op": "add", "key": "x9", "type": "decision", "before": "M02.1.s4", "label": "連携できたか", "yes": "できた",
+                                                                     "source": src2}, {"op": "move", "item": "M02.1.s4", "after": "M02.1.s1"}]), "のあとに項目が無い"),
+            ("分岐の線のラベルを付けない", lambda e: next(o for o in e["ops"] if o["op"] == "label").pop("branches"), "から出る線に、ラベルの無いものがある"),
+            ("行き先が、下書きに無い", lambda e: next(o for o in e["ops"] if o["op"] == "add").update(no_to="M09.9.s9"), "行き先「M09.9.s9」という項目が無い"),
+            ("下書きに無い線を外す", lambda e: e["ops"].append({"op": "disconnect", "from": "M02.1.s1", "to": "M02.2.s3"}), "は、下書きに無い"),
+            ("分岐から出す線に、ラベルが無い", lambda e: e["ops"].append({"op": "connect", "from": "M03.2.d1", "to": "M02.1.s3"}), "分岐から出る線には label が要る"),
+            ("確認事項が、下書きに無い項目を指す", lambda e: e["questions"][0].update(items=["M09.9.s9"]), "items・edge が指す項目が、下書きに無い")]:
         passed, text = bad_edits(fx, change, expect)
         out.append((f"直しの一覧の誤り: {name} → 何も書かずに知らせる" + ("" if passed else f"（「{expect}」が出ない）\n" + text[-500:]), passed))
+    e = json.loads((SKILL / "evals/fixture_edits/F03.edits.json").read_text(encoding="utf-8"))
+    e["ops"].append({"op": "time", "item": "M03.1.s2", "action": ["確認する", "承認する"]})
+    (fx / "flows/F03.edits.json").write_text(json.dumps(e, ensure_ascii=False), encoding="utf-8")
+    c4, o4 = run("apply_edits.py", fx, "--flow", "F03")
+    two = [n.get("action") for n in json.loads((fx / "flows/F03.flow.json").read_text(encoding="utf-8"))["nodes"] if isinstance(n.get("action"), list)]
+    c5, o5 = run("check_flow.py", fx, "--stage", "flow")
+    out.append(("直しの一覧: 2 つの動きのある箱は、動作の種類を違う 2 語で書ける（op time。そのまま flow.json に入り、点検を通る）" + ("" if c4 == 0 and c5 == 0 else o4[-300:] + o5[-300:]),
+                c4 == 0 and two == [["確認する", "承認する"]] and c5 == 0 and "FAIL  " not in o5))
+
+    def raw(change):
+        e = json.loads((SKILL / "evals/fixture_edits/F03.edits.json").read_text(encoding="utf-8"))
+        change(e)
+        return e
+    for name, change, expect in [
+            ("決まっていない種類の直し", lambda e: e["ops"].append({"op": "rewrite", "item": "M02.1.s1"}), "決まっていない種類。使えるのは"),
+            ("決まっていない動作の種類", lambda e: e["ops"].append({"op": "time", "item": "M02.1.s1", "action": "打ち込む"}), "決まった語でないか、2 語を超える"),
+            ("決まっていない量", lambda e: e["ops"].append({"op": "time", "item": "M02.1.s1", "volume": "巨大", "reason": "x"}), "volume「巨大」は、決まった語でない"),
+            ("分けたあとの作業の label が空", lambda e: e["ops"].append({"op": "split", "item": "M02.2.s2", "parts": [{"label": "", "lane": "経理部"}, {"label": "b", "lane": "経理課長"}]}),
+             "parts の label が空"),
+            ("確認事項に、答えで変わる所（effect）が無い", lambda e: e["questions"][0].pop("effect"), "effect（答えで、図のどこが変わるか）が無い")]:
+        _f, errs, _d = make(fx, "F03", raw(change))
+        out.append((f"直しの一覧の誤り（形の点検が先に止める所。当てる部品を直に呼ぶ）: {name}" + ("" if any(expect in x for x in errs) else f"\n{errs[:2]}"),
+                    any(expect in x for x in errs)))
+    nl = tmp / "ptr_nolane"                                          # 担当の書かれていないカード
+    shutil.copytree(fx, nl)
+    for f in (nl / "cards").glob("*/*.json"):
+        edit(f, lambda c: (c.update(actors=[], systems=[]), [s.update(actor="", system="") for s in c.get("steps") or []]))
+    _f, errs, _d = make(nl, "F03", {"ops": [{"op": "exclude", "item": k, "reason": "試験"} for k in keys3 if k != "M02.1.s1"]})
+    out.append(("直しの一覧の誤り: カードに担当が無く、default_lane も無い → レーンが決まらないと知らせる", any("レーンが1つも決まらない" in x for x in errs)))
     return out
 
 
@@ -1224,12 +1299,28 @@ CASES += [
      "の根拠「どこにも書かれていない続きの根拠」が、出典のページに見当たらない", "WARN"),
     ("フロー: 引用が原典と完全には一致しない（1 字違う）", "check_flow.py", ["--stage", "flow"],
      lambda w: edit(w / "flows/F01.flow.json", lambda f: node(f, "P-001")["sources"][0].update(quote=_one_off(node(f, "P-001")["sources"][0]["quote"]))),
-     "P-001: 引用が原典", "WARN"),
+     "〔M01/p0003〕）の文字と完全には一致しない", "WARN"),
     ("カード: 引用が機械抽出の文字と完全には一致しない（1 字違う）", "check_extract.py", [], _quote_off, "引用が機械抽出の文字と完全には一致しない", "WARN"),
     ("図: flow.json を消したのに、書き出した図にそのページが残る", "check_flow.py", ["--stage", "drawio"],
      lambda w: (w / "flows/F02.flow.json").unlink(), "対応する flow.json（F02）が無い"),
     ("フロー: JSON をまるごと書いたフローで、システムのレーンが右端に無い", "check_flow.py", ["--stage", "flow"],
      lambda w: edit(w / "flows/F03.flow.json", lambda f: f["lanes"].insert(0, f["lanes"].pop())), "F03: システムのレーンが右端に無い", "WARN"),
+    ("階層: 文章の中で、資料を ID で呼ぶ（門では FAIL）", "check_flow.py", ["--stage", "structure"],
+     lambda w: edit(w / "structure/hierarchy.json", lambda h: h.update(rationale="M01 の目次から、業務の木を作った")), "hierarchy.json: 文章の中で、資料を ID で呼んでいる", "WARN"),
+    ("業務分類: 文章の中で、資料を ID で呼ぶ（門では FAIL）", "check_flow.py", ["--stage", "structure"],
+     lambda w: edit(w / "taxonomy.json", lambda t: t.update(rationale="M02 の手順を、支払処理に入れた")), "taxonomy.json: 文章の中で、資料を ID で呼んでいる", "WARN"),
+    ("業務分類: 見出しのページを割り当てず、別のページから割り当てる（見出しが割当の外）", "check_flow.py", ["--stage", "structure"],
+     lambda w: edit(w / "taxonomy.json", lambda t: cat(t, "F03")["pages"][0].update(pages=[5])), "「支払処理」の見出しが、割当の先頭"),
+    ("カード: 曖昧な所があるページを出典にしたのに、確認事項が無い（門では FAIL）", "check_flow.py", ["--stage", "flow"],
+     lambda w: edit(w / "cards/M01/p0006.json", lambda c: c.update(uncertain=[{"what": "振込の締めの時刻", "why": "数字がにじんでいる"}])),
+     "このページを出典にした確認事項がどのフローにも無い", "WARN"),
+    ("フロー: 同じ手順を、2 つのフローに描く（門では FAIL）", "check_flow.py", ["--stage", "flow"],
+     lambda w: edit(w / "flows/F02.flow.json", lambda f: node(f, "P-001")["sources"].append(
+         node(json.loads((w / "flows/F01.flow.json").read_text(encoding="utf-8")), "P-001")["sources"][0])), "が 2 つのフローに描かれている", "WARN"),
+    ("フロー: 確認事項が、無い線を指す", "check_flow.py", ["--stage", "flow"],
+     lambda w: edit(w / "flows/F02.flow.json", lambda f: f["questions"][0].update(edge=["start", "end"])), "が存在しない線 ['start', 'end'] を指す"),
+    ("業務マトリクス一覧: 文のシート（読み方）の数を、手で直す", "check_flow.py", ["--stage", "matrix"],
+     lambda w: edit_book(w, lambda wb: wb["読み方"]["B3"].__setattr__("value", "フロー 99 本")), "「読み方」B3 の数が、いまのデータと違う"),
 ]
 
 
@@ -1278,6 +1369,72 @@ def matrix_looks(work):
         ("業務マトリクス一覧: 戻りの線は「へ戻る」、推定の線は（推定）と書く", any("へ戻る" in c for c in cells(f3)) and any("→（推定）" in c for c in cells(f3))),
         ("業務マトリクス一覧: 空白だけの区切りを書かない（あると Excel がブックを開かない）", not re.search(r"<t(?: [^>]*)?>\s*</t>", xml)),
     ]
+
+
+def two_actions_tests(tmp, good):
+    """2 つの動きのある箱（決まり 3.22）: 動作の種類を違う 2 語で書ける。仮の値は、いまの基準の表で大きいほう（MAX の式）。
+    表を直すと、大きいほうも引き直す。点検（形・式・保存した計算の結果）は通り、--calibrate の中央値には数えない。「作成する」の WARN は、2 語の片方でも出る"""
+    import types
+    from openpyxl import load_workbook
+    import build_matrix as BM
+    import office_to_pdf
+    import table_template as TT
+    from validate import validate
+    out, w = [], tmp / "two_actions"
+    shutil.copytree(good, w)
+    book, key = w / "out" / BM.BOOK, ("F02", "P-006")
+    edit(w / "flows/F02.flow.json", lambda f: node(f, "P-006").update(action=["承認する", "確認する"]))
+    edit(w / "flows/F01.flow.json", lambda f: node(f, "P-002").update(action=["作成する", "確認する"]))
+    c0, o0 = run("check_flow.py", w, "--stage", "flow")
+    c1, o1 = run("build_matrix.py", w)
+    c2, o2 = run("check_flow.py", w, "--stage", "matrix")
+
+    def time_cell(data_only, path=book):
+        """(式か保存した計算の結果, コメント)"""
+        wb = load_workbook(path, data_only=data_only)
+        for row in wb[BM.M].iter_rows():
+            for c in row:
+                m = BM.TAG_TIME.match(c.comment.text if c.comment is not None else "")
+                if m and (m.group(1), m.group(2)) == key:
+                    return c.value, c.comment.text
+        return None, ""
+    f1, note1 = time_cell(False)
+    v1, _n = time_cell(True)
+    nl = load_workbook(book, data_only=True)[BM.NODES]
+    col = {c.value: k for k, c in enumerate(nl[1])}
+    listed = {(r[col["フローID"]].value, r[col["ノード番号"]].value): r[col["動作の種類"]].value for r in nl.iter_rows(min_row=2)}
+    snap = BM.baseline(w)
+    cells = {(f["flow"], x["node"]): x for f in snap["flows"] for x in f["cells"]}
+    out.append(("2 つの動き: 仮の値は、2 つを引いて大きいほうの式（MAX）。保存した計算の結果は、既定の表で大きいほう（確認する 中 5 分＞承認する 中 3 分）。"
+                "コメント・ノード一覧・現状の時間の写しに、2 語が出る。点検は FAIL 0" + ("" if c1 == 0 and c2 == 0 else o1[-300:] + o2[-600:]),
+                c1 == 0 and c2 == 0 and "FAIL  " not in o2 and re.fullmatch(r'=MAX\(VLOOKUP\("承認する",(.+?),3,FALSE\),VLOOKUP\("確認する",\1,3,FALSE\)\)', str(f1)) is not None
+                and v1 == 5 and "承認する／確認する × 中。表で大きいほう" in note1 and listed[key] == "承認する／確認する"
+                and cells[key]["action"] == "承認する／確認する" and cells[key]["value"] == 5 and validate(snap, "baseline") == []))
+    out.append(("2 つの動き: 使うシステムの札が付いた箱で、2 語の片方が「作成する」なら、点検が WARN で「入力する」を案内する（形は通る）",
+                c0 == 0 and "「作成する」の箱が 1 個（P-002）" in o0 and "FAIL  " not in o0))
+    wb = load_workbook(book)
+    tb = TT.time_table(wb, BM.SPEC["time"])[0]
+    wb[tb["title"]].cell(tb["rows"]["確認する"], tb["col"] + tb["cols"]["中"] - 1).value = 1
+    wb.save(book)
+    c3, o3 = run("build_matrix.py", w)
+    c4, o4 = run("check_flow.py", w, "--stage", "matrix")
+    v2, _n = time_cell(True)
+    out.append(("2 つの動き: 基準の表で「確認する × 中」を 1 分に直すと、大きいほうが入れ替わり、仮の値は承認する（3 分）になる（いまの表で引く）" + ("" if c3 == 0 and c4 == 0 else o3[-300:] + o4[-600:]),
+                c3 == 0 and c4 == 0 and "FAIL  " not in o4 and v2 == 3))
+    office = office_to_pdf.find_soffice()
+    if office:
+        d = tmp / "two_actions_calc"
+        d.mkdir()
+        subprocess.run([office, "--headless", "--convert-to", "xlsx:Calc MS Excel 2007 XML", "--outdir", str(d), str(book)], capture_output=True, timeout=300)
+        out.append(("2 つの動き: 表計算ソフトで計算し直しても、大きいほうの値（3 分）", time_cell(True, d / book.name)[0] == 3))
+    else:
+        out.append(("2 つの動き: 計算し直しての確かめは、飛ばした（LibreOffice が無い）", True))
+    step = lambda i, act: {"id": i, "node": {"type": "process"}, "time": (act, "中", "")}
+    fake = types.SimpleNamespace(rows=[{"id": "F", "steps": [step(f"P-00{k}", "確認する／承認する") for k in range(3)] + [step(f"P-01{k}", "確認する") for k in range(3)]}],
+                                 times=types.SimpleNamespace(cells={("F", f"P-0{j}{k}"): {"value": 9} for j in (0, 1) for k in range(3)}, table={}))
+    out.append(("2 つの動き: --calibrate は、2 つの動きのある箱の人の値を、表の中央値に数えない（表のどちらの行の値とも言えない）",
+                BM.calibration(fake, {("確認する", "中"): 5}) == [(("確認する", "中"), 3, 9, 5)]))
+    return out
 
 
 def time_tests(tmp, good):
@@ -1959,8 +2116,11 @@ def schema_tests(tmp, good):
          and list(systems.BASIS) == enum("systems", "$defs", "link", "properties", "basis")
          and set(build_drawio.BASIS) == set(C.schema_enum("hierarchy", "properties", "basis", "items"))),
         ("決まった語: スキーマの中の写し（直しの一覧の動作の種類・量・直しの種類、確認事項の下書きの種別・答えで変わる所）",
-         enum("edits", "$defs", "op", "properties", "action") == enum("edits", "$defs", "op", "properties", "parts", "items", "properties", "action")
-         == enum("flow", "$defs", "node", "properties", "action") == list(C.ACTIONS)
+         all(json.loads((C.ASSETS / f"schemas/{k}.schema.json").read_text(encoding="utf-8"))["$defs"][d]["properties"][p]
+             .get("$ref") == "common#/$defs/actions" for k, d, p in (("edits", "op", "action"), ("flow", "node", "action")))
+         and json.loads((C.ASSETS / "schemas/edits.schema.json").read_text(encoding="utf-8"))["$defs"]["op"]["properties"]["parts"]["items"]["properties"]["action"]
+         == {"$ref": "common#/$defs/actions"}
+         and enum("common", "$defs", "action") == list(C.ACTIONS)
          and enum("edits", "$defs", "op", "properties", "volume") == enum("edits", "$defs", "op", "properties", "parts", "items", "properties", "volume")
          == enum("flow", "$defs", "node", "properties", "volume")
          and enum("common", "$defs", "question_draft", "properties", "category") == enum("common", "$defs", "question", "properties", "category")
@@ -2091,6 +2251,8 @@ def review_gate_tests(tmp, good):
     gate("採否表の形が違う", lambda x: edit(x / "review/F02.review.json", lambda r: r["verdicts"][0].update(verdict="まあまあ")), "review/F02.review.json: 形が違う")
     gate("照合に出した版の記録が崩れている", lambda x: (x / "review/sheets.json").write_text("{", encoding="utf-8"), "review/sheets.json（照合に出した版の記録）が JSON として読めない")
     gate("照合の報告が無い（採否表を手で書いた）", lambda x: (x / "reports/review_F02.json").unlink(), "照合の報告（reports/）が無い")
+    gate("採否表の sheets（報告 → シートの番号）を書き換えた", lambda x: edit(x / "review/F02.review.json", lambda r: r.update(sheets={"review_F02.json": "S-99"})),
+         "照合の報告（reports/）と違う")
     gate("照合の報告から、シートの番号（sheet）を消した（採否表は、照合に出した版の記録のある新しい版）",
          lambda x: edit(x / "reports/review_F02.json", lambda d: d.pop("sheet")), "F02: 照合の報告に、照合したシートの番号（sheet）が無い")
     y = tmp / "gate_case_bad"
@@ -2189,8 +2351,8 @@ def diff_review_tests(tmp, w):
     rec = json.loads((w / "review/sheets.json").read_text(encoding="utf-8"))["sheets"]
     rv = json.loads((w / "review/F02.review.json").read_text(encoding="utf-8"))
     mine = [e for e in rec if e["figure"] == "F02"]
-    out.append(("差分照合: 照合に出した版（箱ごとの要約・図の印）が記録に残り、採否表は報告とシートの番号を結ぶ。形が正しい",
-                len(mine) == 1 and mine[0]["kind"] == "全体" and set(mine[0]["nodes"]) == set(boxes) and mine[0]["mark"] == RV.figure_mark(RV.figures(w)["F02"])
+    out.append(("差分照合: 照合に出した版（箱ごとの要約・図全体の項目・図の印）が記録に残り、採否表は報告とシートの番号を結ぶ。形が正しい",
+                len(mine) == 1 and mine[0]["kind"] == "全体" and set(mine[0]["nodes"]) == set(boxes) | {RV.FIG} and mine[0]["mark"] == RV.figure_mark(RV.figures(w)["F02"])
                 and rv["sheets"] == {"review_F02.json": mine[0]["id"]} and validate(rv, "review") == []
                 and validate({"sheets": rec}, "sheets") == []))
     S1 = mine[0]["id"]
@@ -2233,6 +2395,11 @@ def diff_review_tests(tmp, w):
     code, hit, _t = fails(x)
     out.append(("差分照合: 差分照合の指摘を採用して、図を直していなければ FAIL（その指摘を受けたシートのときのまま）",
                 code == 1 and any(f"{rv['findings'][-1]['id']}）があるのに" in ln and "その指摘を受けたシートのときのまま" in ln for ln in hit)))
+    ob = case("other_box", x)                                       # 指摘の箱は直さず、関係ない箱だけを直す
+    edit(ob / "flows/F02.flow.json", lambda f: node(f, Q).update(label="関係ない箱だけを直した名前を付ける"))
+    code, hit, _t = fails(ob)
+    out.append(("差分照合: 採用した指摘の箱を直さず、関係ない箱だけを直しても、反映したことにしない（箱を指す指摘は、箱ごとに見る）",
+                code == 1 and any(f"{rv['findings'][-1]['id']}）があるのに" in ln and "その指摘を受けたシートのときのまま" in ln for ln in hit)))
     edit(x / "flows/F02.flow.json", lambda f: node(f, P).update(label="差分照合の指摘で直した名前を付ける"))
     code, hit, _t = fails(x)
     out.append(("差分照合: 採用した指摘を図に反映すると、直した箱が、また照合していない箱になる（反映の FAIL は消える）",
@@ -2262,7 +2429,40 @@ def diff_review_tests(tmp, w):
     c5, o5 = run("review.py", k, "draft", "--only", "F02")
     _code, hit, text = fails(k)
     out.append(("差分照合: 差分照合で判定した箱を、あとで消しても、下書きと点検は止まらない（消した箱の判定は、判定のあとに無くしたノードとして数える）",
-                c5 == 0 and not any("判定している" in ln for ln in hit) and "照合に出していない箱" not in o5))
+                c5 == 0 and not any("判定している" in ln for ln in hit) and "照合に出していない箱" not in o5
+                and "ここから先を点検できない" not in text and "業務フローの支持率" in text))
+    pt_ = case("partial", x)                                         # 差分照合のシートに 2 箱を載せ、報告が 1 箱しか判定しない
+    edit(pt_ / "flows/F02.flow.json", lambda f: node(f, Q).update(label="照合のあとに直した別の名前を付ける"))
+    c14, o14 = run("review.py", pt_, "record", "--only", "F02", "--nodes", f"{P},{Q}")
+    S4 = re.search(r"シート (S-\d+)", o14).group(1) if re.search(r"シート (S-\d+)", o14) else "?"
+    put(pt_, "review_F02_差分2.json", {"sheet": S4, "verdicts": [{"node": P, "verdict": "支持", "evidence": "「直した名前」"}], "findings": []})
+    run("review.py", pt_, "draft", "--only", "F02")
+    decide(pt_)
+    code, hit, _t = fails(pt_)
+    out.append(("差分照合: シートに載せても、報告が判定していない箱は、照合済みにしない（判定した箱だけが済み）",
+                c14 == 0 and code == 1 and len(hit) == 1 and f"{Q} シート {S4} に載せたが、報告が判定していない" in hit[0] and f"{P} " not in hit[0]))
+    out.append(("差分照合: 控えるときに、報告の置き場（まだ使っていない番号の _差分<N>）を出す（親が数えない。前の報告を上書きしない）",
+                "報告の置き場は reports/review_F02_差分1.json" in o1 and "報告の置き場は reports/review_F02_差分2.json" in o14))
+    br = case("broken_shape", x)                                     # 形の崩れた報告: その図の FAIL にして、ほかの図と支持率を続ける。下書きは落ちずに止まる
+    put(br, "review_F02_差分2.json", {"sheet": S2, "verdicts": ["P-001"], "findings": []})
+    code, hit, text = fails(br)
+    c15, o15 = run("review.py", br, "draft", "--only", "F02")
+    out.append(("差分照合: 形の崩れた報告（判定が文字だけ）は、中を読む前に止める。点検はその図の FAIL にして、支持率まで続ける。下書きは、ファイルを名指しして止まる",
+                any(ln.startswith("FAIL  F02: reports/review_F02_差分2.json の形が崩れている") for ln in hit) and "業務フローの支持率" in text
+                and "ここから先を点検できない" not in text and c15 == 1 and "review_F02_差分2.json の形が崩れている" in o15 and "Traceback" not in o15))
+    fg = case("figure_item")                                        # 図全体の項目（開始条件）と、箱に付く帳票を、照合のあとに直す
+    fx = next(n for n in flow(fg)["nodes"] if n["type"] == "file" and n.get("attach_to"))
+    edit(fg / "flows/F02.flow.json", lambda f: (f.update(start_condition="照合のあとに直した開始条件"),
+                                               f.update(nodes=[n for n in f["nodes"] if n["id"] != fx["id"]])))
+    code, hit, _t = fails(fg)
+    c21, o21 = run("review.py", fg, "record", "--only", "F02", "--nodes", f"{RV.FIG},{fx['attach_to']}")
+    S6 = re.search(r"シート (S-\d+)", o21).group(1) if re.search(r"シート (S-\d+)", o21) else "?"
+    put(fg, "review_F02_差分1.json", {"sheet": S6, "verdicts": [{"node": fx["attach_to"], "verdict": "支持", "evidence": "「帳票は付けない」"}], "findings": []})
+    c22, _o = run("review.py", fg, "draft", "--only", "F02")
+    code2, hit2, _t = fails(fg)
+    out.append(("差分照合: 図全体の項目（開始条件）と、箱に付いた帳票を消したことも、照合したあとに変わったと挙げる。図の項目と、その箱を差分照合に出せば通る",
+                code == 1 and any(f"{RV.FIG} 開始条件が変わった" in ln and f"{fx['attach_to']} 付いている帳票が変わった" in ln for ln in hit)
+                and c21 == 0 and c22 == 0 and code2 == 0))
     bad = case("bad_reports", x)
     put(bad, "review_F02_差分2.json", {"sheet": S2, "verdicts": [{"node": Q, "verdict": "支持", "evidence": "「別の箱」"}], "findings": []})
     c6, o6 = run("review.py", bad, "draft", "--only", "F02")
@@ -2303,16 +2503,40 @@ def diff_review_tests(tmp, w):
     rec2 = json.loads((z / "review/sheets.json").read_text(encoding="utf-8"))["sheets"] if (z / "review/sheets.json").exists() else []
     c13, o13 = run("review.py", x, "snapshot", "--only", "F02", "--assume-current")
     out.append(("差分照合: 前の版の採否表は WARN（FAIL にしない）。snapshot は --assume-current を付けたときだけ、いまの図を「認めた」版として控え（日が残り、点検の INFO に出る）、"
-                "採否表を写し直す（採否は引き継ぐ）。シートの番号のある報告のある図には使えない",
+                "採否表を写し直す（採否は引き継ぐ）。前の版の報告の無い図には使えない",
                 code == 0 and "WARN  F01: 照合に出した版の記録が無い" in text and c11 != 0 and "--assume-current" in o11 and c12 == 0
                 and code2 == 0 and "WARN  F01: 照合に出した版の記録が無い" not in text2 and "F01: 利用者が照合済みと認めた版" in text2
                 and [e["kind"] for e in rec2] == ["認めた"] and rv["sheets"] == {"review_F01.json": rec2[0]["id"]}
-                and rv["findings"] and all(f["decision"] == "不採用" for f in rv["findings"]) and "シートの番号（sheet）のある報告がある" in o13))
+                and rv["findings"] and all(f["decision"] == "不採用" for f in rv["findings"]) and "前の版の報告（sheet の無い報告）が無い" in o13))
     v = case("legacy_draft")
     to_legacy(v)
-    run("review.py", v, "draft")
+    c16, _o = run("review.py", v, "draft")
     out.append(("差分照合: 前の版の採否表から下書きを作り直しても、前の版のまま（照合に出した版を勝手に作らない）",
-                "sheets" not in json.loads((v / "review/F02.review.json").read_text(encoding="utf-8")) and not (v / "review/sheets.json").exists()))
+                c16 == 0 and "sheets" not in json.loads((v / "review/F02.review.json").read_text(encoding="utf-8")) and not (v / "review/sheets.json").exists()))
+    L = case("legacy_then")                                          # 前の版の採否表の図を、照合に出した（門・make_compare が控える）
+    to_legacy(L)
+    RV.record(L, {"F01": RV.figures(L)["F01"]}, "全体")
+    code_a, _h, text_a = fails(L)
+    P1 = next(n["id"] for n in flow(L, "F01")["nodes"] if n["type"] == "process")
+    put(L, "review_F01_1.json", {"verdicts": [{"node": P1, "verdict": "支持", "evidence": "「x」"}], "findings": []})   # 照合に出したあとに書いた、sheet の無い報告
+    code_b, hit_b, _t = fails(L)
+    c17, o17 = run("review.py", L, "draft", "--only", "F01")
+    (L / "reports/review_F01_1.json").unlink()
+    edit(L / "flows/F01.flow.json", lambda f: node(f, P1).update(label="照合のあとに直した名前を付ける"))
+    S5 = RV.record(L, {"F01": RV.figures(L)["F01"]}, "差分", [P1])["F01"]
+    put(L, "review_F01_差分1.json", {"sheet": S5, "verdicts": [{"node": P1, "verdict": "支持", "evidence": "「差分で見た」"}], "findings": []})
+    c18, o18 = run("review.py", L, "draft", "--only", "F01")
+    c19, o19 = run("review.py", L, "snapshot", "--only", "F01", "--assume-current")
+    c20, _o = run("review.py", L, "draft", "--only", "F01")
+    rvL = json.loads((L / "review/F01.review.json").read_text(encoding="utf-8"))
+    code_c, _h, text_c = fails(L)
+    out.append(("差分照合: 前の版の報告は、照合に出したあとも WARN のまま。照合に出したあとに書いた sheet の無い報告は FAIL（前の版として受けない）",
+                code_a == 0 and "WARN  F01: 照合に出した版の記録が無い" in text_a and code_b == 1
+                and any("F01: 照合の報告に、照合したシートの番号（sheet）が無い" in ln for ln in hit_b) and c17 == 1 and "sheet）が無い（照合シートの見出し" in o17))
+    passed = c18 == 1 and "前の版の報告" in o18 and "書き足さない" in o18 and c19 == 0 and c20 == 0 \
+        and next(v_ for v_ in rvL["verdicts"] if v_["node"] == P1)["evidence"] == "「差分で見た」" and code_c == 0 and "F01: 照合に出した版の記録が無い" not in text_c
+    out.append(("差分照合: 前の版の報告の図で差分照合をすると、認めるまで止まり、前の報告に番号を書き足させない。認めれば、認めた版を先に重ね、差分照合の判定が勝つ"
+                + ("" if passed else f"\n{c18} {o18[-300:]}\n{c19} {o19[-300:]}\n{c20} {code_c} {text_c[-800:]}"), passed))
     # 重ね方: 照合に出した順。業務フローは、差分照合の判定が、前の判定を置き換える（厳しいほうではない）。アクティビティ図は、差分照合で見た箱の判定を置き換える
     a = tmp / "diff_merge"
     (a / "reports").mkdir(parents=True)
@@ -2331,13 +2555,25 @@ def diff_review_tests(tmp, w):
     fv, _f = RV.from_reports(a, "F05", fig)
     av, af = RV.from_reports(a, "A-01-1", fig)
     fig2 = dict(fig, nodes=fig["nodes"][:2] + [dict(fig["nodes"][2], label="直した")] + fig["nodes"][3:])
-    gaps = RV.unreviewed(fig2, RV.mapped("A-01-1", RV.reports(a, "A-01-1"), RV.read_record(a)))
+    gaps = RV.unreviewed("A-01-1", fig2, RV.mapped("A-01-1", RV.reports(a, "A-01-1"), RV.read_record(a)))
     out.append(("差分照合: 判定は照合に出した順に重ね、差分照合の判定が前の判定を置き換える（業務フロー: 一部支持 → 支持。アクティビティ図: 指摘のあった箱も、"
                 "差分照合で見て指摘が無ければ支持。前の指摘は残る）。アクティビティ図も、照合に出した版と違う箱を挙げる",
                 s1["F05"] == s1["A-01-1"] and len({s1["F05"], s2["F05"], s3["A-01-1"]}) == 3
                 and {x["node"]: (x["verdict"], x["evidence"]) for x in fv} == {"P-001": ("支持", "前"), "P-002": ("支持", "後"), "P-003": ("支持", "前")}
                 and {x["node"]: x["verdict"] for x in av} == {"P-001": "支持", "P-002": "支持", "P-003": "支持"} and len(af) == 1 and af[0]["sheet"] == s1["A-01-1"]
                 and gaps == [("P-002", "名前が変わった")]))
+    b = tmp / "diff_group"
+    (b / "reports").mkdir(parents=True)
+    g1 = RV.record(b, {"A-01-1": fig, "A-01-2": fig}, "全体")
+    fig_b = dict(fig, nodes=fig["nodes"][:1] + [dict(fig["nodes"][1], label="直した")] + fig["nodes"][2:])
+    g2 = RV.record(b, {"A-01-1": fig, "A-01-2": fig_b}, "全体")
+    g3 = RV.record(b, {"A-01-1": fig, "A-01-2": fig_b}, "全体")
+    rec_b = RV.read_record(b)
+    RV.save_record(b, rec_b + [dict(next(e for e in reversed(rec_b) if e["figure"] == "A-01-1"), id="S-9", kind="認めた", reports={})])
+    g4 = RV.record(b, {"A-01-1": fig}, "全体")
+    out.append(("照合に出す版の控え: 1 回に出す図の組は同じ番号。1 枚でも変われば、組の全部に新しい番号（報告の sheet は 1 つ）。同じ組・同じ図なら同じ番号。"
+                "認めた版のあとは、その前の番号を使い回さない",
+                len(set(g1.values())) == 1 and len(set(g2.values())) == 1 and g2 != g1 and g3 == g2 and g4["A-01-1"] not in (g1["A-01-1"], g2["A-01-1"], "S-9")))
     return out
 
 
@@ -2652,12 +2888,26 @@ def gate_tests(tmp, good):
     stopped_quiet = len(RV.read_record(w)) == n_rec
     run("make_compare.py", w, "--only", "F01")
     out.append(("差分照合のシート: 1 ページ目に照合し直す箱（見出しにシートの番号）、続けて、その箱の出典ページだけ。シートの番号と照合し直す箱を、照合に出した版の記録に控える。"
-                "フローを 2 本・開始の箱を指定すると、控えずに止まる。全体を作り直しても残り（照合に出した記録）、門が作業の記録に写す",
-                cd == 0 and last["kind"] == "差分" and sorted(last["nodes"]) == [P["id"]] and pages == 1 + len({(s["doc_id"], s["page"]) for s in P["sources"]})
+                "報告の置き場（まだ使っていない番号）を出す。フローを 2 本・開始の箱を指定すると、控えずに止まる。全体を作り直しても残り（照合に出した記録）、門が作業の記録に写す",
+                cd == 0 and last["kind"] == "差分" and sorted(last["nodes"]) == [P["id"]] and "差分照合の報告の置き場は reports/review_F01_差分1.json" in od and pages == 1 + len({(s["doc_id"], s["page"]) for s in P["sources"]})
                 and "差分照合" in first and P["id"] in first and f"［{last['id']}］" in first
                 and cb != 0 and cc != 0 and "開始・終了は照合しない" in oc and stopped_quiet and diff.exists()
                 and any(fnmatch.fnmatch(diff.name, pat) for pat in RECORDS)))
+    keep = (w / "flows/F01.flow.json").read_bytes()
+    edit(w / "flows/F01.flow.json", lambda f: next(n for n in f["nodes"] if n["id"] == P["id"]).update(label="書き出したあとに直した名前を付ける"))
+    ce, oe = run("make_compare.py", w, "--only", "F01")
+    (w / "flows/F01.flow.json").write_bytes(keep)
+    import deliver as DL
     os.utime(w / "flows" / "F02.flow.json")
+    out.append(("照合シート: 書き出したあとに flow.json を直していれば、作らずに止まる（シートの図と、控える版をそろえる）。"
+                "照合に出した図（採否表のある図）のシートは、フローのほうが新しくても、門が作り直さない",
+                ce != 0 and "書き出した図が、いまの flow.json と違う" in oe and not any("照合シート_F02" in x for x in DL.stale(w))))
+    n0, kept_pdf = len(RV.read_record(w)), {p.name: p.stat().st_mtime for p in (w / "out").glob("照合シート_F02*.pdf")}
+    cs_, _os = run("make_compare.py", w, "--skip-reviewed")
+    out.append(("照合シート: 門の書き出し直し（--skip-reviewed）は、照合に出した図（採否表のある図）のシートを作り直さず、照合に出した版も控えない",
+                cs_ == 0 and kept_pdf and not any(e["figure"] == "F02" for e in RV.read_record(w)[n0:])
+                and {p.name: p.stat().st_mtime for p in (w / "out").glob("照合シート_F02*.pdf")} == kept_pdf
+                and '("make_compare.py", ["--skip-reviewed"])' in pathlib.Path(DL.__file__).read_text(encoding="utf-8")))
     (w / "out" / "~$業務マトリクス一覧.xlsx").write_bytes(b"")
     code, text = run("deliver.py", w, "--to", str(dest))
     (w / "out" / "~$業務マトリクス一覧.xlsx").unlink()
@@ -3116,7 +3366,7 @@ def access_tests(tmp):
         shutil.copytree(good, w)
         change(w)
         code, text = run(script, w, *args)
-        hit = next((ln for ln in text.splitlines() if expect in ln), None)
+        hit = next((ln for ln in text.splitlines() if expect in ln and (ln.startswith("FAIL") or not script.startswith("check_"))), None)   # 点検は FAIL の行で
         out.append((f"{name}: {(hit or '')[:110]}" if hit and code != 0 else f"{name}: 「{expect}」が出ない（終了コード {code}）\n{text[-600:]}", bool(hit) and code != 0))
         shutil.rmtree(w, ignore_errors=True)
     twin = tmp / "acc_twin"                                           # 同じプログラムから2回作った図の揺れ: 片方だけ、2つのまとまりを1つにまとめ、名前を変える
@@ -3900,7 +4150,7 @@ def code_pipeline_tests(tmp):
         for sc, ar in before:
             run(sc, w, *ar)
         code, text = run(script, w, *args)
-        hit = next((ln for ln in text.splitlines() if expect in ln), None)
+        hit = next((ln for ln in text.splitlines() if expect in ln and (ln.startswith("FAIL") or not script.startswith("check_"))), None)   # 点検は FAIL の行で
         out.append((f"{name}: {(hit or '')[:110]}" if hit and code != 0 else f"{name}: 「{expect}」が出ない（終了コード {code}）\n{text[-600:]}", bool(hit) and code != 0))
         shutil.rmtree(w, ignore_errors=True)
     sysj, a2 = "structure/systems.json", "activities/A-01-2"
@@ -3919,6 +4169,24 @@ def code_pipeline_tests(tmp):
          lambda w: edit(w / sysj, lambda s: s["excluded_entries"].append({"entry": "M01.e1", "reason": "中身が空"})), "「M01.e1」の理由は「中身が空」なのに")
     case("台帳: 図にしない理由が「ほかの起動点と同じ処理を呼ぶだけ」なのに、呼ばない", "check_flow.py", ["--stage", "systems"],
          lambda w: edit(w / sysj, lambda s: s["excluded_entries"].append({"entry": "M01.e1", "reason": "ほかの起動点と同じ処理を呼ぶだけ"})), "「ほかの起動点と同じ処理を呼ぶだけ」なのに")
+    # 中継の内側（2026-10-17）: 台帳の紐付け・図にしない起動点の誤りの文ごとに
+    for name, change, expect in [
+            ("図にしない理由が「画面の表示の制御だけ」なのに、読み書きがある", lambda s: s["excluded_entries"].append({"entry": "M01.e2", "reason": "画面の表示の制御だけ"}),
+             "の理由は「画面の表示の制御だけ」なのに"),
+            ("紐付けの手順が無い", lambda s: s["links"][0].update(step="M03.1.s99"), "手順「M03.1.s99」が無い"),
+            ("図にしない起動点に、紐付けがある", lambda s: s["excluded_entries"].append({"entry": "M01.e3", "reason": "開発・試験用"}), "としているのに、紐付けがある"),
+            ("起動点のプログラムの資料が、どのシステムにも無い", lambda s: s["systems"][0].update(docs=[]), "どのシステムにも入っていない（systems[].docs）"),
+            ("紐付けの根拠が、決まった語でない", lambda s: s["links"][0].update(basis="たぶん"), "basis「たぶん」は決まった語でない"),
+            ("紐付けの根拠の文字が短すぎる", lambda s: s["links"][0].update(evidence="M"), "evidence（両方に出てくる文字）が空か、短すぎる")]:
+        case(f"台帳の誤り: {name}", "check_flow.py", ["--stage", "systems"], lambda w, ch=change: edit(w / sysj, ch), expect)
+    import types
+    import systems as SY
+    proc = lambda pid, calls=(): {"id": pid, "calls": [{"to": c} for c in calls], "io": [], "interactions": [], "dynamic": [], "ui": [], "exec": [1]}
+    fake = types.SimpleNamespace(units=[{"project": "M01", "procedure": "m.A", "kind": "shared"}, {"project": "M01", "procedure": "m.B", "kind": "shared"}],
+                                 raw={"folded_procedures": [{"procedure": "M01.m.A", "reason": "x"}]}, folded={"M01.m.A"},
+                                 structs={"M01": {"procedures": [proc("m.A", ["m.B"]), proc("m.B")], "entries": [], "inline": []}})
+    out.append(("台帳の誤り: 図にしない手続き（補助）が、図のままの共通の処理を呼ぶ（架空のプログラムに無い形なので、台帳の部品を直に呼ぶ）",
+                any("が呼ぶ m.B が、図のまま" in x for x in SY.Ledger.folded_errors(fake))))
     import code_struct as cs
     ui_ok = all(cs.UI_WRITE.search(x) for x in ("Me.lstResult.AddItem 名前", "lblStatus.Caption = \"完了\"", "Me.txtMonth.Value = \"\"")) \
         and not any(cs.UI_WRITE.search(x) for x in ("ws.Range(\"A1\").Value = 1", "Sheets(\"集計\").Cells(1, 1).Value = x"))
@@ -3949,6 +4217,8 @@ def code_pipeline_tests(tmp):
     case("アクティビティ図: 直しの一覧を直したあと、作り直していない", "check_flow.py", ["--stage", "activity"],
          lambda w: edit(w / f"{a2}.edits.json", lambda e: e.update(name="集計する")), "作り直したものと違う")
     case("アクティビティ図: 図を1枚消す", "check_flow.py", ["--stage", "activity"], lambda w: (w / "activities/A-01-5.activity.json").unlink(), "アクティビティ図がまだ無い")
+    case("照合に出す版: アクティビティ図を書き出したあとに直したら、控えずに止まる", "review.py", ["record", "--only", "A-01-2"],
+         lambda w: edit(w / f"{a2}.activity.json", lambda a: a.update(name="書き出したあとに直した名前")), "書き出したあとに直した")
     case("図: activity.json を消したのに、書き出した図にそのページが残る", "check_flow.py", ["--stage", "drawio"],
          lambda w: (w / "activities/A-01-5.activity.json").unlink(), "対応する activity.json（A-01-5）が無い")
     case("直しの一覧: 決まっていない理由で畳む（スキーマの決まった語に無い）", "activity.py", ["apply", "--id", "A-01-2"],
@@ -3963,6 +4233,28 @@ def code_pipeline_tests(tmp):
          lambda w: edit(w / f"{a2}.edits.json", lambda e: e["ops"].append({"op": "merge", "items": ["Main.15", "Main.23"]})), "隣り合う「まとまり」だけ")
     case("直しの一覧: 無い項目を指す", "activity.py", ["apply", "--id", "A-01-2"],
          lambda w: edit(w / f"{a2}.edits.json", lambda e: e["ops"].append({"op": "name", "item": "Main.999", "label": "x"})), "という項目が、下書きに無い")
+    # 中継の内側（2026-10-17）: アクティビティ図の直しの一覧の誤りの文ごとに。形の点検が先に止める所は、点検が中継する例の文で見る
+    act_op = lambda *ops: lambda w: edit(w / f"{a2}.edits.json", lambda e: e["ops"].extend(ops))
+    for name, script, args, change, expect in [
+            ("分ける項目が、まとまりでない", "activity.py", ["apply", "--id", "A-01-2"], act_op({"op": "split", "item": "Main.16", "at": [17]}), "seqでない"),
+            ("決まっていない種類の直し", "check_flow.py", ["--stage", "activity"], act_op({"op": "rewrite", "item": "Main.15"}), "決まっていない種類"),
+            ("分ける行が、2 つ目以降の実行文の行でない", "activity.py", ["apply", "--id", "A-01-2"], act_op({"op": "split", "item": "Main.15", "at": [15]}), "at（分ける行）は"),
+            ("まとめる項目が 1 つ", "check_flow.py", ["--stage", "activity"], act_op({"op": "merge", "items": ["Main.15"]}), "items に、まとめる「まとまり」を2つ以上"),
+            ("呼ぶ側の図に入れた手続きの呼び出しをまとめる", "activity.py", ["apply", "--id", "A-01-2"], act_op({"op": "merge", "items": ["Main.36", "Main.39"]}), "まとめられる呼び出しは"),
+            ("共通の処理を 1 回呼ぶだけの並びをまとめる", "activity.py", ["apply", "--id", "A-01-2"], act_op({"op": "merge", "items": ["Main.36", "Main.36.2"]}), "呼び出しをまとめられるのは"),
+            ("操作者とのやり取りのある分岐を畳む", "activity.py", ["apply", "--id", "A-01-2"], act_op({"op": "fold", "item": "Main.16", "reason": "型や空の確認"}), "操作者とのやり取り"),
+            ("畳む理由の語で、対象外にする", "activity.py", ["apply", "--id", "A-01-2"], act_op({"op": "exclude", "item": "Main.15", "reason": "型や空の確認"}), "reason は、決まった語から選ぶ"),
+            ("抜ける所に、箱の名前を付ける", "activity.py", ["apply", "--id", "A-01-2"], act_op({"op": "name", "item": "Main.18", "label": "終える"}), "は箱にならない項目"),
+            ("箱の名前が空", "activity.py", ["apply", "--id", "A-01-2"], act_op({"op": "name", "item": "Main.15", "label": " "}), "label が空"),
+            ("出口の名前の数が違う", "activity.py", ["apply", "--id", "A-01-2"], act_op({"op": "name", "item": "Main.16", "label": "対象月が入っているか", "branches": ["入っていない"]}),
+             "branches は、出口の数"),
+            ("確認事項の id が重なる", "activity.py", ["apply", "--id", "A-01-2"], lambda w: edit(w / f"{a2}.edits.json", lambda e: e["questions"].append(dict(e["questions"][0]))),
+             "が空か、重なっている"),
+            ("確認事項が、図の箱でない項目を指す", "activity.py", ["apply", "--id", "A-01-2"], lambda w: edit(w / f"{a2}.edits.json", lambda e: e["questions"][0].update(items=["Main.12"])),
+             "図の箱になっていない"),
+            ("確認事項の effect が、決まった語でない", "check_flow.py", ["--stage", "activity"],
+             lambda w: edit(w / f"{a2}.edits.json", lambda e: e["questions"][0].update(effect="時間")), "effect（答えで")]:
+        case(f"アクティビティ図の直しの一覧の誤り: {name}", script, args, change, expect)
     case("図: アクティビティ図の箱の名前を手で直す", "check_flow.py", ["--stage", "drawio"],
          lambda w: [p.write_text(p.read_text(encoding="utf-8").replace("対象月が入っているか", "対象月の確認"), encoding="utf-8") for p in (w / "out").glob("アクティビティ図*.drawio")],
          "ラベルが flow.json と違う")
@@ -5071,6 +5363,11 @@ def unit_tests():
     stale = [f"{r['func']}「{r['part']}」" for r in rows if not any(CV.matches(r, s) for s in ss)]
     out.append(("被覆: 試験しない点検の一覧（evals/untested_checks.md）の行が、どれも、いまの点検に当たる。点検の場所を構文から拾える"
                 + (f"（当たらない行: {'・'.join(stale[:4])}）" if stale else ""), bool(rows) and not stale and len(ss) > 250))
+    import deliver
+    src = pathlib.Path(__file__).read_text(encoding="utf-8")
+    lost = [k for k in deliver.PROMOTE if k not in src]
+    out.append(("門が FAIL に上げる WARN の語は、どれも、自己点検の期待の文に入っている（点検の文を変えて語が外れたら、その試験が落ちる）"
+                + (f"（入っていない: {'・'.join(lost)}）" if lost else ""), not lost))
     from check_layout import page_problems
     cross = lambda k: {"nodes": {}, "edges": [{"from": "P-001", "to": "P-009", "points": [[0, 50], [200, 50]]}]
                        + [{"from": f"D-{i}", "to": f"P-{i}", "points": [[20 + 40 * i, 0], [20 + 40 * i, 100]]} for i in range(k)]}
@@ -5126,7 +5423,7 @@ def main():
             ("階層と業務分類に、結び付きと根拠が載る", "詳しくしている" in (good / "out" / "階層と業務分類.md").read_text(encoding="utf-8")),
             ("まとめた確認事項は、対象のノードを並べて載る", "| P-001・P-002 |" in (good / "out" / "確認事項一覧.md").read_text(encoding="utf-8")),
         ]
-        for name, passed in looks + matrix_looks(good) + title_tests(tmp, good) + axis_tests(tmp) + heading_tests(tmp) + pointer_tests(tmp, good) + draft_tests(tmp) + form_tests(tmp, good) + unit_tests() + code_tests() + vba_stmt_tests() + io_fix_tests() + lang_tests() + code_pipeline_tests(tmp) + call_run_tests(tmp) + narrow_tests(tmp) + template_tests(tmp, good) + time_tests(tmp, good) + shown_tests(tmp, good) + supply_tests(tmp, good) + review_tests(tmp, good) + big_tests(tmp, good) + volume_tests() + access_tests(tmp) + direct_tests(tmp) + sample_fix_tests(tmp) + tree_tests(tmp) + tree_rule_tests(tmp) + review_fix_tests(tmp) + schema_tests(tmp, good) + review_gate_tests(tmp, good) + output_check_tests(tmp, good) + answer_tests(tmp, good) + gate_tests(tmp, good) + mech_tests(tmp, good):
+        for name, passed in looks + matrix_looks(good) + title_tests(tmp, good) + axis_tests(tmp) + heading_tests(tmp) + pointer_tests(tmp, good) + draft_tests(tmp) + form_tests(tmp, good) + unit_tests() + code_tests() + vba_stmt_tests() + io_fix_tests() + lang_tests() + code_pipeline_tests(tmp) + call_run_tests(tmp) + narrow_tests(tmp) + template_tests(tmp, good) + time_tests(tmp, good) + two_actions_tests(tmp, good) + shown_tests(tmp, good) + supply_tests(tmp, good) + review_tests(tmp, good) + big_tests(tmp, good) + volume_tests() + access_tests(tmp) + direct_tests(tmp) + sample_fix_tests(tmp) + tree_tests(tmp) + tree_rule_tests(tmp) + review_fix_tests(tmp) + schema_tests(tmp, good) + review_gate_tests(tmp, good) + output_check_tests(tmp, good) + answer_tests(tmp, good) + gate_tests(tmp, good) + mech_tests(tmp, good):
             print(f"{'OK  ' if passed else 'SKIP' if passed is None else 'NG  '} {name}")   # None は、道具が無くて飛ばした（合格に数えない）
             ok = ok and passed is not False
             skipped += passed is None

@@ -79,7 +79,8 @@ REL_LABEL = {"parent_of": "上位→下位", "appendix_of": "別紙", "basis_of"
 SEV_LABEL = {"high": "高", "mid": "中", "low": "低"}
 EFFECTS = schema_enum("common", "$defs", "question", "properties", "effect")   # 確認事項の「答えで変わる所」。どれにも当たらない問いは、確認事項にしない
 # 動作の種類（処理時間の仮の値を、表から引く鍵）。人の作業（process）は、LLM がこの中から選ぶ。数字は、表（業務マトリクス一覧の「処理時間の基準」）からだけ
-ACTIONS = schema_enum("flow", "$defs", "node", "properties", "action")
+ACTIONS = schema_enum("common", "$defs", "action")
+ACT_JOIN = "／"                                                      # 2 つの動きのある箱の動作の種類（確認する／承認する）。仮の値は、基準の表で大きいほう
 IO_KINDS = schema_enum("common", "$defs", "io_kind")                 # プログラムが触る相手の種類（機械の取り出しも、ブロックの木も）
 IO_KIND_WAS = {"レポート": "帳票", "印刷": "帳票", "フォーム": "画面"}       # 機械の取り出しの語 → 業務の語
 
@@ -484,7 +485,15 @@ def guarded(rp, what):
 
 
 FAIL_LOG = "ASIS_FAIL_LOG"                                            # これがあれば、Report.fail・warn が、出した場所（ファイル:行）を、そのファイルに書き足す
-FAIL_HELPERS = ("shape_fails", "read_checked", "evidence_pages", "question_sources", "check_question_ids", "check_label_form")   # 点検の共通の部品（呼び元の行も控える）
+FAIL_HELPERS = ("shape_fails", "read_checked", "evidence_pages", "question_sources", "check_question_ids", "check_label_form", "stale_refs")   # 点検の共通の部品（呼び元の行も控える）
+
+
+def site(msg, up=1):
+    """中継する点検の内側の誤りの文（直しの一覧・アクティビティ図の直し・台帳の紐付け。点検は、その誤りを 1 行で中継する）。
+    自己点検の被覆（evals/coverage.py）のために、出した場所（ファイル:行）を控え、文はそのまま返す。up: 何段上の行を控えるか（誤りを溜める部品 bad の中なら 2。呼び元の行）"""
+    if FAIL_LOG in os.environ:
+        Report._log(sys._getframe(up))
+    return msg
 
 
 class Report:
@@ -511,8 +520,8 @@ class Report:
         self.fails.insert(0, msg) if first else self.fails.append(msg)
 
     def fail_if(self, cond, msg):
-        """cond なら FAIL、でなければ WARN（段によって、同じ誤りの重さが変わる点検）"""
-        if FAIL_LOG in os.environ:
+        """cond なら FAIL、でなければ WARN（段によって、同じ誤りの重さが変わる点検）。被覆の控えは FAIL のときだけ（WARN の側だけ出ても、FAIL を確かめたことにしない）"""
+        if cond and FAIL_LOG in os.environ:
             self._log(sys._getframe(1))
         (self.fails if cond else self.warns).append(msg)
 
@@ -1006,9 +1015,20 @@ def whole(v):
     return int(v) if float(v).is_integer() else round(float(v), 2)
 
 
+def actions_of(v):
+    """動作の種類（1 語か、2 語までの並び）を、決まった語の並びに。決まった語でないものは落とす"""
+    return list(dict.fromkeys(x for x in (v if isinstance(v, list) else [v]) if x in ACTIONS))[:2]
+
+
+def soft_formula(action, ref, col):
+    """仮の値の式（基準の表を引く）。2 つの動きのある箱（確認する／承認する）は、2 つを引いて大きいほう"""
+    one = [f'VLOOKUP("{a}",{ref},{col},FALSE)' for a in action.split(ACT_JOIN)]
+    return one[0] if len(one) == 1 else f"MAX({','.join(one)})"
+
+
 def time_basis(n, seen=0):
     """作業のノードの (動作の種類, 量, 量の決め方)。処理時間の仮の値は、この 2 つで表を引く。
-    種類: 人の作業は action（無ければ「その他」）。判断・システム処理・別のフローへは、種別から。
+    種類: 人の作業は action（無ければ「その他」。2 語なら「確認する／承認する」— 表で大きいほうを引く）。判断・システム処理・別のフローへは、種別から。
     量: volume があれば、それ（決め方は volume_reason）。無ければ、同じページの手順を 3 つ以上まとめた箱・見る帳票が 2 つ以上の箱は「大」、ほかは「中」。
     「特大」（時間・日の単位でかかる作業）は、機械は付けない。LLM が、資料からそう読めるときだけ、理由つきで付ける。
     seen は、その作業が見る帳票（direction が in の file）の数。作る帳票は数えない（見て 1 つ作るのは、ふつうの作業。伝票を作る箱だけが「大」になる）。
@@ -1016,7 +1036,7 @@ def time_basis(n, seen=0):
     出典が引くカードの手順（item が s1・s2…）を、ページごとに数えた、いちばん多い数"""
     if n.get("type") != "process":
         return TYPE_ACTION.get(n.get("type"), ACTIONS[-1]), "中", ""
-    act = n.get("action") if n.get("action") in ACTIONS else ACTIONS[-1]
+    act = ACT_JOIN.join(actions_of(n.get("action"))) or ACTIONS[-1]
     if n.get("volume") in VOLUMES:
         return act, n["volume"], str(n.get("volume_reason") or "").strip() or "指定"
     steps = {}

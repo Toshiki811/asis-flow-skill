@@ -46,7 +46,7 @@ import statistics
 import unicodedata
 
 from build_reports import KIND, Reports
-from common import (ACTIONS, REL_LABEL, STEP_TYPES, SYSTEM_KIND, TYPE_ACTION, VOLUME_SPARE, VOLUMES, Answers, BadJson, Times, answer_gaps, category_path, flow_key, load, locate, node_clues, node_details, order_of, own_number,
+from common import (ACT_JOIN, ACTIONS, REL_LABEL, STEP_TYPES, SYSTEM_KIND, TYPE_ACTION, VOLUME_SPARE, VOLUMES, Answers, BadJson, Times, answer_gaps, category_path, flow_key, load, locate, node_clues, node_details, order_of, own_number,
                     question_ids, step_order_by_branch, system_ledger, time_basis, tree_nodes, whole, work_dir, unlinked_note, ASSETS)
 from table_template import (Cell, Template, TemplateError, circled, clean, fill as fill_template, lock_of, manual_back, remembered,
                             side_path, time_table)
@@ -84,7 +84,7 @@ TIME_NAME, TIME_ACTIONS = "処理時間の表", ACTIONS + list(TYPE_ACTION.value
 TIME_WAS = {"判断する": (0,)}                                         # 前の版の、既定の値。書き出したときの表の値を残していないブック（前の版）に、この値があっても、人が直した値と見ない
 TAG_TIME, TAG_COUNT, TAG_LABEL = re.compile(r"^処理時間 (\S+) (\S+)｜"), re.compile(r"^件数 (\S+)｜"), re.compile(r"^作業: (.*)$", re.M)
 TAG_CLUE = re.compile(r"^担当: (.*?)｜前: (.*)$", re.M)                 # 時間のセルのコメントの、付け替えの手がかり（担当・直前の箱。同じ作業名の箱を見分ける）
-OURS = re.compile(r'^=VLOOKUP\("')                                    # 仮の値の式（基準の表を引く）
+OURS = re.compile(r'^=(MAX\()?VLOOKUP\("')                            # 仮の値の式（基準の表を引く。2 つの動きのある箱は、MAX で大きいほう）
 TEMPLATE = "業務マトリクス一覧_テンプレート.xlsx"
 M, NODES = SHEETS[0], SHEETS[1]                                      # 業務マトリクスのシート（式の番地は、ここを指す）・業務フローのノード一覧
 STEP = "作業"                                                         # 業務マトリクスの、繰り返す列（①②③…）の印
@@ -380,12 +380,13 @@ def pull(times, book, flows, replace, base):
 
 
 def calibration(mx, base):
-    """人が入れた時間から見た、基準の表: [((動作の種類, 量), 人の値の数, その中央値, いまの表の値)]。人の作業の箱で、3 つ以上あるものだけ"""
+    """人が入れた時間から見た、基準の表: [((動作の種類, 量), 人の値の数, その中央値, いまの表の値)]。人の作業の箱で、3 つ以上あるものだけ。
+    2 つの動きのある箱の値は、表のどちらの行の値とも言えないので、数えない"""
     groups = {}
     for r in mx.rows:
         for s in r["steps"]:
             x = mx.times.cells.get((r["id"], s["id"]))
-            if x and s["node"]["type"] == "process":
+            if x and s["node"]["type"] == "process" and ACT_JOIN not in s["time"][0]:
                 groups.setdefault(s["time"][:2], []).append(x["value"])
     return [(k, len(v), whole(statistics.median(v)), mx.times.table.get(k, {}).get("value", base.get(k))) for k, v in sorted(groups.items()) if len(v) >= 3]
 
@@ -616,7 +617,7 @@ class Matrix:
         for s in r["steps"]:
             (act, vol, why), got = s["time"], self.times.cells.get((F, s["id"]))
             _name, lane, after = self.clues.get((F, s["id"]), ("", "", []))
-            note = "\n".join([f"処理時間 {F} {s['id']}｜{'人が入れた値' if got else '仮の値'}（{act} × {vol}{'：' + why if why else ''}）", f"作業: {s['detail']['label']}",
+            note = "\n".join([f"処理時間 {F} {s['id']}｜{'人が入れた値' if got else '仮の値'}（{act} × {vol}{'：' + why if why else ''}{'。表で大きいほう' if ACT_JOIN in act else ''}）", f"作業: {s['detail']['label']}",
                               "担当: {}｜前: {}".format(lane, "｜".join(after)),
                               "数を打つと、その値が正になる（書き出し直しても残る）。消すと、仮の値に戻る"])
             if got:
