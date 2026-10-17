@@ -11,6 +11,7 @@
 下書きの scope は「未定」。LLM が、項目ごとに当てはまる拠点を決める（all／only／except と sites・evidence）。
 拠点ごとのフローは、これに従う（sc_site_ops.py が、外す直しを出す。点検 --stage applies が、フローと突き合わせる）。
 """
+import re
 import argparse
 import sys
 
@@ -38,10 +39,32 @@ def candidates(cmp, sites):
                 who = mentions(blob, sites)
                 hits.append((x, text, who, bool(who) or any(norm(w) in norm(blob) for w in SWITCH_WORDS)))
             secs = {x.get("section", "") for x, _t, _w, hit in hits if hit}
+            all_secs = {x.get("section", "") for x, _t in items}
+            for n in c.get("notes") or []:                           # 作業でない補足（「契約事務は本部拠点だけが行う」）も、その小見出しの手順を候補にする
+                blob = " ".join(str(v or "") for v in (n.get("text"), n.get("quote"), n.get("about"), n.get("section")))
+                if not (mentions(blob, sites) or any(norm(w) in norm(blob) for w in SWITCH_WORDS)):
+                    continue
+                named = {s for s in all_secs if s and any(part and norm(part) in norm(blob) for part in re.split(r"[\s　]+", s, maxsplit=1))}
+                secs |= named or all_secs                            # 補足に小見出しの番号か名前があればその小見出し、無ければそのページの全部
             for x, text, who, hit in hits:
                 if hit or x.get("section", "") in secs:
                     out.append({"key": f"{d['doc_id']}.{p['page']}.{x['id']}", "doc": d["sha1"], "text": text or x.get("quote", ""),
                                 "mentions": who, "scope": "未定", "sites": [], "evidence": ""})
+    return out
+
+
+def all_items(cmp, sites):
+    """共通の資料のカードにある手順・分岐の鍵の全部（親が、候補に無い項目を書き分けに足すときの確かめ）"""
+    sh = shared_work(cmp, sites)
+    m = load(sh / "manifest.json", None) if sh else None
+    out = set()
+    for d in (m or {}).get("docs") or []:
+        if d.get("duplicate_of"):
+            continue
+        for p in d.get("page_list") or []:
+            c = A.load_card(sh, d["doc_id"], p["page"]) or {}
+            for x in (c.get("steps") or []) + (c.get("decisions") or []):
+                out.add(f"{d['doc_id']}.{p['page']}.{x['id']}")
     return out
 
 

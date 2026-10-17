@@ -195,10 +195,11 @@ def check_applies(cx, rp):
         elif it["doc"] != c["doc"]:
             rp.fail(f"applies.json {c['key']}: 共通の資料の中身が変わった（sc_applies.py draft をやり直し、決め直す）")
     keys = {c["key"] for c in cand}
+    have_items = sc_applies.all_items(cx.cmp, cx.sites)
     for it in ap["items"]:
         k = it["key"]
-        if k not in keys:
-            rp.warn(f"applies.json {k}: いまの共通の資料から拾われない項目（sc_applies.py draft で外れる）")
+        if k not in keys and k not in have_items:
+            rp.warn(f"applies.json {k}: 共通の資料のカードに無い項目（手順・分岐の鍵を確かめる。sc_applies.py draft で外れる）")
         if it["scope"] == "未定":
             rp.fail(f"applies.json {k}「{it['text'][:24]}」: 当てはまる拠点が未定（all・only・except を決める）")
         elif it["scope"] in ("only", "except") and not it["sites"]:
