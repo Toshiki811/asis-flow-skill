@@ -1,0 +1,85 @@
+{
+ "doc_id": "M01",
+ "page": 2,
+ "printed_page": null,
+ "page_type": "procedure",
+ "title": "2. Payment",
+ "section_path": [
+  "2. Payment"
+ ],
+ "actors": [
+  "Finance"
+ ],
+ "systems": [
+  "Oracle"
+ ],
+ "documents": [
+  "GST tax invoice"
+ ],
+ "steps": [
+  {
+   "id": "s1",
+   "actor": "Finance",
+   "action": "申請ごとに GST の税額請求書を確認する",
+   "system": "",
+   "inputs": [
+    "GST tax invoice"
+   ],
+   "outputs": [],
+   "condition": "",
+   "section": "2. Payment",
+   "lines": [
+    3,
+    3
+   ],
+   "quote": "Finance checks the GST tax invoice for each claim.",
+   "from_image": false,
+   "origin": "body"
+  },
+  {
+   "id": "s2",
+   "actor": "Finance",
+   "action": "承認済みの申請を銀行振込で支払う",
+   "system": "",
+   "inputs": [],
+   "outputs": [],
+   "condition": "",
+   "section": "2. Payment",
+   "lines": [
+    4,
+    4
+   ],
+   "quote": "Finance pays the approved claims by bank transfer.",
+   "from_image": false,
+   "origin": "body"
+  },
+  {
+   "id": "s3",
+   "actor": "Finance",
+   "action": "支払を Oracle に記録する",
+   "system": "Oracle",
+   "inputs": [],
+   "outputs": [],
+   "condition": "",
+   "section": "2. Payment",
+   "lines": [
+    5,
+    5
+   ],
+   "quote": "Finance records the payment in Oracle.",
+   "from_image": false,
+   "origin": "body"
+  }
+ ],
+ "decisions": [],
+ "diagram": {
+  "nodes": [],
+  "edges": []
+ },
+ "figures": [],
+ "notes": [],
+ "toc_entries": [],
+ "cross_refs": [],
+ "unreadable": [],
+ "uncertain": []
+}

@@ -5579,6 +5579,14 @@ def unit_tests():
     nons = ["金額は十万円までとする。", "承認が必要である。", "入力欄が表示されている。", "担当者が提出できる。", "内容に誤りがある。", "手続きは規程による。"]
     out.append(("作業らしい文: 「る」で終わる作業（確かめる・送る・入れる）を拾い、状態・可能・受け身・決まりの言い回しは拾わない",
                 all(action_like(s) for s in acts) and not any(action_like(s) for s in nons)))
+    from common import page_units
+    en = page_units({"text": ["Claim and approval", "Step 3. Review the application", "form and confirm the name, e.g. ABC. The officer then",
+                              "registers the case. If duplicates are found:", "• escalate to the supervisor.", "• Otherwise continue."]})
+    ja = page_units({"text": ["申請者は、経費申請書を作成し、", "領収書を添付する。", "※ 5万円以上は見積書を添付すること。"]})
+    out.append(("英文の行: 折り返しを空白でつなぎ、文末（略語の点は除く）・• の箇条書き・4 語までの見出しで切る。日本語の行は、いままでどおり",
+                en == ["Claim and approval", "Step 3.", "Review the application form and confirm the name, e.g. ABC.", "The officer then registers the case.",
+                       "If duplicates are found:", "• escalate to the supervisor.", "• Otherwise continue."]
+                and ja == ["申請者は、経費申請書を作成し、領収書を添付する。", "※ 5万円以上は見積書を添付すること。"]))
     out.append(("目次と業務の木: 木の根を 1 段目に置いた木（目次は章が 1 段目）でも、段の差をそろえて突き合わせる",
                 got.get("H1.1") is toc[0] and got.get("H1.2") is toc[1] and got.get("H1.2.1") is toc[2] and "H1" not in got))
     out.append(("刷られた番号の飾りを外す（- 13 -・P.13・13/20。3-2 はそのまま）",

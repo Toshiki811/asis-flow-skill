@@ -1,0 +1,71 @@
+{
+ "basis": "llm",
+ "rationale": "目次が無いので、手順書の見出しを業務の単位にした",
+ "categories": [
+  {
+   "id": "F01",
+   "number": "",
+   "name": "Claim and approval",
+   "parent": null,
+   "hierarchy_id": "H1",
+   "level": 1,
+   "basis": "llm",
+   "pages": [
+    {
+     "doc_id": "M01",
+     "pages": [
+      1
+     ]
+    }
+   ],
+   "make_flow": true,
+   "name_ref": {
+    "kind": "heading",
+    "doc_id": "M01",
+    "page": 1,
+    "text": "Claim and approval"
+   }
+  },
+  {
+   "id": "F02",
+   "number": "",
+   "name": "Payment",
+   "parent": null,
+   "hierarchy_id": "H2",
+   "level": 1,
+   "basis": "llm",
+   "pages": [
+    {
+     "doc_id": "M01",
+     "pages": [
+      2
+     ]
+    }
+   ],
+   "make_flow": true,
+   "name_ref": {
+    "kind": "heading",
+    "doc_id": "M01",
+    "page": 2,
+    "text": "Payment"
+   }
+  }
+ ],
+ "unassigned_pages": [],
+ "questions": [
+  {
+   "id": "q1",
+   "category": "分類",
+   "effect": "フローの範囲",
+   "question": "業務の分け方は、申請・承認と支払の 2 つでよいですか、申請と承認を分けますか。",
+   "assumption": "資料の見出しごとに分けた",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 1
+    }
+   ],
+   "ask": "シンガポール拠点 Finance"
+  }
+ ]
+}

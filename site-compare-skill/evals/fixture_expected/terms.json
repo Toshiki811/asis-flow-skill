@@ -1,0 +1,25 @@
+{
+ "groups": [
+  {"id": "R01", "kind": "actor", "name": "申請者", "members": [{"site": "TK", "term": "申請者"}, {"site": "OS", "term": "申請者"}, {"site": "SG", "term": "Employee"}],
+   "basis": "translation", "reason": "シンガポール拠点の Employee は、経費精算書を出す社員（「The employee submits the expense claim」）。東京・大阪の申請者（経費を立て替えた社員）と同じ役割"},
+  {"id": "R02", "kind": "actor", "name": "課長", "members": [{"site": "TK", "term": "課長"}, {"site": "OS", "term": "課長"}, {"site": "SG", "term": "Manager"}],
+   "basis": "equivalent", "reason": "シンガポール拠点の Manager は、経費精算書を確認して承認する上長（「The manager reviews the claim and approves it」）。東京・大阪で申請を照合・承認する課長と同じ役割"},
+  {"id": "R03", "kind": "actor", "name": "経理", "members": [{"site": "TK", "term": "経理部"}, {"site": "OS", "term": "経理担当"}, {"site": "SG", "term": "Finance"}],
+   "basis": "equivalent", "reason": "どの拠点も、承認済みの申請の支払データを作り、振込（銀行振込）で支払う担当（東京は経理部、大阪は経理担当、シンガポールは Finance と書く）"},
+  {"id": "R04", "kind": "actor", "name": "経理課長", "members": [{"site": "TK", "term": "経理課長"}], "basis": "same_name", "reason": ""},
+  {"id": "R05", "kind": "actor", "name": "支店長", "members": [{"site": "OS", "term": "支店長"}], "basis": "same_name", "reason": ""},
+  {"id": "Y01", "kind": "system", "name": "経費精算システム", "members": [{"site": "TK", "term": "経費精算システム"}, {"site": "OS", "term": "経費精算システム"}], "basis": "same_name", "reason": ""},
+  {"id": "Y02", "kind": "system", "name": "会計システム", "members": [{"site": "TK", "term": "会計システム"}], "basis": "same_name", "reason": ""},
+  {"id": "Y03", "kind": "system", "name": "ファームバンキング", "members": [{"site": "TK", "term": "ファームバンキング"}], "basis": "same_name", "reason": ""},
+  {"id": "Y04", "kind": "system", "name": "Oracle", "members": [{"site": "SG", "term": "Oracle"}], "basis": "same_name", "reason": ""},
+  {"id": "D01", "kind": "document", "name": "経費申請書", "members": [{"site": "TK", "term": "経費申請書"}, {"site": "OS", "term": "経費申請書"}], "basis": "same_name", "reason": ""},
+  {"id": "D02", "kind": "document", "name": "領収書", "members": [{"site": "TK", "term": "領収書"}, {"site": "OS", "term": "領収書"}, {"site": "SG", "term": "Receipt"}],
+   "basis": "translation", "reason": "Receipt は領収書の英語"},
+  {"id": "D03", "kind": "document", "name": "支払データ", "members": [{"site": "TK", "term": "支払データ"}, {"site": "OS", "term": "支払データ"}], "basis": "same_name", "reason": ""},
+  {"id": "D04", "kind": "document", "name": "GST の税額請求書", "members": [{"site": "SG", "term": "GST tax invoice"}], "basis": "same_name", "reason": ""}
+ ],
+ "questions": [
+  {"id": "q1", "category": "用語", "effect": "差の種類", "group": "R02", "question": "シンガポール拠点で経費精算書を承認する Manager は、東京・大阪の課長と同じ立場（社員の直属の上長）ですか、別の役職ですか。",
+   "assumption": "同じ役割（課長）としてまとめた", "ask": "シンガポール拠点の Finance"}
+ ]
+}

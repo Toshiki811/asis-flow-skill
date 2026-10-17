@@ -1,0 +1,49 @@
+{
+ "doc_id": "M02",
+ "page": 1,
+ "printed_page": null,
+ "page_type": "procedure",
+ "title": "大阪支店 支払手順",
+ "section_path": [
+  "支払"
+ ],
+ "actors": [
+  "経理担当"
+ ],
+ "systems": [],
+ "documents": [
+  "支払データ"
+ ],
+ "steps": [
+  {
+   "id": "s1",
+   "actor": "経理担当",
+   "action": "支払データを作成して振込を行う",
+   "system": "",
+   "inputs": [],
+   "outputs": [
+    "支払データ"
+   ],
+   "condition": "承認済みの申請について",
+   "section": "支払",
+   "lines": [
+    3,
+    3
+   ],
+   "quote": "経理担当は、承認済みの申請について、支払データを作成して振込を行う。",
+   "from_image": false,
+   "origin": "body"
+  }
+ ],
+ "decisions": [],
+ "diagram": {
+  "nodes": [],
+  "edges": []
+ },
+ "figures": [],
+ "notes": [],
+ "toc_entries": [],
+ "cross_refs": [],
+ "unreadable": [],
+ "uncertain": []
+}

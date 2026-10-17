@@ -351,18 +351,43 @@ def load_markers(path=None):
     return out
 
 
-BULLET = re.compile(r"^(?:[・･\-–—●○■□◆◇▶➤➲*＊]|[①-⑳]|[(（]?[0-9０-９]{1,2}[)）.．、]|[(（][ア-ンa-zA-Z][)）])")   # 箇条書きの頭
+BULLET = re.compile(r"^(?:[・･\-–—●○■□◆◇▶➤➲*＊•▪◦‣]|[①-⑳]|[(（]?[0-9０-９]{1,2}[)）.．、]|[(（][ア-ンa-zA-Z][)）])")   # 箇条書きの頭
+CJK = re.compile(r"[぀-ヿ㐀-鿿豈-﫿＀-￯]")   # かな・漢字・全角（日本語の行か）
+LATIN_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"“(\[])")             # 英文の文末（文末の記号のあとの空白。次が大文字・数字・かっこ）
+LATIN_ABBR = ("No.", "no.", "Nos.", "Mr.", "Ms.", "Mrs.", "Dr.", "e.g.", "i.e.", "etc.", "approx.", "vs.", "Fig.", "fig.", "p.", "pp.", "Co.", "Ltd.", "Inc.", "St.", "Dept.")
+
+
+def latin(text):
+    """日本語の字が無く、ローマ字のある文（英語・ベトナム語などの資料の行）"""
+    return not CJK.search(text) and re.search(r"[A-Za-zÀ-ỹĐđ]", text) is not None
+
+
+def latin_split(text):
+    """英文を文末で切る（略語の点では切らない）。日本語の字のある文は切らない"""
+    if not latin(text):
+        return [text]
+    out, start = [], 0
+    for m in LATIN_END.finditer(text):
+        if text[start:m.start()].endswith(LATIN_ABBR):
+            continue
+        out.append(text[start:m.start()])
+        start = m.end()
+    return out + [text[start:]]
 
 
 def _cut(pj, breaks=()):
-    """機械抽出の文字を文の単位に切った並び: (文, 外字の箇条書きの印で始まっていたか)"""
-    out, buf, lead = [], "", False
+    """機械抽出の文字を文の単位に切った並び: (文, 外字の箇条書きの印で始まっていたか)。
+    日本語の資料は「。．」と短い行で切る。日本語の字の無い行（英語などの資料）は、行をつなぐときに空白をはさみ、英文の文末（. ! ? のあと）と、
+    4 語までの短い行（見出し）でも切る"""
+    out, buf, lead, joint = [], "", False, False
 
     def flush(split):
-        nonlocal buf, lead
+        nonlocal buf, lead, joint
         parts = [x for x in (re.split(r"(?<=[。．])", buf) if split else [buf]) if x.strip()]
+        if split:
+            parts = [y for x in parts for y in latin_split(x) if y.strip()]
         out.extend((x, lead and k == 0) for k, x in enumerate(parts))
-        buf, lead = "", False
+        buf, lead, joint = "", False, False
     for raw in page_text(pj).split("\n"):
         for ln in raw.split(" | "):                                  # Excel は1行に複数のセル
             ln = ln.strip()
@@ -373,8 +398,9 @@ def _cut(pj, breaks=()):
             lead = lead or mark                                      # 印だけの行のあとに文が続くときは、その文の印
             if not ln:
                 continue
-            buf += ln
-            if ln.endswith(("。", "．")) or len(norm(ln)) <= 12:
+            buf += (" " if joint and latin(ln) else "") + ln         # 英文の行の折り返しは、語の切れ目（日本語の行は、そのままつなぐ）
+            joint = latin(ln)
+            if ln.endswith(("。", "．")) or len(norm(ln)) <= 12 or (joint and (ln.endswith((".", "!", "?", ":")) or len(ln.split()) <= 4)):   # 英文の短い行（4 語まで）は見出し
                 flush(True)
     if buf.strip():
         flush(True)

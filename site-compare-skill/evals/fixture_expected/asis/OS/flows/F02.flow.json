@@ -1,0 +1,221 @@
+{
+ "flow_id": "F02",
+ "name": "承認",
+ "number": "",
+ "parent": null,
+ "level": 1,
+ "basis": "llm",
+ "summary": "課長が申請の内容と領収書を照合し、不備があれば差し戻し、無ければ承認する。",
+ "start_condition": "経費申請書が提出されたとき",
+ "end_condition": "申請を承認したとき",
+ "lanes": [
+  {
+   "id": "L1",
+   "name": "課長",
+   "kind": "role"
+  },
+  {
+   "id": "L2",
+   "name": "支店長",
+   "kind": "role"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "start",
+   "type": "start",
+   "lane": "L1",
+   "label": "開始"
+  },
+  {
+   "id": "P-001",
+   "type": "process",
+   "lane": "L1",
+   "label": "申請の内容と領収書を照合する",
+   "action": "確認する",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 2,
+     "quote": "(1) 課長は、申請の内容と領収書を照合する。",
+     "from_image": false,
+     "item": "s1",
+     "lines": [
+      2,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F-001",
+   "type": "file",
+   "lane": "L1",
+   "label": "領収書",
+   "attach_to": "P-001",
+   "direction": "in",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 2,
+     "quote": "(1) 課長は、申請の内容と領収書を照合する。",
+     "from_image": false,
+     "item": "s1",
+     "lines": [
+      2,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "id": "D-001",
+   "type": "decision",
+   "lane": "L1",
+   "label": "不備があるか",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 2,
+     "quote": "(2) 不備がある場合は、課長は申請者に差し戻す。(3) 不備がない場合は、課長が申請を承認する。",
+     "from_image": false,
+     "item": "d1",
+     "lines": [
+      3,
+      4
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P-002",
+   "type": "process",
+   "lane": "L1",
+   "label": "申請者に差し戻す",
+   "action": "提出・回付する",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 2,
+     "quote": "(2) 不備がある場合は、課長は申請者に差し戻す。",
+     "from_image": false,
+     "item": "s2",
+     "lines": [
+      3,
+      3
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P-003",
+   "type": "process",
+   "lane": "L2",
+   "label": "申請を承認する",
+   "action": "承認する",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 2,
+     "quote": "※ 大阪支店では、課長に代えて支店長が申請を承認する。",
+     "from_image": false,
+     "item": "s4",
+     "lines": [
+      5,
+      5
+     ]
+    }
+   ]
+  },
+  {
+   "id": "SUB-001",
+   "type": "subprocess",
+   "lane": "L2",
+   "label": "支払処理に進む",
+   "link_flow": "F03",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 2,
+     "quote": "承認された申請は、各拠点の経理の支払処理に回る。",
+     "from_image": false
+    }
+   ]
+  },
+  {
+   "id": "end2",
+   "type": "end",
+   "lane": "L1",
+   "label": "終了（差し戻し）"
+  },
+  {
+   "id": "end",
+   "type": "end",
+   "lane": "L2",
+   "label": "終了"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "P-001"
+  },
+  {
+   "from": "P-001",
+   "to": "D-001"
+  },
+  {
+   "from": "D-001",
+   "to": "P-002",
+   "label": "ある"
+  },
+  {
+   "from": "D-001",
+   "to": "P-003",
+   "label": "ない"
+  },
+  {
+   "from": "P-002",
+   "to": "end2",
+   "inferred": true
+  },
+  {
+   "from": "P-003",
+   "to": "SUB-001"
+  },
+  {
+   "from": "SUB-001",
+   "to": "end"
+  }
+ ],
+ "unused_pages": [],
+ "excluded_items": [
+  {
+   "doc_id": "M01",
+   "page": 2,
+   "item": "s3",
+   "reason": "ほかの拠点だけの手順（大阪支店では行わない）"
+  }
+ ],
+ "questions": [
+  {
+   "id": "q1",
+   "category": "記載なし",
+   "effect": "フローの範囲",
+   "edge": [
+    "P-002",
+    "end2"
+   ],
+   "question": "差し戻したあと、この業務は終わりますか、経費申請からやり直しますか。",
+   "assumption": "差し戻しで終わるとした",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 2
+    }
+   ],
+   "ask": "経理の担当",
+   "severity": "high"
+  }
+ ]
+}

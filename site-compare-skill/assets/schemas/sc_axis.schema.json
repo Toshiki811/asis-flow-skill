@@ -1,0 +1,77 @@
+{
+ "title": "比べる行（業務分類 › 業務種別）と、各拠点のフローの当て方",
+ "file": "axis.json",
+ "description": "工程 4。sc_axis.py draft が下書きを書く（基準ありは基準の業務分類から行を作り、基準の拠点のフローを当てる。基準なしは 1 つ目の拠点から）。LLM は、ほかの拠点のフロー（箱の一部も）を行に当て、どれにも当たらない業務は行を足す（origin: not_in_baseline・merged）。どの拠点の作業の箱も、ちょうど 1 つの行か not_compared に入る",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["mode", "groups", "rows", "not_compared", "questions"],
+ "properties": {
+  "mode": {"enum": ["baseline", "side_by_side"], "description": "基準あり／基準なし（sites.json の baseline と合わせる）"},
+  "groups": {"type": "array", "items": {"$ref": "#/$defs/group"}, "description": "業務分類（表の左の列。行を束ねる）"},
+  "rows": {"type": "array", "items": {"$ref": "#/$defs/row"}, "description": "比べる行（業務種別）。並びは機械が決める（基準の順・1 つ目の拠点の順）"},
+  "not_compared": {"type": "array", "items": {"$ref": "#/$defs/part_out"}, "description": "比べないフロー・箱と理由（業務でない・ほかの業務の前置き など）"},
+  "questions": {"type": "array", "items": {"$ref": "sc_common#/$defs/question"}}
+ },
+ "$defs": {
+  "group": {
+   "title": "groups[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["id", "name", "name_from"],
+   "properties": {
+    "id": {"$ref": "sc_common#/$defs/group_id"},
+    "name": {"type": "string", "minLength": 1, "description": "業務分類の名前（日本語）"},
+    "name_from": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/from_category"}], "description": "名前を取った拠点の分類（訳したときも、もとを書く）。拠点に束ねる分類が無いときだけ null"}
+   }
+  },
+  "from_category": {"type": "object", "additionalProperties": false, "required": ["site", "category"], "properties": {"site": {"$ref": "sc_common#/$defs/site_id"}, "category": {"$ref": "common#/$defs/flow_id"}}},
+  "row": {
+   "title": "rows[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["id", "group", "parent", "name", "name_from", "origin", "sites"],
+   "properties": {
+    "id": {"$ref": "sc_common#/$defs/row_id"},
+    "group": {"anyOf": [{"$ref": "sc_common#/$defs/group_id"}, {"type": "null"}], "description": "業務分類（下位の行は親と同じ。null は、分類の無い行）"},
+    "parent": {"anyOf": [{"$ref": "sc_common#/$defs/row_id"}, {"type": "null"}], "description": "親の行（拠点の下位フローの単位で比べるとき。B03-1 の親は B03）"},
+    "name": {"type": "string", "minLength": 1, "description": "業務種別の名前（日本語。納品物に出る）"},
+    "name_from": {"type": "object", "additionalProperties": false, "required": ["site", "flow"], "properties": {"site": {"$ref": "sc_common#/$defs/site_id"}, "flow": {"$ref": "common#/$defs/flow_id"}}, "description": "名前を取った拠点のフロー（訳したときも、もとを書く）"},
+    "origin": {"enum": ["baseline", "merged", "not_in_baseline"], "description": "`baseline` 基準の拠点の業務／`merged` 基準なしで、拠点をまたいで束ねた業務／`not_in_baseline` 基準に無い業務（ほかの拠点にだけある）"},
+    "sites": {"type": "array", "items": {"$ref": "#/$defs/site_part"}, "description": "拠点ごとの当て方（全拠点を 1 回ずつ）"}
+   }
+  },
+  "site_part": {
+   "title": "rows[].sites[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["site", "relation", "parts", "reason"],
+   "properties": {
+    "site": {"$ref": "sc_common#/$defs/site_id"},
+    "relation": {"enum": ["same", "part", "split", "none", "out_of_scope"], "description": "`same` この業務を書いたフローがある／`part` この行の業務の一部だけを書いている／`split` その拠点の 1 本のフローが、この行とほかの行にまたがる（parts.nodes で箱を分ける）／`none` 資料に記載なし（業務が無いとは言わない）／`out_of_scope` その拠点では対象外にした業務（asis の out_of_scope）"},
+    "parts": {"type": "array", "items": {"$ref": "#/$defs/part"}, "description": "当てるフロー（none・out_of_scope は空）"},
+    "reason": {"type": "string", "description": "当てた・当てない理由（same 以外は必須。none は、何を探して無かったか）"}
+   }
+  },
+  "part": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["flow", "expand", "nodes"],
+   "properties": {
+    "flow": {"$ref": "common#/$defs/flow_id"},
+    "expand": {"type": "boolean", "description": "true: 下位フローへのリンクを中身で開いた 1 本（親子をまとめて比べる）／false: そのフローの箱だけ（下位フローは、別の行に当てる）"},
+    "nodes": {"anyOf": [{"type": "null"}, {"type": "array", "items": {"$ref": "sc_common#/$defs/node_key"}, "minItems": 1}], "description": "null: 全部の箱／並び: この行に入れる箱だけ（split のとき）"}
+   }
+  },
+  "part_out": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["site", "flow", "nodes", "reason"],
+   "properties": {
+    "site": {"$ref": "sc_common#/$defs/site_id"},
+    "flow": {"$ref": "common#/$defs/flow_id"},
+    "nodes": {"anyOf": [{"type": "null"}, {"type": "array", "items": {"$ref": "sc_common#/$defs/node_key"}, "minItems": 1}]},
+    "reason": {"type": "string", "minLength": 1}
+   }
+  }
+ }
+}

@@ -31,7 +31,7 @@ import argparse
 import collections
 import json
 
-from common import (NON_CONTENT_TYPES, PAGE_TYPES, QUOTE_OK, SHIFT_MIN, SHIFT_SHARE, Report, _split, all_pages, bare_number, card_json, covers,
+from common import (CJK, NON_CONTENT_TYPES, PAGE_TYPES, QUOTE_OK, SHIFT_MIN, SHIFT_SHARE, Report, _split, all_pages, bare_number, card_json, covers,
                     action_like, guarded, labels, load_markers, load_page, manifest, norm, note_actions, page_json, page_text, page_units,
                     parse_pages, quote_match, span_text, work_dir)
 from validate import validate
@@ -214,6 +214,8 @@ class CardChecks:
             rp.fail(f"{name}: 行の番号 {it['lines']} が範囲の外（このページの行は 1〜{len(pg.units)}。python3 scripts/pages.py lines で番号を見る）")
         elif norm(q) != norm(text):
             rp.fail(f"{name}: 引用（quote）が、指した行 {it['lines']} の文字と違う。引用は手で書かず、python3 scripts/quotes.py fill で入れる: 「{q[:30]}」／行「{text[:30]}」")
+        elif CJK.search(said) and not CJK.search(text):              # 日本語以外の資料: 作業の文は日本語に訳して書くので、字の一致では見られない（照合レビューが見る）
+            pass
         else:
             a, b = grams(norm(said), 2), grams(norm(text), 2)
             if a and len(a & b) / len(a) < POINT_MIN:

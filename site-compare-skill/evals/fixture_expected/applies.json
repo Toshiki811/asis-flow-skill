@@ -1,0 +1,56 @@
+{
+ "items": [
+  {
+   "key": "M01.2.s1",
+   "doc": "bf992feafd87f80bdfccebb1a1d97c15e1ad1813",
+   "text": "申請の内容と領収書を照合する",
+   "mentions": [],
+   "scope": "all",
+   "sites": [],
+   "evidence": "拠点の書き分けの無い手順（同じ節にあるので拾った）"
+  },
+  {
+   "key": "M01.2.s2",
+   "doc": "bf992feafd87f80bdfccebb1a1d97c15e1ad1813",
+   "text": "申請者に差し戻す",
+   "mentions": [],
+   "scope": "all",
+   "sites": [],
+   "evidence": "拠点の書き分けの無い手順（同じ節にあるので拾った）"
+  },
+  {
+   "key": "M01.2.s3",
+   "doc": "bf992feafd87f80bdfccebb1a1d97c15e1ad1813",
+   "text": "申請を承認する",
+   "mentions": [],
+   "scope": "except",
+   "sites": [
+    "OS"
+   ],
+   "evidence": "「大阪支店では、課長に代えて支店長が申請を承認する」とある（大阪支店では、課長は承認しない）"
+  },
+  {
+   "key": "M01.2.s4",
+   "doc": "bf992feafd87f80bdfccebb1a1d97c15e1ad1813",
+   "text": "申請を承認する",
+   "mentions": [
+    "OS"
+   ],
+   "scope": "only",
+   "sites": [
+    "OS"
+   ],
+   "evidence": "「大阪支店では」とある"
+  },
+  {
+   "key": "M01.2.d1",
+   "doc": "bf992feafd87f80bdfccebb1a1d97c15e1ad1813",
+   "text": "不備があるか",
+   "mentions": [],
+   "scope": "all",
+   "sites": [],
+   "evidence": "拠点の書き分けの無い分岐（同じ節にあるので拾った）"
+  }
+ ],
+ "questions": []
+}

@@ -1,0 +1,29 @@
+{
+ "title": "拠点間の用語の対応",
+ "file": "terms.json",
+ "description": "工程 3。sc_terms.py draft が、拠点ごとの用語（レーン・使うシステム・帳票）を、名前が同じものだけまとめて書く。LLM は、訳・言い換えで同じものを、理由つきで 1 つの組にまとめる（違うものは、まとめない。決められなければ確認事項）。比べる箱に出る用語は、どれか 1 つの組に 1 回だけ入る",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["groups", "questions"],
+ "properties": {
+  "groups": {"type": "array", "items": {"$ref": "#/$defs/group"}},
+  "questions": {"type": "array", "items": {"$ref": "sc_common#/$defs/question"}, "description": "同じものか決められない用語（種別「用語」・group に組の ID）"}
+ },
+ "$defs": {
+  "group": {
+   "title": "groups[]",
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["id", "kind", "name", "members", "basis", "reason"],
+   "properties": {
+    "id": {"$ref": "sc_common#/$defs/term_id", "description": "R＝担当・役割（actor）、Y＝システム（system）、D＝帳票（document）"},
+    "kind": {"enum": ["actor", "system", "document"], "description": "`actor` 担当（部門・役職・社外）／`system` システム（レーン・札）／`document` 帳票"},
+    "name": {"type": "string", "minLength": 1, "description": "比べるときの名前（納品物に出る。担当・帳票は日本語で。システムの固有の名前はそのまま）"},
+    "members": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["site", "term"], "properties": {
+     "site": {"$ref": "sc_common#/$defs/site_id"}, "term": {"type": "string", "minLength": 1, "description": "その拠点の用語（asis の用語の正本の名前のまま）"}}}},
+    "basis": {"enum": ["same_name", "translation", "equivalent"], "description": "まとめた根拠: `same_name` 名前が同じ（機械が確かめる）／`translation` 訳が同じ／`equivalent` 呼び方は違うが、原典の役割の説明・担う作業が同じ"},
+    "reason": {"type": "string", "description": "まとめた理由（translation・equivalent は必須。原典の説明・担う作業を書く）"}
+   }
+  }
+ }
+}

@@ -1,0 +1,115 @@
+{
+ "doc_id": "M02",
+ "page": 1,
+ "printed_page": null,
+ "page_type": "procedure",
+ "title": "東京支店 支払処理手順",
+ "section_path": [
+  "1. 支払処理"
+ ],
+ "actors": [
+  "経理部",
+  "経理課長"
+ ],
+ "systems": [
+  "経費精算システム",
+  "会計システム"
+ ],
+ "documents": [
+  "支払データ"
+ ],
+ "steps": [
+  {
+   "id": "s1",
+   "no": 1,
+   "actor": "経理部",
+   "action": "承認済みの申請を一覧で出力する",
+   "system": "経費精算システム",
+   "inputs": [],
+   "outputs": [],
+   "condition": "",
+   "section": "1. 支払処理",
+   "lines": [
+    3,
+    3
+   ],
+   "quote": "(1) 経理部は、経費精算システムから承認済みの申請を一覧で出力する。",
+   "from_image": false,
+   "origin": "body"
+  },
+  {
+   "id": "s2",
+   "no": 2,
+   "actor": "経理部",
+   "action": "支払データを作成する",
+   "system": "会計システム",
+   "inputs": [],
+   "outputs": [
+    "支払データ"
+   ],
+   "condition": "",
+   "section": "1. 支払処理",
+   "lines": [
+    4,
+    4
+   ],
+   "quote": "(2) 経理部は、会計システムで支払データを作成する。",
+   "from_image": false,
+   "origin": "body"
+  },
+  {
+   "id": "s3",
+   "no": 3,
+   "actor": "経理課長",
+   "action": "支払データを確認する",
+   "system": "",
+   "inputs": [
+    "支払データ"
+   ],
+   "outputs": [],
+   "condition": "",
+   "section": "1. 支払処理",
+   "lines": [
+    5,
+    5
+   ],
+   "quote": "(3) 経理課長は、支払データを確認する。",
+   "from_image": false,
+   "origin": "body"
+  },
+  {
+   "id": "s4",
+   "no": 4,
+   "actor": "経理部",
+   "action": "振込を行う",
+   "system": "",
+   "inputs": [],
+   "outputs": [],
+   "condition": "",
+   "section": "1. 支払処理",
+   "lines": [
+    6,
+    7
+   ],
+   "quote": "(4) 経理部は、振込を行う。振込の手順は「2. 振込」による。",
+   "from_image": false,
+   "origin": "body"
+  }
+ ],
+ "decisions": [],
+ "diagram": {
+  "nodes": [],
+  "edges": []
+ },
+ "figures": [],
+ "notes": [],
+ "toc_entries": [],
+ "cross_refs": [
+  {
+   "text": "振込の手順は「2. 振込」による。",
+   "target": "2. 振込"
+  }
+ ],
+ "unreadable": [],
+ "uncertain": []
+}

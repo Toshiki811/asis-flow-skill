@@ -1,0 +1,95 @@
+{
+ "is_hierarchical": "no",
+ "basis": [
+  "numbering",
+  "folder"
+ ],
+ "rationale": "目次は無い。全社共通のマニュアルの見出し（1. 経費申請・2. 承認）と、大阪支店の支払手順を、それぞれ業務にした",
+ "tree": [
+  {
+   "id": "H1",
+   "level": 1,
+   "number": "1.",
+   "title": "経費申請",
+   "kind": "process",
+   "source": "heading",
+   "refs": [
+    {
+     "doc_id": "M01",
+     "pages": [
+      1
+     ],
+     "rel": "describes"
+    }
+   ],
+   "children": []
+  },
+  {
+   "id": "H2",
+   "level": 1,
+   "number": "2.",
+   "title": "承認",
+   "kind": "process",
+   "source": "heading",
+   "refs": [
+    {
+     "doc_id": "M01",
+     "pages": [
+      2
+     ],
+     "rel": "describes"
+    }
+   ],
+   "children": []
+  },
+  {
+   "id": "H3",
+   "level": 1,
+   "title": "支払",
+   "kind": "process",
+   "source": "heading",
+   "refs": [
+    {
+     "doc_id": "M02",
+     "pages": [
+      1
+     ],
+     "rel": "describes"
+    }
+   ],
+   "children": []
+  }
+ ],
+ "docs": [
+  {
+   "doc_id": "M01",
+   "role": "manual",
+   "title": "経費精算マニュアル（全社共通）"
+  },
+  {
+   "doc_id": "M02",
+   "role": "procedure",
+   "title": "大阪支店 支払手順"
+  }
+ ],
+ "doc_relations": [],
+ "sequence": [
+  {
+   "from": "H2",
+   "to": "H3",
+   "evidence": "承認された申請は、各拠点の経理の支払処理に回る。",
+   "sources": [
+    {
+     "doc_id": "M01",
+     "page": 2
+    }
+   ]
+  }
+ ],
+ "toc_flow_list": {
+  "found": false,
+  "source": [],
+  "entries": []
+ },
+ "questions": []
+}

@@ -1,0 +1,142 @@
+{
+ "doc_id": "M01",
+ "page": 2,
+ "printed_page": null,
+ "page_type": "procedure",
+ "title": "2. 承認",
+ "section_path": [
+  "2. 承認"
+ ],
+ "actors": [
+  "課長",
+  "支店長",
+  "申請者"
+ ],
+ "systems": [],
+ "documents": [
+  "領収書"
+ ],
+ "steps": [
+  {
+   "id": "s1",
+   "no": 1,
+   "actor": "課長",
+   "action": "申請の内容と領収書を照合する",
+   "system": "",
+   "inputs": [
+    "領収書"
+   ],
+   "outputs": [],
+   "condition": "",
+   "section": "2. 承認",
+   "lines": [
+    2,
+    2
+   ],
+   "quote": "(1) 課長は、申請の内容と領収書を照合する。",
+   "from_image": false,
+   "origin": "body"
+  },
+  {
+   "id": "s2",
+   "no": 2,
+   "actor": "課長",
+   "action": "申請者に差し戻す",
+   "system": "",
+   "inputs": [],
+   "outputs": [],
+   "condition": "不備がある場合",
+   "section": "2. 承認",
+   "lines": [
+    3,
+    3
+   ],
+   "quote": "(2) 不備がある場合は、課長は申請者に差し戻す。",
+   "from_image": false,
+   "origin": "body"
+  },
+  {
+   "id": "s3",
+   "no": 3,
+   "actor": "課長",
+   "action": "申請を承認する",
+   "system": "",
+   "inputs": [],
+   "outputs": [],
+   "condition": "不備がない場合",
+   "section": "2. 承認",
+   "lines": [
+    4,
+    4
+   ],
+   "quote": "(3) 不備がない場合は、課長が申請を承認する。",
+   "from_image": false,
+   "origin": "body"
+  },
+  {
+   "id": "s4",
+   "actor": "支店長",
+   "action": "申請を承認する",
+   "system": "",
+   "inputs": [],
+   "outputs": [],
+   "condition": "大阪支店の場合（課長に代えて）",
+   "section": "2. 承認",
+   "lines": [
+    5,
+    5
+   ],
+   "quote": "※ 大阪支店では、課長に代えて支店長が申請を承認する。",
+   "from_image": false,
+   "origin": "note",
+   "applies_to": "s3"
+  }
+ ],
+ "decisions": [
+  {
+   "id": "d1",
+   "question": "不備があるか",
+   "branches": [
+    {
+     "label": "ある",
+     "to": "申請者に差し戻す"
+    },
+    {
+     "label": "ない",
+     "to": "申請を承認する"
+    }
+   ],
+   "section": "2. 承認",
+   "lines": [
+    3,
+    4
+   ],
+   "quote": "(2) 不備がある場合は、課長は申請者に差し戻す。(3) 不備がない場合は、課長が申請を承認する。",
+   "from_image": false,
+   "origin": "body"
+  }
+ ],
+ "diagram": {
+  "nodes": [],
+  "edges": []
+ },
+ "figures": [],
+ "notes": [
+  {
+   "id": "n1",
+   "about": "支払処理への引き継ぎ",
+   "text": "承認された申請は、各拠点の経理の支払処理に回る。",
+   "lines": [
+    6,
+    6
+   ],
+   "quote": "承認された申請は、各拠点の経理の支払処理に回る。",
+   "from_image": false,
+   "why_not_action": "次の業務（支払処理）へ進むことの説明で、担当が行う作業ではない"
+  }
+ ],
+ "toc_entries": [],
+ "cross_refs": [],
+ "unreadable": [],
+ "uncertain": []
+}

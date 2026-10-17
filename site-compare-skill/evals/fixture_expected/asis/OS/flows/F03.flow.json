@@ -1,0 +1,89 @@
+{
+ "flow_id": "F03",
+ "name": "支払",
+ "number": "",
+ "parent": null,
+ "level": 1,
+ "basis": "llm",
+ "summary": "経理担当が、承認済みの申請について支払データを作り、振込を行う。",
+ "start_condition": "承認済みの申請があるとき",
+ "end_condition": "振込を行ったとき",
+ "lanes": [
+  {
+   "id": "L1",
+   "name": "経理担当",
+   "kind": "role"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "start",
+   "type": "start",
+   "lane": "L1",
+   "label": "開始"
+  },
+  {
+   "id": "P-001",
+   "type": "process",
+   "lane": "L1",
+   "label": "支払データを作成して振込を行う",
+   "action": [
+    "作成する",
+    "入力する"
+   ],
+   "sources": [
+    {
+     "doc_id": "M02",
+     "page": 1,
+     "quote": "経理担当は、承認済みの申請について、支払データを作成して振込を行う。",
+     "from_image": false,
+     "item": "s1",
+     "lines": [
+      3,
+      3
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F-001",
+   "type": "file",
+   "lane": "L1",
+   "label": "支払データ",
+   "attach_to": "P-001",
+   "direction": "out",
+   "sources": [
+    {
+     "doc_id": "M02",
+     "page": 1,
+     "quote": "経理担当は、承認済みの申請について、支払データを作成して振込を行う。",
+     "from_image": false,
+     "item": "s1",
+     "lines": [
+      3,
+      3
+     ]
+    }
+   ]
+  },
+  {
+   "id": "end",
+   "type": "end",
+   "lane": "L1",
+   "label": "終了"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "P-001"
+  },
+  {
+   "from": "P-001",
+   "to": "end"
+  }
+ ],
+ "unused_pages": [],
+ "excluded_items": [],
+ "questions": []
+}
