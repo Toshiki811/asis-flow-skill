@@ -193,6 +193,24 @@ def cmd_draft(cmp, mdl, only):
         print(f"{rid}: 採否表 review/{rid}.review.json（判定 {len(verdicts)}・指摘 {len(finds)}・採否の無い指摘 {open_}）")
 
 
+def review_md(cmp, mdl):
+    """照合の採否表（作業の記録）: 行ごとの支持率と、指摘ごとの採否と対応"""
+    out = ["# 対応の照合 採否表", "", "| 業務種別 | 主張 | 支持 | 一部支持 | 不支持 |", "| --- | --- | --- | --- | --- |"]
+    finds = []
+    for r in mdl.rows():
+        rv = try_load(cmp / "review" / f"{r['id']}.review.json")[0] or {}
+        vs = [v["verdict"] for v in rv.get("verdicts") or []]
+        out.append(f"| {r['name']} | {len(vs)} | {vs.count('支持')} | {vs.count('一部支持')} | {vs.count('不支持')} |")
+        finds += [(r["name"], f) for f in rv.get("findings") or []]
+    out += ["", "| # | 業務種別 | 対象 | 指摘（原文のまま） | 種別 | 採否 | 対応／理由 |", "| --- | --- | --- | --- | --- | --- | --- |"]
+    for i, (name, f) in enumerate(finds, 1):
+        cell = lambda s: str(s).replace("|", "｜").replace("\n", " ")
+        out.append(f"| {i} | {cell(name)} | {cell(f['target'])} | {cell(f['text'])} | {cell(f['kind'])} | {cell(f['decision'])} | {cell(f['action'])} |")
+    if not finds:
+        out.append("| — | — | — | 指摘なし | — | — | — |")
+    return "\n".join(out) + "\n"
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd", choices=["sheet", "draft"])
