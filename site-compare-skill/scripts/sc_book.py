@@ -69,11 +69,11 @@ LEGEND = [
     ("追加の資料の依頼", "粗く書いた拠点・記載なしの拠点ごとに、どの資料があれば、使えていない詳しい情報（ほかの拠点の作業・判断・受け渡し）と比べられるかを、比べられるようになるタスクの多い順に並べた。"),
     ("出典", "資料の題名と、資料に刷られたページ番号。原文の引用は、拠点ごとの as-is の出典対応表にある。"),
 ]
-OVERVIEW = [("比べた拠点", "{拠点}（表と図では、基準の拠点を左に置く）"), ("基準の拠点", "基準: {基準}"), ("比べる行（業務種別）", "{行の数} 行（業務分類 {分類の数}）"),
-            ("タスク", "{タスクの数}（共通 {共通}・差異あり {差異あり}・拠点固有 {拠点固有}）"), ("対応の照合の支持率", "支持率 {支持率}"),
-            ("複雑性の大中小", "大中小は、{決め方}"), ("大中小の境", "境: {境}"), ("差の大きさの境", "{差の境}（拠点ごとの大中小とは別の列）"),
-            ("拠点ごとの as-is", "拠点の写し: {拠点の状態}"),
-            ("確認事項", "{確認事項の数} 件（比較のもの。拠点ごとの as-is の確認事項は、拠点の確認事項一覧）"), ("作った日", "作った日: {日付}")]
+OVERVIEW = [("比べた拠点", "{拠点}（表と図では、基準の拠点を左に置く）"), ("基準の拠点", "{基準}（基準があれば、ほかの拠点を基準の業務の一覧に寄せる。無ければ、拠点を横に並べて同じ業務をそろえる）"), ("比べる行（業務種別）", "{行の数} 行（業務分類 {分類の数}）"),
+            ("タスク", "{タスクの数}（共通 {共通}・差異あり {差異あり}・拠点固有 {拠点固有}）"), ("対応の照合の支持率", "{支持率}。作り方を知らない別のエージェントが、主張を 1 つずつ原典で照合した"),
+            ("複雑性の大中小", "大中小は、{決め方}"), ("大中小の境", "{境}（既定は目安。実物の拠点で数えてから直す）"), ("差の大きさの境", "{差の境}（拠点ごとの大中小とは別の列）"),
+            ("拠点ごとの as-is", "{拠点の状態}。どれも原典照合を通した、拠点の業務フローの写し"),
+            ("確認事項", "{確認事項の数} 件（比較のもの。拠点ごとの as-is の確認事項は、拠点の確認事項一覧）"), ("作った日", "{日付}（この日のデータから書き出した）")]
 SPEC = {"sheets": HEADS, "repeat": REPEAT, "values": ["拠点", "基準", "行の数", "分類の数", "タスクの数", "共通", "差異あり", "拠点固有", "支持率", "決め方", "境",
                                                      "差の境", "拠点の状態", "確認事項の数", "日付"],
         "required": {T_TASK: ["No", "タスク", "区分", "拠点"], T_Q: ["番号", "質問"]}, "keys": {T_Q: ["番号"], T_TASK: ["No"]},
@@ -202,7 +202,7 @@ def sheets(cmp, mdl, results, qs):
                 out[T_DETAIL].append([C(x["no"]), C(res["name"]), C(x["name"]), C(mdl.names[s]), C(mk, font="mark", fill={"—": "none", "対象外": "none", "△": "mark"}.get(mk)),
                                       C("\n".join(m["label"] for m in mem) or "（記載なし）"), C("\n".join(dict.fromkeys(m["role"] for m in mem)) or "—"),
                                       C("・".join(dict.fromkeys(y for m in mem for y in m["systems"])) or "—"), C("・".join(dict.fromkeys(f for m in mem for f in m["files"])) or "—"),
-                                      C([(y, "src") for y in dict.fromkeys(z for m in mem for z in m["src"])] or "—"), C("推定" if any(m["inferred"] for m in mem) else ""),
+                                      C([("\n".join(dict.fromkeys(z for m in mem for z in m["src"])), "src")] if any(m["src"] for m in mem) else "—"), C("推定" if any(m["inferred"] for m in mem) else ""),
                                       C("粗" if s in x["grain"]["coarse"] else "詳" if s in x["grain"]["fine"] and x["grain"]["coarse"] else ""),
                                       C("\n".join(f"{d['kind']}: {d['text']}" for d in x["diffs"] if s in d["sites"]) or "—")])
         cls = [x["class"] for x in res["tasks"]]
@@ -281,8 +281,8 @@ def values(cmp, mdl, results, qs):
         pass
     w = cfg["weights"]
     border = "・".join(f"{lv['name']}: 点 {lv['max']} 以下" if lv["max"] is not None else f"{lv['name']}: それより上" for lv in cfg["levels"])
-    state = "・".join(f"{mdl.names[s]}（写し {(mdl.snaps.get(s) or {}).get('made', '—')[:10]}・asis の確認事項 {(mdl.snaps.get(s) or {}).get('questions', 0)} 件）" for s in mdl.order)
-    return {"拠点": "・".join(mdl.names[s] for s in mdl.order), "基準": mdl.names.get(mdl.baseline, "なし（拠点を横に並べて、同じ業務をそろえた）"),
+    state = "・".join(f"{mdl.names[s]}（{(mdl.snaps.get(s) or {}).get('made', '—')[:10]} 時点・拠点の確認事項 {(mdl.snaps.get(s) or {}).get('questions', 0)} 件）" for s in mdl.order)
+    return {"拠点": "・".join(mdl.names[s] for s in mdl.order), "基準": mdl.names.get(mdl.baseline, "なし"),
             "行の数": str(len(results)), "分類の数": str(len(mdl.axis.get("groups") or [])), "タスクの数": str(len(cls)),
             "共通": str(cls.count("共通")), "差異あり": str(cls.count("差異あり")), "拠点固有": str(cls.count("拠点固有")), "支持率": rate,
             "決め方": f"{'そろえた粒度' if cfg['basis'] == 'aligned' else '原典の粒度'}の、分岐 × {w['branch']} ＋ 受け渡し × {w['handoff']} の点数",

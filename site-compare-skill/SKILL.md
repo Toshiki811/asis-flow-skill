@@ -67,9 +67,9 @@ asis-flow-skill が要る（このスキルは asis の部品と検証器を使�
 2. **写し**: `python3 scripts/sc_collect.py -w <CMP>`。門の通らない拠点は写さない。拠点のフローをあとで直したら、asis の側で直して照合し直し、`--site <拠点>` で写し直す（番号の振り直しは機械が付け直す）。
 3. **用語の対応**（`references/terms-guide.md`）: `python3 scripts/sc_terms.py draft -w <CMP>` → 訳・言い換えで同じ担当・システム・帳票を、理由つきで 1 つの組にまとめる（名前は日本語）→ `sc_check.py --stage terms` を FAIL 0 に。
 4. **比べる行**（`references/axis-guide.md`）: `python3 scripts/sc_axis.py draft -w <CMP>` → ほかの拠点のフロー（箱の一部も）を行に当て、基準に無い業務は行を足す（捨てない）→ `sc_axis.py show` → `sc_check.py --stage axis` を FAIL 0 に → `sc_axis.py plan`（4 万字を超える行は子の行に分ける）。**利用者に、比べる行（業務分類 › 業務種別 × 拠点の当て方）を見せる（確認点①）。**
-5. **タスクの対応**（`references/match-guide.md`）: 行ごとに `sc_match.py draft`、1 行 1 体のサブエージェント（同時に 4〜6 体）に、拠点の箱をタスクにまとめさせる。そろったら `sc_check.py --stage rows` を FAIL 0 に。
+5. **タスクの対応**（`references/match-guide.md`）: 行ごとに `sc_match.py draft`、1 行 1 体のサブエージェント（同時に 4〜6 体）に、拠点の箱をタスクにまとめさせる（サブエージェントを起こせず、材料が小さいときは親が書いてよい）。粗い箱に含めるのは、その箱の文が名指ししている作業と、その間にある詳しい箱だけ（前後の端の作業は別のタスク。compare-rules 4.3）。そろったら `sc_check.py --stage rows` を FAIL 0 に。
 6. **計算**: `python3 scripts/sc_compute.py -w <CMP>`（`sc_run.py` が回す）→ `sc_check.py --stage compute`。
-7. **対応の照合**（`references/verify-prompt.md`）: `python3 scripts/sc_verify.py sheet -w <CMP>` → 照合シート 1 つにつき、作り方を伝えない別のエージェント 1 体 → `python3 scripts/sc_verify.py draft -w <CMP>` → 採否（採用／不採用／保留＋対応）を書き、採用分をタスクの対応・比べる行・用語の対応に反映して工程 6 から → 照合のあとに変わった主張は、点検が挙げるコマンドで差分照合 → `sc_check.py --stage verify` が FAIL 0（支持率 95% 以上）になるまで。
+7. **対応の照合**（`references/verify-prompt.md`）: `python3 scripts/sc_verify.py sheet -w <CMP>` → 照合シート 1 つにつき、作り方を伝えない別のエージェント 1 体 → `python3 scripts/sc_verify.py draft -w <CMP>` → 採否（採用／不採用／保留＋対応）を書き、採用分をタスクの対応・比べる行・用語の対応に反映して工程 6 から → 照合のあとに変わった主張は、点検が挙げるコマンドで差分照合 → `sc_check.py --stage verify` が FAIL 0（支持率 95% 以上）になるまで。同意しない指摘は、その主張だけを別の担当に照合し直させる（親が自分で照合しない。compare-rules 6.4）。サブエージェントを起こせない環境では、別のプロセスの Claude（`claude -p`）か、利用者の別のセッションで照合する（6.5）。
 8. **書き出しと点検**:
    ```bash
    python3 scripts/sc_book.py -w <CMP>                  # out/拠点比較.xlsx（確認事項一覧の回答は、いまのブックから取り込んで戻す）
@@ -77,7 +77,7 @@ asis-flow-skill が要る（このスキルは asis の部品と検証器を使�
    python3 scripts/sc_layout.py -w <CMP>                # 配置の点検 FAIL 0。PNG を out/png/ に（draw.io デスクトップが要る）
    python3 scripts/sc_check.py -w <CMP> --report <CMP>/out/チェック_比較.txt    # 全段 FAIL 0（表と図が、いまのデータのとおりか・納品物に内部の番号が出ていないかも見る）
    ```
-   **PNG を全ページ目で見る**（帯のそろい・空き枠・内訳の枠・色・字のはみ出し）。行が 10 を超えるときは、数ページずつ別のエージェントに見させて指摘だけを受け取る。**利用者に、拠点タスク一覧と複雑性ヒートマップを見せる（確認点②。大中小の境 `assets/sc_complexity.json` は既定が目安なので、実物で直す）。**
+   **PNG を全ページ目で見る**（帯のそろい・空き枠・内訳の枠・色・字のはみ出し）。draw.io デスクトップの無い環境では `sc_layout.py --preview` の下見で形だけを確かめ、PNG と目視は利用者の環境で。照合のあとに足したタスクで番号の順が並びと合わなくなったら、はじめて納品する前に限り `sc_compute.py --renumber`（7.6）。行が 10 を超えるときは、数ページずつ別のエージェントに見させて指摘だけを受け取る。**利用者に、拠点タスク一覧と複雑性ヒートマップを見せる（確認点②。大中小の境 `assets/sc_complexity.json` は既定が目安なので、実物で直す）。**
 9. **納品の門**: 出力先を利用者に聞き、`python3 scripts/sc_deliver.py -w <CMP> --to <出力先>`。門は書き出しと点検を回し直し（拠点の門も）、全段 FAIL 0・PNG がそろって新しい・照合済み、を確かめてから写す。利用者には次をまとめて渡す。
    - 写した 2 つのフォルダ
    - 数（`比較の数.md`。機械が書く）: 拠点・行・タスクの数、区分ごとの数（共通・差異あり・拠点固有）、記載なしの数、粒度をそろえたタスクの数、照合の支持率、確認事項の件数

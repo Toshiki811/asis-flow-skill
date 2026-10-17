@@ -35,9 +35,11 @@ def render(path, out_dir, scale=0.8):
     lay = json.loads(pathlib.Path(str(path).replace(".drawio", ".layout.json")).read_text(encoding="utf-8"))
     out = []
     for pi, dg in enumerate(tree.getroot().findall("diagram")):
-        cells = []
+        cells, elabel = [], {}
         root = dg.find("mxGraphModel/root")
         for el in root:
+            if el.tag == "mxCell" and el.get("edge") == "1" and el.get("value"):
+                elabel[el.get("id")] = text_of(el.get("value"))
             if el.tag == "object":
                 c = el.find("mxCell")
                 cells.append((el.get("id"), el.get("label"), c))
@@ -54,12 +56,15 @@ def render(path, out_dir, scale=0.8):
             geos.append((cid, val, c.get("style"), x, y, w, h))
         if not geos:
             continue
-        W = int(max(x + w for _, _, _, x, _, w, _ in geos) + 60)
-        H = int(max(y + h for _, _, _, _, y, _, h in geos) + 60)
+        ox = 20 - min(0, min(x for _, _, _, x, _, _, _ in geos))      # 上・左にはみ出した題も入るように、ずらす
+        oy = 20 - min(0, min(y for _, _, _, _, y, _, _ in geos))
+        W = int(max(x + w for _, _, _, x, _, w, _ in geos) + 60 + ox)
+        H = int(max(y + h for _, _, _, _, y, _, h in geos) + 60 + oy)
         img = Image.new("RGB", (int(W * scale), int(H * scale)), "white")
         d = ImageDraw.Draw(img)
         f = ImageFont.truetype(FONT, max(9, int(10 * scale))) if FONT else ImageFont.load_default()
         S = lambda v: v * scale
+        geos = [(cid, val, st, x + ox, y + oy, w, h) for cid, val, st, x, y, w, h in geos]
         for cid, val, st, x, y, w, h in geos:
             s = style_of(st)
             fill = s.get("fillColor", "#ffffff")
@@ -82,18 +87,23 @@ def render(path, out_dir, scale=0.8):
                     pass
             t = text_of(val)
             if t:
-                lines = t.split("\n")
+                per = max(4, int((w - 8) / 10.5))                         # 箱の幅で折り返す（字の幅は 10 ほどの目安）
+                lines = [ln[i:i + per] for ln in t.split("\n") for i in range(0, max(1, len(ln)), per)]
                 yy = S(y) + 3
-                for ln in lines[:8]:
-                    d.text((S(x) + 4, yy), ln[:40], fill=s.get("fontColor", "#000000") if s.get("fontColor", "").startswith("#") else "#000", font=f)
+                for ln in lines[:max(1, int((h - 4) / 13))]:
+                    d.text((S(x) + 4, yy), ln, fill=s.get("fontColor", "#000000") if s.get("fontColor", "").startswith("#") else "#000", font=f)
                     yy += 12 * scale + 2
         pg = lay["pages"][pi]
         for e in pg["edges"]:
-            pts = [(S(a), S(b)) for a, b in e["points"]]
+            pts = [(S(a + ox), S(b + oy)) for a, b in e["points"]]
             d.line(pts, fill="#333333", width=1)
             if len(pts) >= 2:
                 (x1, y1), (x2, y2) = pts[-2], pts[-1]
                 d.ellipse([x2 - 3, y2 - 3, x2 + 3, y2 + 3], fill="#333333")
+                lab = elabel.get(e.get("id"))
+                if lab:                                              # 分岐の線のラベル（ある／ない）を、最初の折れ目の近くに
+                    (ax, ay), (bx, by) = pts[0], pts[1]
+                    d.text(((ax + bx) / 2 + 3, (ay + by) / 2 - 12 * scale), lab[:12], fill="#1F4E79", font=f)
         p = pathlib.Path(out_dir) / f"{pathlib.Path(path).stem}_p{pi + 1:02d}.png"
         img.save(p)
         out.append(p)

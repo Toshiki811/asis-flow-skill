@@ -16,7 +16,10 @@
 
 3. `python3 scripts/sc_verify.py draft -w <CMP>` — 報告から採否表 `review/<行>.review.json` の下書き（判定と指摘は機械が写す）。親は、指摘ごとに `decision`（採用／不採用／保留）と `action`（直したこと・採らない理由）だけを書く。
 4. 採用した指摘を、タスクの対応（`rows/<行>.match.json`）・比べる行・用語の対応に反映し、`sc_compute.py` をやり直す。
+   同意しない指摘（不採用・保留）は、理由を `action` に書き、その主張だけを**別の担当**に差分照合させる（`sc_verify.py sheet --only <行> --claims <主張>` → 新しいエージェントに同じ指示文）。2 人目も支持しなければ、直すか、確認事項にして仮置きのほうに直す（`compare-rules.md` 6.4）。親が自分で照合し直さない。
 5. `python3 scripts/sc_check.py -w <CMP> --stage verify` を FAIL 0 に（支持率 95% 以上）。照合のあとに変わった主張は、点検が挙げるコマンドで差分照合する（`sc_verify.py sheet --only <行> --claims <主張>`）。
+
+サブエージェントを起こせない環境では、別のプロセスの Claude に回す（空のフォルダで `claude -p "<指示文>" --allowedTools Read Write --add-dir <CMP>/out --add-dir <CMP>/reports`。それもできなければ、利用者に別のセッションで回してもらう）。親が自分で照合すると、作った人の読みがそのまま「支持」になる。
 
 渡してよいもの: 照合シート。渡さないもの: `compare-rules.md`・このスキルの説明・タスクの対応の JSON・材料（渡すと、作った側と同じ読み方をしてしまう）。
 親は、照合シートを開かない（行が多いと文脈があふれる）。受け取るのは、照合の担当が書いたファイルだけ。

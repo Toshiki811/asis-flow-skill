@@ -554,7 +554,9 @@ CASES = [
      "英語が出ている（「Claim and approval」"),
     ("英語の文が図に出る（内容の差）", "outputs",
      seq(M("B03", lambda m: task(m, "t4")["content"][0].update(text="シンガポール拠点は records the payment in Oracle と書く")), rebuild), "図の文字に英語が出ている"),
-    ("図の箱が重なる", "outputs", overlap, "拠点比較フロー.drawio［B01 経費申請］"),
+    ("内容の差に行の ID", "outputs", seq(M("B03", lambda m: task(m, "t4")["content"][0].update(text="B03 の記帳は、東京支店は自動で、シンガポール拠点は経理が記録する")), rebuild),
+     "行の IDが出ている"),
+    ("図の箱が重なる", "outputs", overlap, "拠点比較フロー.drawio［経費申請］"),
 ]
 
 
@@ -690,7 +692,7 @@ def status_and_gate(base, root):
         shutil.copytree(d, e, ignore=shutil.ignore_patterns("e1", "e2"))
         overlap(e)
         rc, out = run("sc_layout.py", "-w", e, "--no-png")
-        say(rc == 1 and "［B01 経費申請］" in out, "配置: 箱が重なれば FAIL", tail(out))
+        say(rc == 1 and "［経費申請］" in out, "配置: 箱が重なれば FAIL", tail(out))
         shutil.rmtree(e)
         rc, out = run("sc_layout.py", "-w", d, env=fake_drawio(root, ok=False))
         say(rc == 1 and "PNG に書き出せない" in out, "配置: PNG に書き出せなければ FAIL", tail(out))

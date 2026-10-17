@@ -65,7 +65,7 @@ def main():
             why = "機械の仕事は済んだ。その結果を見て、LLM・人が書く番"
             break
         done.append(todo)
-        print(f"▶ {todo.split('    #', 1)[0].strip()}")
+        print(f"▶ {todo.split('    #', 1)[0].strip().replace(W, shlex.quote(str(cmp)))}")
         if a.dry_run:
             why = "--dry-run なので、ここまで（実行していない）"
             break
@@ -82,13 +82,14 @@ def main():
         why = f"{MAX_ROUNDS} 工程を回した。もう一度実行すると続きから進む"
     st = Status(cmp, fast=False)
     st.run()
+    here = shlex.quote(str(cmp))
     print(f"\n== 進み具合（{cmp.name}）==")
-    print("\n".join(st.rows))
+    print("\n".join(x.replace(W, here) for x in st.rows))
     if st.todo:
         print("\n次にやること:")
         for t in st.todo[:3]:
-            print("  " + t)
-    print(f"\n止めた理由: {why}")
+            print("  " + t.replace(W, here))
+    print(f"\n止めた理由: {why.replace(W, here)}")
 
 
 if __name__ == "__main__":

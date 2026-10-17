@@ -209,8 +209,8 @@ def main():
     names = [p["name"] for p in lay["pages"]]
     want = 1 + 3 * a.reps * 2 + 2 * 2
     say(len(names) == want, f"ページ: 1 ページ目＋行ごとに（6 拠点は基準と 3 拠点ずつで 2 ページ・タスク 25 超えはタスクの境で）= {want}", f"{len(names)}")
-    say(any("（1/2）" in x and "［2/2］" in x for x in names) and any(x.startswith(bid) and "（2/2）［1/2］" in x for x in names),
-        "ページ: 拠点の分け方と、タスクの境の分け方の名前", f"{[x for x in names if x.startswith(bid)]}")
+    say(any("（1/2）" in x and "［2/2］" in x for x in names) and "経費精算のまとめ（2/2）［1/2］" in names and not any(re.search(r"\bB\d\d", x) for x in names),
+        "ページ: 拠点の分け方と、タスクの境の分け方の名前（行の ID は出さない）", f"{[x for x in names if x.startswith('経費精算のまとめ')]}")
     per = {}
     for p in lay["pages"]:
         if p["id"].startswith("row-"):

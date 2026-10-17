@@ -190,7 +190,7 @@ def page_data(mdl, rid, res, sids, tasks, X):
     names = mdl.names
     fl = {"flow_id": rid, "name": res["name"], "lanes": [], "nodes": [], "edges": []}
     meta = {"X": X, "node": {}, "blocks": [], "frames": [], "band_rows": {}, "task_lane": 0,
-            "title": f"{rid}　{res['name']}（拠点比較）　" + "・".join(names[s] for s in sids)}
+            "title": f"{res.get('label') or res['name']}（拠点比較）　" + "・".join(names[s] for s in sids)}
     fl["lanes"].append({"id": "TASK", "name": "タスク", "kind": "role"})
     roles = lane_order(mdl, rid, sids)
     lane_of = {}
@@ -332,7 +332,7 @@ def row_pages(mdl, rid, res, X, S, ctx):
             sub = dict(res, tasks=[x for x in res["tasks"] if x["id"] in ids])
             fl, rows, meta = page_data(mdl, rid, sub, ss, tasks, X)
             suffix = ("" if len(groups) == 1 else f"-s{gi + 1}") + ("" if len(chunks) == 1 else f"-t{ci + 1}")
-            name = f"{rid} {res['name']}" + (f"（{gi + 1}/{len(groups)}）" if len(groups) > 1 else "") + (f"［{ci + 1}/{len(chunks)}］" if len(chunks) > 1 else "")
+            name = (res.get("label") or res["name"]) + (f"（{gi + 1}/{len(groups)}）" if len(groups) > 1 else "") + (f"［{ci + 1}/{len(chunks)}］" if len(chunks) > 1 else "")
             page = None
             for width in (X["lane"]["width"], S["lane"]["width"], S["lane"]["width"] + 80):
                 S2 = copy.deepcopy(S)
@@ -388,6 +388,18 @@ def overview_page(mdl, results, X, S):
     return page
 
 
+def page_labels(results):
+    """行ごとのページの名前: 業務種別の名前。同じ名前の行があれば「業務分類 › 業務種別」、それでも重なれば番号を足す"""
+    names = [r["name"] for r in results]
+    out = [f"{r.get('group_name')} › {r['name']}" if names.count(r["name"]) > 1 and r.get("group_name") else r["name"] for r in results]
+    seen = {}
+    for i, x in enumerate(out):
+        seen[x] = seen.get(x, 0) + 1
+        if out.count(x) > 1:
+            out[i] = f"{x}（{seen[x]}）"
+    return out
+
+
 def build(cmp, write=True):
     """書き出す（write=False は、点検が作り直して比べるとき。ファイルを書かない）→ (道, ページの数, 配置の点検に当たるページ, 図の文字)"""
     mdl = Model(cmp, sites_of(cmp))
@@ -402,7 +414,8 @@ def build(cmp, write=True):
     if not results:
         sys.exit("計算の結果が無い（python3 scripts/sc_compute.py を先に）")
     pages, problems = [overview_page(mdl, results, X, S)], []
-    for res in results:
+    for res, label in zip(results, page_labels(results)):
+        res["label"] = label                                         # ページの名前（納品物に出る。行の ID は出さない）
         ps, bad = row_pages(mdl, res["row"], res, X, S, ctx)
         pages += ps
         problems += bad

@@ -3,6 +3,7 @@
 
   python3 scripts/sc_compute.py -w <比較の作業フォルダ>              # 全部の行（タスクの対応 rows/<行>.match.json のある行）
   python3 scripts/sc_compute.py -w <比較の作業フォルダ> --row B03
+  python3 scripts/sc_compute.py -w <比較の作業フォルダ> --renumber   # タスクの番号を並びの順に振り直す（はじめて納品する前だけ。照合はやり直さなくてよい）
 
 書くもの: rows/<行>.result.json（手で直さない）・numbers.json（タスクの通し番号 T-001。行とタスクの ID で引き継ぐ）。
 決め方（references/compare-rules.md の 3 章）:
@@ -415,11 +416,19 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("-w", "--work", required=True)
     ap.add_argument("--row")
+    ap.add_argument("--renumber", action="store_true", help="タスクの番号を、いまの並びの順に振り直す（はじめて納品する前だけ）")
     a = ap.parse_args()
     cmp = work_dir(a.work)
     mdl = Model(cmp, sites_of(cmp))
     cfg = config()
     nb = numbers(cmp, mdl)
+    if a.renumber:
+        if (cmp / "out" / "比較の数.json").exists():
+            sys.exit("納品の門を通ったあとは、タスクの番号を振り直さない（お客様とのやり取り・確認事項の回答が、番号で指している）")
+        if a.row:
+            sys.exit("--renumber は、全部の行をまとめて振り直す（--row と一緒に使わない）")
+        nb.update(next=1, assigned={})
+        print("タスクの番号を、いまの並び（行の順・行の中のタスクの順）で振り直す")
     todo = [a.row] if a.row else [r["id"] for r in mdl.rows()]
     done = 0
     for rid in todo:

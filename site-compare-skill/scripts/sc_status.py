@@ -9,11 +9,12 @@
 次に打つコマンドのうち「python3 scripts/sc_…」で始まるものは機械の工程（sc_run.py が順に回す）。「#」で始まるものは LLM・人の仕事。
 """
 import argparse
+import shlex
 import re
 import subprocess
 import sys
 
-from sc_common import ASIS_SCRIPTS, A, Report, load, match_path, shared_work, site_names, site_work, sites_of, snap_path, try_load, work_dir
+from sc_common import ASIS_SCRIPTS, FIG, A, Report, load, match_path, shared_work, site_names, site_work, sites_of, snap_path, try_load, work_dir
 from sc_validate import validate
 
 W = "<比較の作業フォルダ>"
@@ -97,12 +98,14 @@ class Status:
         ap, err = try_load(self.cmp / "applies.json")
         n, first = stage_fails(self.cx, "applies") if ap is not None else (0, "")
         if ap is None:
-            self.row("1b", "書き分け", "未", "applies.json が無い")
+            early = any(any((site_work(self.cmp, self.sites, s) / "flows").glob("*.flow.json")) for s in self.cx.ids)
+            self.row("1b", "書き分け", "未", "applies.json が無い" + ("（拠点のフローが先にある。書き分けを決めたら、点検 --stage applies がフローと突き合わせる。"
+                                                                 "合わない拠点は、asis の側でフローを直す）" if early else ""))
             self.add(f"python3 scripts/sc_applies.py draft -w {W}    # 共通の資料の書き分けの候補",
                      "# applies.json の未定の項目に、当てはまる拠点を書く（references/site-guide.md の 1b）")
             return
         left = sum(1 for it in ap.get("items") or [] if it.get("scope") == "未定")
-        self.row("1b", "書き分け", "要直し" if n else "済み", f"項目 {len(ap.get('items') or [])}・未定 {left}" + (f"・点検 {n} FAIL（{first[:50]}）" if n else ""))
+        self.row("1b", "書き分け", "要直し" if n else "済み", f"項目 {len(ap.get('items') or [])}・未定 {left}" + (f"・点検 {n} FAIL（{first[:120]}）" if n else ""))
         if n:
             self.add("# applies.json を直す・拠点のフローの外す直しを直す（python3 scripts/sc_check.py -w <比較の作業フォルダ> --stage applies の FAIL を見る）")
 
@@ -142,7 +145,7 @@ class Status:
     def snapshot(self):
         n, first = stage_fails(self.cx, "snapshot")
         have = sum(1 for sid in self.cx.ids if snap_path(self.cmp, sid).exists())
-        self.row("2", "写し", "要直し" if n else "済み", f"写し {have}/{len(self.cx.ids)}" + (f"・{first[:60]}" if n else ""))
+        self.row("2", "写し", "要直し" if n else "済み", f"写し {have}/{len(self.cx.ids)}" + (f"・{first[:120]}" if n else ""))
         if n:
             self.add(f"python3 scripts/sc_collect.py -w {W}    # 拠点の写しを取る（取り直す）")
             self.blocked = True
@@ -155,7 +158,7 @@ class Status:
                      "# terms.json: 訳・言い換えで同じ用語を、理由つきでまとめ、担当・帳票の組の名前を日本語に（references/terms-guide.md）")
             self.blocked = True
             return
-        self.row("3", "用語の対応", "要直し" if n else "済み", f"組 {len((try_load(self.cmp / 'terms.json')[0] or {}).get('groups') or [])}" + (f"・点検 {n} FAIL（{first[:50]}）" if n else ""))
+        self.row("3", "用語の対応", "要直し" if n else "済み", f"組 {len((try_load(self.cmp / 'terms.json')[0] or {}).get('groups') or [])}" + (f"・点検 {n} FAIL（{first[:120]}）" if n else ""))
         if n:
             self.add("# terms.json を直す（python3 scripts/sc_check.py -w <比較の作業フォルダ> --stage terms）")
             self.blocked = True
@@ -169,7 +172,7 @@ class Status:
             self.blocked = True
             return
         ax = try_load(self.cmp / "axis.json")[0] or {}
-        self.row("4", "業務種別", "要直し" if n else "済み", f"行 {len(ax.get('rows') or [])}" + (f"・点検 {n} FAIL（{first[:50]}）" if n else ""))
+        self.row("4", "業務種別", "要直し" if n else "済み", f"行 {len(ax.get('rows') or [])}" + (f"・点検 {n} FAIL（{first[:120]}）" if n else ""))
         if n:
             self.add("# axis.json を直す（python3 scripts/sc_check.py -w <比較の作業フォルダ> --stage axis。まだ当てていないフローは sc_axis.py show）")
             self.blocked = True
@@ -181,7 +184,7 @@ class Status:
         miss = [r for r in rows if not match_path(self.cmp, r).exists()]
         n, first = stage_fails(self.cx, "rows")
         self.row("5", "タスク", "未" if len(miss) == len(rows) else "途中" if miss else "要直し" if n else "済み",
-                 f"行 {len(rows) - len(miss)}/{len(rows)}" + (f"・点検 {n} FAIL（{first[:50]}）" if n and not miss else ""))
+                 f"行 {len(rows) - len(miss)}/{len(rows)}" + (f"・点検 {n} FAIL（{first[:120]}）" if n and not miss else ""))
         if miss:
             self.add(*[f"python3 scripts/sc_match.py draft -w {W} --row {r}" for r in miss[:3]],
                      f"# 行ごとにサブエージェントでタスクの対応を書く（references/match-guide.md）: {', '.join(miss[:8])}{' ほか' if len(miss) > 8 else ''}")
@@ -192,7 +195,7 @@ class Status:
 
     def compute(self):
         n, first = stage_fails(self.cx, "compute")
-        self.row("6", "計算", "作り直し" if n else "済み", first[:70] if n else f"行 {len(self.mdl.rows())}")
+        self.row("6", "計算", "作り直し" if n else "済み", first[:120] if n else f"行 {len(self.mdl.rows())}")
         if n:
             self.add(f"python3 scripts/sc_compute.py -w {W}    # 並び・区分・差・複雑性・依頼を計算する")
             self.blocked = True
@@ -200,7 +203,7 @@ class Status:
     def verify(self):
         n, first = stage_fails(self.cx, "verify")
         has = (self.cmp / "review" / "versions.json").exists()
-        self.row("7", "照合", "未" if not has else "要直し" if n else "済み", first[:80] if n else "支持率 95% 以上")
+        self.row("7", "照合", "未" if not has else "要直し" if n else "済み", first[:120] if n else "支持率 95% 以上")
         if n:
             if "対応の照合をしていない" in first:
                 self.add(f"python3 scripts/sc_verify.py sheet -w {W}    # 対応の照合シート（行ごと）",
@@ -210,9 +213,15 @@ class Status:
 
     def outputs(self):
         n, first = stage_fails(self.cx, "outputs")
-        self.row("8", "書き出し", "作り直し" if n else "済み", first[:80] if n else "拠点比較.xlsx・拠点比較フロー.drawio")
+        from sc_deliver import pngs
+        fig = self.cmp / "out" / FIG
+        lack = [x for x, _name in pngs(self.cmp) if not x.exists() or (fig.exists() and x.stat().st_mtime < fig.stat().st_mtime)]
+        self.row("8", "書き出し", "作り直し" if n else "済み", first[:120] if n else "拠点比較.xlsx・拠点比較フロー.drawio"
+                 + (f"・PNG の無い・古いページ {len(lack)}（全ページを目で見るのは、まだ）" if lack else ""))
         if n:
             self.add(f"python3 scripts/sc_book.py -w {W} && python3 scripts/sc_drawio.py -w {W} && python3 scripts/sc_layout.py -w {W}    # 書き出しと配置の点検・PNG")
+        elif lack:
+            self.add(f"# PNG を書き出して、全ページを目で見る: python3 scripts/sc_layout.py -w {W}（draw.io デスクトップが要る。無い環境の下見は --preview）")
 
     def gate(self):
         done = (self.cmp / "out" / "比較の数.md").exists()
@@ -229,11 +238,12 @@ def main():
     cmp = work_dir(a.work)
     st = Status(cmp, a.fast)
     st.run()
+    here = shlex.quote(str(cmp))                                     # 打てるように、作業フォルダの道をそのまま入れる
     print(f"== 進み具合（{cmp.name}）==")
-    print("\n".join(st.rows))
+    print("\n".join(x.replace(W, here) for x in st.rows))
     print("\n次にすること:")
     for t in st.todo[:5]:
-        print(f"  {t}")
+        print(f"  {t.replace(W, here)}")
 
 
 if __name__ == "__main__":
