@@ -5726,15 +5726,27 @@ def size_tests(tmp, good):
     f["nodes"] = f["nodes"][:1] + new + f["nodes"][1:]
     fp.write_text(json.dumps(f, ensure_ascii=False, indent=1), encoding="utf-8")
     n = sum(x["type"] in STEP_TYPES for x in f["nodes"])
-    _c1, o1 = run("check_flow.py", w, "--stage", "flow")
+    c1, o1 = run("check_flow.py", w, "--stage", "flow")
+    _c, o1b = run("check_flow.py", w, "--stage", "flow", "--only", "F01")
+    edge = tmp / "size25"                                            # 境目: ちょうど 25 ステップなら、INFO も出ない
+    shutil.copytree(w, edge)
+    g = json.loads(fp.read_text(encoding="utf-8"))
+    cut = [f"P-1{k:02d}" for k in range(15, 22)]                     # 足した箱の終わりの 7 つを外して、32 → 25
+    g["nodes"] = [x for x in g["nodes"] if x["id"] not in cut]
+    g["edges"] = [e for e in g["edges"] if e["from"] not in cut and e["to"] not in cut] + [{"from": "P-114", "to": "P-001"}]
+    (edge / "flows" / "F02.flow.json").write_text(json.dumps(g, ensure_ascii=False, indent=1), encoding="utf-8")
+    c5, o5 = run("check_flow.py", edge, "--stage", "flow")
     c2, _o2 = run("build_drawio.py", w)
     lay = json.loads((w / "out" / "業務フロー_as-is.layout.json").read_text(encoding="utf-8")) if c2 == 0 else {"pages": []}
     c3, o3 = run("check_flow.py", w, "--stage", "drawio")
     c4, o4 = run("check_layout.py", w, "--no-png")
     mine = [x for x in o1.splitlines() if x.startswith(("INFO  F02:", "WARN  F02:")) and "ステップが" in x]
-    return [("25 ステップを超えるフロー: 大きさだけでは下位フローに分けよ、と言わない。INFO で知らせるだけ（決まり 2.10）",
-             n == 32 and mine == [f"INFO  F02: ステップが {n} 個（1 ページの目安 25 個を超える）。大きさだけでは分けない。"
-                                  "節・項ごとに、きっかけが別の手続きが並んでいれば、下位フローに分ける（決まり 2.10）"]),
+    split = [x for x in o1.splitlines() if x.startswith(("FAIL", "WARN")) and "分け" in x]   # ほかの文で、分けよと言っていない
+    return [("25 ステップを超えるフロー: 大きさだけでは下位フローに分けよ、と言わない。INFO で知らせるだけ（決まり 2.10）。"
+             "ちょうど 25 ステップなら INFO も出ない。--only でほかのフローを見るときは出ない",
+             n == 32 and c1 == 0 and not split and mine == [f"INFO  F02: ステップが {n} 個（1 ページの目安 25 個を超える）。大きさだけでは分けない。"
+                                                          "節・項ごとに、きっかけが別の手続きが並んでいれば、下位フローに分ける（決まり 2.10）"]
+             and "F02: ステップが" not in o1b and c5 == 0 and "ステップが" not in o5 and "FAIL  F02" not in o5),
             ("25 ステップを超えるフロー: 図は分けずに 1 枚に描き、図の点検・配置の点検が通る",
              c2 == 0 and [pg["id"] for pg in lay["pages"] if "F02" in pg["id"]] == ["flow-F02"] and c3 == 0 and "0 FAIL" in o3 and c4 == 0 and "0 FAIL" in o4)]
 

@@ -854,6 +854,7 @@ class FlowChecks:
             other = lambda ln: any(re.match(rf"{re.escape(x)}[ :]", ln) for x in self.flow_ids | set(self.cats))
             rp.fails[:] = [x for x in rp.fails if mine(x) or not other(x)]
             rp.warns[:] = [x for x in rp.warns if mine(x) or not other(x)]
+            rp.infos[:] = [x for x in rp.infos if mine(x) or not other(x)]
 
     # ---- フロー1本 ----
 

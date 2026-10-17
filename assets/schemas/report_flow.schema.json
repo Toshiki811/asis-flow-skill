@@ -10,7 +10,7 @@
   "nodes": {"type": "integer", "minimum": 0, "description": "ノードの数"},
   "inferred": {"type": "integer", "minimum": 0, "description": "推定で置いた数"},
   "questions_high": {"type": "array", "items": {"type": "string"}, "description": "重要度 高 の確認事項の問い（1件1行）"},
-  "for_parent": {"type": "array", "items": {"type": "string"}, "description": "親に決めてほしいこと（担当名の食い違い・続き先・用語の正本に無い名前）。1件1行"},
+  "for_parent": {"type": "array", "items": {"type": "string"}, "description": "親に決めてほしいこと（担当名の食い違い・続き先・用語の正本に無い名前・下位フローに分ける切れ目（flow-rules 2.10））。1件1行"},
   "split_proposal": {
    "type": "array",
    "description": "分割案（`split_needed` のとき）。原典の節・項の切れ目で分ける",
