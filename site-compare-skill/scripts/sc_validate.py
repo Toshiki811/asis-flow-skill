@@ -40,8 +40,8 @@ def kind_name(kind):
 
 
 def validate(data, kind):
-    """違反の一覧（文字列）。無ければ空"""
-    return V.validate(data, kind_name(kind))
+    """違反の一覧（文字列）。無ければ空（answers.json は asis と同じ形）"""
+    return V.validate(data, "answers" if kind == "answers" else kind_name(kind))
 
 
 def validate_file(path, kind):
@@ -59,7 +59,7 @@ def files_of(cmp, kind):
 
 
 def render_doc(text):
-    for kind in ["common"] + KINDS:
+    for kind in ["common"] + [k for k in KINDS if k != "answers"]:
         name = kind_name(kind)
         pat = re.compile(rf"<!-- BEGIN schema:{name}（.*?<!-- END schema:{name} -->", re.S)
         if not pat.search(text):

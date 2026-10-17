@@ -18,6 +18,10 @@
 [rows]      タスクの対応（rows/<行>.match.json）: 行ごとにある・拠点の欄・箱がその行の作業の箱・箱がちょうど 1 つのタスクに入る・名前は日本語の動詞で終える・
             粒度の決まり（どの拠点も 2 つ以上の箱なら joined に理由）・記載なしは機械の候補を全部確かめる・内容の差の拠点と根拠の箱
 [compute]   計算の結果（rows/<行>.result.json）が、いまのデータから計算し直したものと同じ（違えば sc_compute.py）
+[verify]    対応の照合: 行ごとに採否表がある・採否表が報告の写しのまま・どの主張も、いまの中身で照合済み（照合のあとに変わった主張は差分照合）・
+            指摘に採否がある・採用した指摘を反映した・支持率（支持 ÷ いまの主張の数）が 95% 以上
+[outputs]   納品物: 拠点比較.xlsx と拠点比較フロー.drawio が、いまのデータから作り直したものと同じ（違えば書き出し直す）・配置の点検（重なり・貫通）・
+            納品物の文字に、箱の鍵（F03:P-001）・資料 ID（M01）・決まっていない用語（? の付いた名前）が無い・拠点の列の名前・タスクとレーンの名前が日本語
 """
 import argparse
 import pathlib
@@ -28,7 +32,7 @@ from sc_common import (OTHER_SITE, STEP_TYPES, SWITCH_WORDS, A, Report, ends_wit
                        shared_work, site_ids, site_names, site_work, sites_of, snap_path, split_key, try_load, work_dir)
 from sc_validate import validate
 
-STAGES = ["sites", "applies", "snapshot", "terms", "axis", "rows", "compute"]
+STAGES = ["sites", "applies", "snapshot", "terms", "axis", "rows", "compute", "verify", "outputs"]
 
 
 class Ctx:
@@ -576,8 +580,148 @@ def check_compute(cx, rp):
             rp.fail(f"rows/{rid}.result.json が、いまのデータと違う（手で直した・計算し直していない。python3 scripts/sc_compute.py -w <比較の作業フォルダ>）")
 
 
+# ---------- [verify] ----------
+
+def check_verify(cx, rp):
+    import sc_verify
+    from sc_common import REVIEW_MIN
+    mdl = model(cx)
+    vs = sc_verify.versions(cx.cmp)
+    shown = {v["id"]: v for v in vs["versions"]}
+    total = ok = 0
+    for r in mdl.rows():
+        rid = r["id"]
+        if not mdl.match(rid):
+            continue
+        cur = sc_verify.claims(mdl, rid)
+        rv, err = try_load(cx.cmp / "review" / f"{rid}.review.json")
+        if err or rv is None:
+            rp.fail(f"{rid}: 対応の照合をしていない（python3 scripts/sc_verify.py sheet → 作り方を知らない別のエージェントに照合させる → sc_verify.py draft。references/verify-prompt.md）")
+            total += len(cur)
+            continue
+        if not shape(rp, rv, "review", f"review/{rid}.review.json"):
+            continue
+        reps = [try_load(p)[0] for p in sc_verify.reports_of(cx.cmp, rid)]
+        reps = [d for d in reps if isinstance(d, dict) and d.get("sheet") in shown]
+        reps.sort(key=lambda d: list(shown).index(d["sheet"]))
+        want = {}
+        for d in reps:
+            for v in d.get("verdicts") or []:
+                want[v.get("claim")] = (v.get("verdict"), v.get("evidence"), d["sheet"])
+        got = {v["claim"]: (v["verdict"], v["evidence"], v["sheet"]) for v in rv["verdicts"]}
+        wf = [(d["sheet"], f.get("kind"), f.get("target"), f.get("text")) for d in reps for f in d.get("findings") or []]
+        gf = [(f["sheet"], f["kind"], f["target"], f["text"]) for f in rv["findings"]]
+        if got != want or wf != gf:
+            rp.fail(f"review/{rid}.review.json: 判定・指摘が、照合の報告と違う（手で直さない。python3 scripts/sc_verify.py draft --only {rid}。親が書くのは採否と対応だけ）")
+        stale = []
+        for c, (mark, _b) in cur.items():
+            total += 1
+            v = got.get(c)
+            if v is None:
+                stale.append(c)
+                continue
+            if shown.get(v[2], {}).get("claims", {}).get(c) != mark:
+                stale.append(c)
+                continue
+            ok += v[0] == "支持"
+        if stale:
+            rp.fail(f"{rid}: 照合していない・照合したあとに変わった主張 {len(stale)}（{', '.join(stale[:6])}）。その主張だけを照合し直す: "
+                    f"python3 scripts/sc_verify.py sheet -w <比較の作業フォルダ> --only {rid} --claims {','.join(stale)}")
+        for f in rv["findings"]:
+            if not f["decision"]:
+                rp.fail(f"review/{rid}.review.json {f['id']}: 指摘「{f['text'][:24]}」に採否（decision）と対応（action）が無い")
+            elif f["decision"] == "採用":
+                targets = [c for c in cur if c == f["target"] or c.split("/")[0] == f["target"]]
+                then = shown.get(f["sheet"], {}).get("claims", {})
+                if targets and all(then.get(c) == cur[c][0] for c in targets):
+                    rp.fail(f"review/{rid}.review.json {f['id']}: 採用した指摘「{f['text'][:24]}」を、まだ反映していない（主張の中身が、指摘を受けたシートのときのまま）")
+            if f["decision"] and not f["action"].strip():
+                rp.fail(f"review/{rid}.review.json {f['id']}: 対応・理由（action）が無い")
+    if total:
+        rate = ok / total
+        rp.info(f"対応の照合の支持率 {rate:.0%}（支持 {ok} ÷ いまの主張 {total}）")
+        if rate < REVIEW_MIN:
+            rp.fail(f"対応の照合の支持率が {rate:.0%}（{REVIEW_MIN:.0%} 未満）。不支持・一部支持の多い行のタスクを直して、照合し直す")
+
+
+# ---------- [outputs] ----------
+
+LEAK = [(re.compile(r"F[0-9]+(?:-[0-9]+)*:(?:P|D|S|F|SUB)-[0-9]{3}"), "箱の鍵"), (re.compile(r"(?<![A-Za-z0-9])M[0-9]{2,}(?![A-Za-z0-9])"), "資料 ID"),
+        (re.compile(r"(?<![A-Za-z0-9])\?[^\s　]"), "決まっていない用語（用語の組に無い名前）")]
+
+
+def check_outputs(cx, rp):
+    import json
+    import sc_book
+    import sc_drawio
+    from sc_common import BOOK, FIG
+    mdl = model(cx)
+    results = [r for r in (try_load(result_path(cx.cmp, x["id"]))[0] for x in mdl.rows()) if isinstance(r, dict)]
+    if not results:
+        return
+    book, fig = cx.cmp / "out" / BOOK, cx.cmp / "out" / FIG
+    if not book.exists():
+        rp.fail(f"{BOOK} が無い（python3 scripts/sc_book.py -w <比較の作業フォルダ>）")
+    else:
+        mp = sc_book.mark_path(book)
+        qs = sc_book.questions(cx.cmp, mdl, write=False)
+        if not mp.exists() or mp.read_text(encoding="utf-8").strip() != sc_book.book_mark(results, qs):
+            rp.fail(f"{BOOK} が、いまのデータと違う（計算し直した・確認事項が変わった。python3 scripts/sc_book.py -w <比較の作業フォルダ> で書き出し直す。手で直さない）")
+        scan_book(cx, rp, book)
+    if not fig.exists():
+        rp.fail(f"{FIG} が無い（python3 scripts/sc_drawio.py -w <比較の作業フォルダ>）")
+        return
+    _out, _n, problems, text = sc_drawio.build(cx.cmp, write=False)
+    if text != fig.read_text(encoding="utf-8"):
+        rp.fail(f"{FIG} が、いまのデータと違う（python3 scripts/sc_drawio.py -w <比較の作業フォルダ> で書き出し直す。図を手で直さない）")
+    for name, bad in problems:
+        rp.fail(f"{FIG}［{name}］: 配置の点検に当たる（{bad[0]}）。タスクを分ける・行を子の行に分けるなどで、箱の数を減らす")
+    lay = load(fig.with_suffix(".layout.json"), None)
+    from check_layout import page_problems
+    for pg in (lay or {}).get("pages") or []:
+        found = page_problems(pg)
+        for kind, msg in found:
+            if kind == "fail":
+                rp.fail(f"{FIG}［{pg['name']}］: {msg}", at=found.gi_frame.f_lineno)
+    import xml.etree.ElementTree as ET
+    labels = []
+    for el in ET.fromstring(text).iter():
+        v = el.get("value") if el.tag == "mxCell" else el.get("label") if el.tag == "object" else None
+        if v:
+            labels.append(re.sub(r"<[^>]+>", "", v))
+        if el.tag == "object" and el.get("tooltip"):
+            labels.append(el.get("tooltip"))
+    for v in labels:
+        for pat, what in LEAK:
+            if pat.search(v):
+                rp.fail(f"{FIG}: 図の文字に{what}が出ている（「{v[:30]}」）")
+                break
+
+
+def scan_book(cx, rp, book):
+    try:
+        import openpyxl
+    except ImportError:
+        return
+    wb = openpyxl.load_workbook(book)
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for c in row:
+                v = c.value
+                if v is None:
+                    continue
+                v = str(v)
+                for pat, what in LEAK:
+                    if pat.search(v):
+                        rp.fail(f"{BOOK_NAME}「{ws.title}」{c.coordinate}: {what}が出ている（「{v[:30]}」）")
+                        break
+
+
+BOOK_NAME = "拠点比較.xlsx"
+
+
 CHECKS = {"sites": check_sites, "applies": check_applies, "snapshot": check_snapshot, "terms": check_terms, "axis": check_axis, "rows": check_rows,
-          "compute": check_compute}
+          "compute": check_compute, "verify": check_verify, "outputs": check_outputs}
 
 
 def main():

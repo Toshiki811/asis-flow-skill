@@ -1,0 +1,18 @@
+{
+ "title": "対応の照合の採否表",
+ "file": "review/<行>.review.json",
+ "description": "sc_verify.py draft が、照合の報告から機械で下書きする（判定と指摘は機械が写す）。親は、指摘ごとの decision（採用／不採用／保留）と action（対応か、採らない理由）だけを書く",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["row", "verdicts", "findings"],
+ "properties": {
+  "row": {"$ref": "sc_common#/$defs/row_id"},
+  "verdicts": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["claim", "verdict", "evidence", "sheet"], "properties": {
+   "claim": {"type": "string"}, "verdict": {"enum": ["支持", "一部支持", "不支持"]}, "evidence": {"type": "string"}, "sheet": {"$ref": "sc_common#/$defs/version_id"}}},
+   "description": "主張ごとの、いちばん新しい判定（機械が写す）"},
+  "findings": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "sheet", "kind", "target", "text", "decision", "action"], "properties": {
+   "id": {"type": "string", "pattern": "^f[0-9]+$"}, "sheet": {"$ref": "sc_common#/$defs/version_id"}, "kind": {"type": "string"}, "target": {"type": "string"}, "text": {"type": "string"},
+   "decision": {"enum": ["", "採用", "不採用", "保留"], "description": "親が書く。空のうちは点検が FAIL"},
+   "action": {"type": "string", "description": "親が書く: 採用は直したこと、不採用・保留は理由"}}}}
+ }
+}

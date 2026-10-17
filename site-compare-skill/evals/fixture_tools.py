@@ -71,12 +71,31 @@ def build_sites(cmp, inp):
         mark_reviewed(w)
 
 
+def fake_verify(cmp, rows=None):
+    """対応の照合を済ませる（試験だけの手順: シートを作り、全部「支持」の報告を書き、採否表を作る。実際は、作り方を知らない別のエージェントが照合する）"""
+    run("sc_verify.py", "sheet", "-w", cmp, *(["--only", ",".join(rows)] if rows else []))
+    vs = json.loads((cmp / "review" / "versions.json").read_text(encoding="utf-8"))
+    last = {}
+    for v in vs["versions"]:
+        last[v["row"]] = v
+    (cmp / "reports").mkdir(exist_ok=True)
+    for rid, v in last.items():
+        if rows and rid not in rows:
+            continue
+        rep = {"sheet": v["id"], "row": rid, "verdicts": [{"claim": c, "verdict": "支持", "evidence": "原典のとおり"} for c in v["claims"]], "findings": []}
+        (cmp / "reports" / f"verify_{rid}.json").write_text(json.dumps(rep, ensure_ascii=False), encoding="utf-8")
+    run("sc_verify.py", "draft", "-w", cmp)
+
+
 def build_compare(cmp):
     for name in ("applies.json", "terms.json", "axis.json"):
         if (FX / name).exists():
             shutil.copy2(FX / name, cmp / name)
     if (FX / "rows").exists():
         shutil.copytree(FX / "rows", cmp / "rows", dirs_exist_ok=True)
+    run("sc_collect.py", "-w", cmp)
+    run("sc_compute.py", "-w", cmp)
+    fake_verify(cmp)
 
 
 def main():

@@ -379,7 +379,12 @@ def compute_row(mdl, rid, cfg, nb):
                                   + ("（一部の箱）" if isinstance(p.get("nodes"), list) else ""))
         if sid in graphs:
             nodes, edges, _r = graphs[sid]
-            entry["complexity"] = complexity(mdl, sid, nodes, edges, mdl.task_of(rid, sid), cfg)
+            tof = mdl.task_of(rid, sid)
+            entry["complexity"] = complexity(mdl, sid, nodes, edges, tof, cfg)
+            no = {x["id"]: x["no"] for x in res}
+            for it in entry["complexity"]["counted"]:                # 箱の鍵は納品物に出さない: タスクの番号で書く
+                ends = it.pop("at").split("→")
+                it["where"] = " → ".join(no.get(tof.get(k), "—") for k in ends)
         sites[sid] = entry
     basis = cfg["basis"]
     ref = mdl.baseline if (sites.get(mdl.baseline) or {}).get("complexity") else None
