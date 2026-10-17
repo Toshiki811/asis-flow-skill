@@ -163,7 +163,11 @@ def is_jp(text):
 
 
 def bigrams(text):
-    t = re.sub(r"\s+", "", norm(str(text or "")))
+    """似ている度合いを見る字の組: 日本語は、かな（助詞・送りがな）と記号を除いた字の 2 字ずつ。日本語の字の無い文は、語（小文字）"""
+    t = norm(str(text or ""))
+    if not is_jp(t):
+        return {w for w in re.findall(r"[a-z0-9]+", t.lower()) if len(w) > 2}
+    t = re.sub(r"[\sぁ-ゖ、。，．・（）()「」『』:：/／\-ー]+", "", t)
     return {t[i:i + 2] for i in range(len(t) - 1)} or ({t} if t else set())
 
 

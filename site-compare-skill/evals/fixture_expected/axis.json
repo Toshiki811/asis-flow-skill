@@ -1,0 +1,169 @@
+{
+ "mode": "baseline",
+ "groups": [
+  {
+   "id": "G01",
+   "name": "経費精算",
+   "name_from": null
+  }
+ ],
+ "rows": [
+  {
+   "id": "B01",
+   "group": "G01",
+   "parent": null,
+   "name": "経費申請",
+   "name_from": {
+    "site": "TK",
+    "flow": "F01"
+   },
+   "origin": "baseline",
+   "sites": [
+    {
+     "site": "TK",
+     "relation": "same",
+     "parts": [
+      {
+       "flow": "F01",
+       "expand": true,
+       "nodes": null
+      }
+     ],
+     "reason": ""
+    },
+    {
+     "site": "OS",
+     "relation": "same",
+     "parts": [
+      {
+       "flow": "F01",
+       "expand": true,
+       "nodes": null
+      }
+     ],
+     "reason": ""
+    },
+    {
+     "site": "SG",
+     "relation": "split",
+     "parts": [
+      {
+       "flow": "F01",
+       "expand": true,
+       "nodes": [
+        "F01:P-001"
+       ],
+       "title": "申請と承認（申請の箱）"
+      }
+     ],
+     "reason": "申請と承認を 1 本（Claim and approval）に書いている。申請の箱をこの行に、承認の箱を「承認」の行に"
+    }
+   ]
+  },
+  {
+   "id": "B02",
+   "group": "G01",
+   "parent": null,
+   "name": "承認",
+   "name_from": {
+    "site": "TK",
+    "flow": "F02"
+   },
+   "origin": "baseline",
+   "sites": [
+    {
+     "site": "TK",
+     "relation": "same",
+     "parts": [
+      {
+       "flow": "F02",
+       "expand": true,
+       "nodes": null
+      }
+     ],
+     "reason": ""
+    },
+    {
+     "site": "OS",
+     "relation": "same",
+     "parts": [
+      {
+       "flow": "F02",
+       "expand": true,
+       "nodes": null
+      }
+     ],
+     "reason": ""
+    },
+    {
+     "site": "SG",
+     "relation": "split",
+     "parts": [
+      {
+       "flow": "F01",
+       "expand": true,
+       "nodes": [
+        "F01:P-002",
+        "F01:SUB-001"
+       ],
+       "title": "申請と承認（承認の箱）"
+      }
+     ],
+     "reason": "申請と承認を 1 本（Claim and approval）に書いている。承認の箱をこの行に"
+    }
+   ]
+  },
+  {
+   "id": "B03",
+   "group": "G01",
+   "parent": null,
+   "name": "支払処理",
+   "name_from": {
+    "site": "TK",
+    "flow": "F03"
+   },
+   "origin": "baseline",
+   "sites": [
+    {
+     "site": "TK",
+     "relation": "same",
+     "parts": [
+      {
+       "flow": "F03",
+       "expand": true,
+       "nodes": null
+      }
+     ],
+     "reason": ""
+    },
+    {
+     "site": "OS",
+     "relation": "same",
+     "parts": [
+      {
+       "flow": "F03",
+       "expand": true,
+       "nodes": null
+      }
+     ],
+     "reason": ""
+    },
+    {
+     "site": "SG",
+     "relation": "same",
+     "parts": [
+      {
+       "flow": "F02",
+       "expand": true,
+       "nodes": null,
+       "title": "支払"
+      }
+     ],
+     "reason": ""
+    }
+   ]
+  }
+ ],
+ "not_compared": [],
+ "questions": []
+}
