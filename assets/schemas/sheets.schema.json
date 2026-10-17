@@ -46,6 +46,7 @@
     "loop": {"type": "string", "description": "アクティビティ図: 繰り返し"},
     "folded": {"type": "string", "description": "アクティビティ図: 畳んだ手続き"},
     "activity": {"type": "string", "description": "業務フロー: 箱からリンクするアクティビティ図"},
+    "action": {"type": "string", "description": "動作の種類（業務マトリクス一覧の処理時間の種類。照合の指摘で直ることがあるので控える）"},
     "files": {"type": "array", "items": {"type": "string"}, "description": "付いている帳票（名前と向き）"},
     "start": {"type": "string", "description": "図の項目: 開始条件"},
     "end": {"type": "string", "description": "図の項目: 終了条件"},

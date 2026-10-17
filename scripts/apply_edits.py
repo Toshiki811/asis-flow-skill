@@ -293,13 +293,18 @@ class Builder:
         if not (src.get("doc_id") and isinstance(src.get("page"), int) and (src.get("lines") or str(src.get("quote", "")).strip())):
             return self.bad(i, op, "source（続くことが書かれた場所: doc_id・page と、lines か quote）を書く")
         after = self.need(i, op, "after") if op.get("after") else None
-        self.links.append({"flow": to, "after": after, "source": src, "label": str(op.get("label") or "").strip()})
+        lane = self.lane_name(i, op, op.get("lane")) if op.get("lane") else ""   # 別のフローへ進む箱の担当（書かなければ、前の箱と同じ）
+        self.links.append({"flow": to, "after": after, "source": src, "label": str(op.get("label") or "").strip(), "lane": lane})
 
     # ---- フローに組み立てる ----
 
     def card_item(self, doc, page, item):
         c = self.d.cards.get((doc, page)) or {}
-        return next((x for place in ("steps", "decisions") for x in c.get(place) or [] if x.get("id") == item), {})
+        it = next((x for place in ("steps", "decisions") for x in c.get(place) or [] if x.get("id") == item), None)
+        if it is None:                                               # 図の箱（図だけのページ）: 引用は箱の字
+            g = next((x for x in (c.get("diagram") or {}).get("nodes") or [] if x.get("id") == item), None)
+            return {"quote": str(g.get("label", "")), "from_image": False} if g else {}
+        return it
 
     def source(self, doc, page, item):
         it = self.card_item(doc, page, item)
@@ -478,7 +483,7 @@ class Builder:
             sid = f"link{k}"
             at = last[ln["after"]] if ln["after"] else next((x["from"] for x in edges if x["to"] == "end" and x["from"] != "start"), order[-1]["id"])
             src = ln["source"]
-            subs.append({"id": sid, "type": "subprocess", "lane": by[at]["lane"], "label": ln["label"] or f"{d.cats[ln['flow']].get('name')}に進む", "link_flow": ln["flow"],
+            subs.append({"id": sid, "type": "subprocess", "lane": ln.get("lane") or by[at]["lane"], "label": ln["label"] or f"{d.cats[ln['flow']].get('name')}に進む", "link_flow": ln["flow"],
                          "sources": [self.plain(src)]})
             for x in [x for x in edges if x["from"] == at and by[at]["type"] != "decision"]:      # at → 次 を、at → リンク → 次 にする
                 x["from"] = sid
@@ -651,7 +656,13 @@ class Builder:
                   f"書かれていない側は、{to}に進むと仮に置いた", edge=(a, b))
             elif why == "note":
                 which = b if by.get(b, {}).get("origin") == "note" else a
-                q(f"m-note-{k}", "記載なし", f"{name(which)}は、補足（注記・囲み）に書かれた作業です。{name(a)}のあと、{'終了' if b not in node or node[b]['type'] == 'end' else name(b)}の前に行いますか。",
+                if which == b:                                       # 補足の作業が線の先: 「a のあと、b の次の箱の前」
+                    nxt = next((x["to"] for x in fl["edges"] if x["from"] == b), None)
+                    after, before = name(a), "終了" if nxt is None or nxt not in node or node[nxt]["type"] == "end" else name(nxt)
+                else:                                                # 補足の作業が線の元: 「a の前の箱のあと、b の前」
+                    prv = next((x["from"] for x in fl["edges"] if x["to"] == a), None)
+                    after, before = ("開始" if prv is None or prv not in node or node[prv]["type"] == "start" else name(prv)), ("終了" if b not in node or node[b]["type"] == "end" else name(b))
+                q(f"m-note-{k}", "記載なし", f"{name(which)}は、補足（注記・囲み）に書かれた作業です。{after}のあと、{before}の前に行いますか。",
                   "補足が掛かる手順のあと（分からなければ、書かれた順）に置いた", edge=(a, b))
             elif why == "doc":
                 q(f"m-doc-{k}", "資料間の順序", f"{name(a)}のあとに、別の資料に書かれた{name(b)}を行いますか。", "資料の並びの順に置いた", edge=(a, b))

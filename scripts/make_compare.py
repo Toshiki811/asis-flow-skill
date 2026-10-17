@@ -19,7 +19,7 @@
 差分照合（--nodes）: 照合のあとに変わった・足した箱（check_flow.py --stage review が挙げる）だけを照合し直すためのシート。
 1ページ目に、照合し直す箱の一覧（図の中で赤枠）。続けて、その箱の出典ページだけ（赤枠と一覧も、その箱だけ）。使わなかったページの一覧は付けない。
 差分照合のシートは、番号ごとに残す（照合した記録として、納品の門が作業の記録に写す）。
-先に check_layout.py を実行しておく（フロー図の PNG を使う）。
+先に check_layout.py を実行しておく（フロー図の PNG を使う。draw.io が無い環境では out/下見/ の近似の画像を使う）。
 """
 import argparse
 import io
@@ -91,7 +91,11 @@ def flow_images(work):
         if errs:
             raise SystemExit(f"{lp.name} の形が崩れている（{'／'.join(errs[:3])}）。build_drawio.py で書き出し直す")
         for pg in lay["pages"]:
-            out[pg["id"]] = (pg, work / "out" / "png" / f"{lp.name[:-len('.layout.json')]}_p{pg['index']:02d}_{pg['id']}.png")
+            name = f"{lp.name[:-len('.layout.json')]}_p{pg['index']:02d}_{pg['id']}.png"
+            png = work / "out" / "png" / name
+            if not png.exists() and (work / "out" / "下見" / name).exists():   # draw.io が無い環境: 近似の下見（配置と同じ大きさなので赤枠は合う）
+                png = work / "out" / "下見" / name
+            out[pg["id"]] = (pg, png)
     return out
 
 
@@ -153,6 +157,8 @@ class Sheets:
     def node_list(self, page, k, uses):
         """左下: このページを出典にしたノードと、その引用"""
         y = TOP + FLOW_H + 22
+        put(page, MARGIN, y - 16, f"開始: {self.fl.get('start_condition') or '（空）'}　／　終了: {self.fl.get('end_condition') or '（空）'}", size=8,
+            color=(0.3, 0.3, 0.3), width=LEFT_W, max_lines=1)              # 図の情報欄が切り出しで見えないことがあるので、文字でも出す
         put(page, MARGIN, y - 6, "このページを出典にしたノード（番号・種別・ラベル ／「引用」）", size=9, color=(0.3, 0.3, 0.3), max_lines=1)
         y += 8
         items = self.items_of(*k)
@@ -310,6 +316,8 @@ def main():
     cat_pages = {c["id"]: [(ps["doc_id"], p) for ps in c.get("pages") or [] for p in ps.get("pages") or []]
                  for c in (load(work / "taxonomy.json", {}) or {}).get("categories") or []}
     images = flow_images(work)
+    if any("下見" in png.parts for _pg, png in images.values()):
+        print("フロー図の PNG が無いので、下見の画像（mxGraph の近似）でシートを作る（納品の PNG は draw.io のある環境で check_layout.py）")
     only = set(a.only.split(",")) if a.only else None
     flows, skipped = load_flows(work), []
     for fl in flows:

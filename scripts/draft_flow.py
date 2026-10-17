@@ -209,6 +209,8 @@ class Draft:
                     "branches": [b for b in it.get("branches") or [] if isinstance(b, dict)],
                     "sources": [(doc, page, it["id"])], "files": []}
         rows = [node(s, "step") for s in c.get("steps") or [] if isinstance(s, dict) and s.get("id")]
+        if not rows and not (c.get("decisions") or []):              # 図だけのページ: 図の箱が項目（flow-rules.md 1.7。線の順にたどる）
+            rows = self.diagram_rows(c, node)
         for r in [x for x in rows if x["origin"] == "note" and x["applies_to"]]:       # 補足の中の作業は、掛かる手順のすぐあと
             at = next((i for i, x in enumerate(rows) if x["item"] == r["applies_to"]), None)
             if at is not None:
@@ -225,6 +227,40 @@ class Draft:
                 self.notes.append(f"{r['key']}: 担当「{r['actor']}」が用語の正本に無い（lane で置くレーンを決める。新しい担当なら親に知らせる）")
             self.nodes[r["key"]] = r
             self.seq.append(r["key"])
+
+    @staticmethod
+    def diagram_rows(c, node):
+        """手順・分岐が 1 つも無い図だけのページ: 図の箱（処理・判断・システム）を、開始から線の順にたどって項目にする。
+        箱の字が作業（action）・問い（question）、レーンが担当。分岐の行き先は、線の上の字と、先の箱の字"""
+        dg = c.get("diagram") or {}
+        boxes = [g for g in dg.get("nodes") or [] if isinstance(g, dict) and g.get("id")]
+        by_id = {g["id"]: g for g in boxes}
+        outs = {}
+        for e in dg.get("edges") or []:
+            if isinstance(e, dict) and e.get("from") in by_id and e.get("to") in by_id:
+                outs.setdefault(e["from"], []).append(e)
+        order, seen = [], set()
+        heads = [g["id"] for g in boxes if g.get("shape") == "start"] or [g["id"] for g in boxes if not any(e["to"] == g["id"] for es in outs.values() for e in es)]
+        stack = list(reversed(heads))
+        while stack:                                                 # 開始から深さ優先（分岐は、線の書かれた順）。線でつながらない箱は、書かれた順に後ろへ
+            g = stack.pop()
+            if g in seen:
+                continue
+            seen.add(g)
+            order.append(g)
+            stack += [e["to"] for e in reversed(outs.get(g, []))]
+        order += [g["id"] for g in boxes if g["id"] not in seen]
+        rows = []
+        for gid in order:
+            g = by_id[gid]
+            shape, label = g.get("shape"), str(g.get("label") or "").split("\n")[0].strip()
+            if shape not in ("process", "decision", "system") or not label:
+                continue
+            it = {"id": gid, "actor": g.get("lane") or "", "action": label, "question": label, "origin": "body",
+                  "branches": [{"label": str(e.get("label") or ""), "to": str(by_id[e["to"]].get("label") or "").split("\n")[0]} for e in outs.get(gid, [])]
+                  if shape == "decision" else []}
+            rows.append(node(it, "decision" if shape == "decision" else "step"))
+        return rows
 
     @staticmethod
     def place(rows, d):
@@ -262,7 +298,11 @@ class Draft:
         return self.lab.ref(n["doc"], n["page"]) if hasattr(self.lab, "ref") else f"{n['doc']} p{n['page']:04d}"
 
     def quote(self, n):
-        it = next((x for place in ("steps", "decisions") for x in self.cards[(n["doc"], n["page"])].get(place) or [] if x.get("id") == n["item"]), {})
+        c = self.cards[(n["doc"], n["page"])]
+        it = next((x for place in ("steps", "decisions") for x in c.get(place) or [] if x.get("id") == n["item"]), None)
+        if it is None:                                               # 図の箱: 引用は箱の字
+            g = next((x for x in (c.get("diagram") or {}).get("nodes") or [] if x.get("id") == n["item"]), {})
+            return str(g.get("label", "")), False, None
         return str(it.get("quote", "")), bool(it.get("from_image")), it.get("lines")
 
     def show(self):

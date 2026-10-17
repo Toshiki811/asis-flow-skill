@@ -18,9 +18,11 @@ from sc_applies import applies_to
 
 
 def reason(item, sid, names):
+    ev = str(item.get("evidence") or "").strip()
+    ev = f"。書き分け: {ev}" if ev else ""                            # 原典照合の担当が、外した理由を原典で確かめられるように（本部では別の担当が行う、など）
     if item["scope"] == "only":
-        return f"{OTHER_SITE}（{'・'.join(names[s] for s in item['sites'])}だけ）"
-    return f"{OTHER_SITE}（{names[sid]}では行わない）"
+        return f"{OTHER_SITE}（{'・'.join(names[s] for s in item['sites'])}だけ{ev}）"
+    return f"{OTHER_SITE}（{names[sid]}では行わない{ev}）"
 
 
 def ops_for(cmp, sites, sid, flow=None):
