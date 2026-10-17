@@ -319,13 +319,17 @@ HO_FLOWS = [
 # ---------- 決定性 ----------
 
 def pin_zip(path):
-    """zip（docx・xlsx・pptx）の項目の日時をそろえ、同じ順に書き直す（python-docx・openpyxl・python-pptx は「いま」の日時を書く）"""
+    """zip（docx・xlsx・pptx）の項目の日時をそろえ、同じ順に書き直す（python-docx・openpyxl・python-pptx は「いま」の日時を書く）。
+    openpyxl は保存のたびに docProps/core.xml の modified を「いま」に書き換えるので、そこも固定する"""
+    import re
     path = pathlib.Path(path)
     with zipfile.ZipFile(path) as z:
         items = [(i.filename, z.read(i.filename)) for i in z.infolist()]
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for name, data in items:
+            if name == "docProps/core.xml":
+                data = re.sub(rb"(<dcterms:(?:modified|created)[^>]*>)[^<]*<", rb"\g<1>2026-04-01T00:00:00Z<", data)
             zi = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
             zi.compress_type = zipfile.ZIP_DEFLATED
             zi.external_attr = 0o600 << 16
@@ -431,15 +435,15 @@ def make_pdf(path):
             if row[0] == "step":
                 n += 1
                 _k, actor, text, system, files = row
-                extra = []
+                extra = []                                           # 内蔵の日本語の字体は半角の空白が広く出るので、空白を入れない
                 if system:
-                    extra.append(f"システム: {system}")
+                    extra.append(f"システム:{system}")
                 if files:
-                    extra.append(f"帳票: {files}")
-                lines.append(("step", f"({n}) {actor}は、{text}" + (f"　［{'／'.join(extra)}］" if extra else "")))
+                    extra.append(f"帳票:{files}")
+                lines.append(("step", f"({n}){actor}は、{text}" + (f"［{'／'.join(extra)}］" if extra else "")))
             elif row[0] == "decision":
                 _k, q, yes, no = row
-                lines.append(("dec", f"【判断】{q}　→ はい: {yes}／いいえ: {no}"))
+                lines.append(("dec", f"【判断】{q}→はい:{yes}／いいえ:{no}"))
             else:
                 lines.append(("meta", row[1]))
         body(page, lines)
@@ -516,6 +520,7 @@ def make_pptx(path):
             ea = rpr.makeelement(qn("a:ea"), {})
             rpr.append(ea)
         ea.set("typeface", JP_FONT)
+        return run
 
     def textbox(slide, text, x, y, w, h, size=14, bold=False, color=None):
         tb = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
