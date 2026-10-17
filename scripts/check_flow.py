@@ -1917,7 +1917,11 @@ def check_activity(cx, rp):
                         rp.fail(f"{aid} {x['id']}: まとめた呼び出しの行き先のアクティビティ図（{c.get('to')}）が無い")
             if len(boxes) > MAX_BOXES:
                 rp.warn(f"{aid}: 箱が {len(boxes)} 個ある（{MAX_BOXES} 個まで）。技術的な分岐を畳む（fold）・隣り合うまとまりをまとめる（merge。"
-                        "同じ共通の処理を続けて呼ぶ並びは、activity.py draft にまとめの案が出る）")
+                        f"下書きのままで {MAX_BOXES} 個を超える図には、activity.py draft に、続けて呼ぶ並びのまとめの案が出る）")
+            runs = [x["id"] for x in boxes if x.get("calls")]
+            if runs and draft.boxes() <= MAX_BOXES:
+                rp.warn(f"{aid}: 下書きのままで箱が {draft.boxes()} 個（{MAX_BOXES} 個まで）なのに、同じ共通の処理を続けて呼ぶ並びをまとめた（{'・'.join(runs[:6])}）。"
+                        f"呼び出しの並びをまとめるのは、{MAX_BOXES} 箱を超える図だけ（references/code-guide.md）。merge から呼び出しを外す")
             n.update(acts=1, boxes=len(boxes), lines=len(need), off=sum(len(o["lines"]) for o in a.get("lines") or [] if o.get("state") == "excluded"),
                      folded=sum(b.get("state") == "folded" for b in logged.values()), forks=len(forks))
     known = {u["activity"] for u in units} | {u["activity"] for u in led.units if u["kind"] == "shared" and led.off(u) is not None}   # 図にしない手続きの残りは、上で知らせた

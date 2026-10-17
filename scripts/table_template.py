@@ -28,7 +28,7 @@ import pathlib
 import re
 import sys
 
-from common import ACT_JOIN, ASSETS, save, soft_formula
+from common import ACT_JOIN, ASSETS, save, site, soft_formula
 
 STYLE_SHEET = "書式の見本"
 TOKEN = re.compile(r"\{([^{}\n]+)\}")
@@ -747,11 +747,11 @@ def read_side(book):
     try:
         side = json.loads(side_path(book).read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        raise TemplateError(f"{side_path(book).name} が無い・読めない（列の対応。本と一緒に書き出される）")
+        raise TemplateError(site(f"{side_path(book).name} が無い・読めない（列の対応。本と一緒に書き出される）"))
     from validate import validate
     errs = validate(side, "columns")
     if errs:                                                         # 崩れた対応で読むと、人が入れた値を別の欄に取り込む
-        raise TemplateError(f"{side_path(book).name} の形が崩れている（{'／'.join(errs[:3])}）。本を書き出し直す")
+        raise TemplateError(site(f"{side_path(book).name} の形が崩れている（{'／'.join(errs[:3])}）。本を書き出し直す"))
     return side
 
 
@@ -850,7 +850,7 @@ def read_back(book, spec):
     out = {"rows": {}, "cells": {}, "absent": {}, "static": {}, "titles": {}, "side": side, "book": wb}
     for title, s in side["sheets"].items():
         if title not in wb.sheetnames:
-            raise TemplateError(f"シート「{title}」が、本に無い")
+            raise TemplateError(site(f"シート「{title}」が、本に無い"))
         canon, columns = (spec.get("was") or {}).get(s["canon"], s["canon"]), s["columns"]     # 前の名前で書いた一覧も、いまの名前で読む
         fixed, rep = list(spec["sheets"][canon]), (spec.get("repeat") or {}).get(canon)
         at = {f: next((k for k, x in enumerate(columns) if x == f), None) for f in fixed}

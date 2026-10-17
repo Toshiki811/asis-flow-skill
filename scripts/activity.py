@@ -16,8 +16,9 @@
             操作者とのやり取り（メッセージ・入力・ファイルの選択）→ 操作者のレーンの箱／別の単位の呼び出し → 呼び出しの箱
   対象外    機械が技術的と分かる文（画面の更新の制御・変数の準備・ログ・後片付け・エラーの扱いの設定）は、はじめから対象外（include で戻せる）
   エラー    On Error GoTo の所に「このあとの処理でエラーが起きたか」の判断を置き、起きた側にエラー処理の節をつなぐ
-  まとめの案  箱が 25 個を超える図だけ: 同じ共通の処理を 3 回以上続けて呼ぶ並びを、ソースのコメントの見出しで切って、merge の items の案を出す
-            （呼び出しが 3 回に満たない見出しは、前の見出しと合わせる。先頭なら後ろと。案を見せるだけで、使うか・名前は LLM）
+  まとめの案  下書きのままで箱が 25 個を超える図だけ: 同じ共通の処理を 3 回以上続けて呼ぶ並びを、ソースのコメントの見出しで切って、merge の items の案を出す
+            （呼び出しが 3 回に満たない見出しは、前の見出しと合わせる。前に同じ呼び先の見出しが無ければ、後ろと。別の共通の処理の呼び出しで切れる。
+            分岐の中・エラー処理の節の中の並びにも出す。案を見せるだけで、使うか・名前は LLM）
 直しの種類（ops[].op）: name 名付ける／merge まとめる／split 分ける／fold 畳む（技術的な分岐・繰り返しを1つの箱に）／exclude 対象外にする／include 図に戻す
 直しの一覧に誤りがあれば、何も書かずに、誤りを全部並べて終わる（終了コード 1）。
 """
@@ -29,7 +30,7 @@ import sys
 
 import code_struct as cs
 import terms as T
-from common import EFFECTS, SEV_LABEL, load, load_page, page_json, page_units, save, severity_of, site, span_text, work_dir
+from common import EFFECTS, SEV_LABEL, STEP_TYPES, load, load_page, page_json, page_units, save, severity_of, site, span_text, work_dir
 from renumber import renumber
 from systems import Ledger, has_ledger
 from validate import blocking, validate
@@ -42,6 +43,7 @@ CALL_RUN = 3                                                         # 同じ共
 OPERATOR, EXTERNAL = "操作者", "外部"
 ERR_LABEL = "このあとの処理でエラーが起きたか"
 ENDLESS = re.compile(r"(?i)^\(?\s*(true|1|-1)?\s*\)?$|^\s*(while\s*\(\s*(true|1)\s*\)|for\s*\(\s*;\s*;\s*\)|loop|perform\s+forever)\s*\{?\s*$")
+CODE_NOTE = re.compile(r'["=;{}]|^[A-Za-z_][A-Za-z0-9_.]*\s*\(|^(?i:call|set|if|for|next|end|dim|exit|do|loop|return|def|while|var|let|const)\b')   # コメントにしたコードらしい行
 ENDLESS_WHY = "条件の無い繰り返し（戻る線で表す。終わるのは、中の「抜ける」）"
 FRAMEWORK_NOTE = "  ※枠組みが、この起動点の手続きの前に呼ぶ（木の起動点の before）"
 QUITS_WHY = "プログラムを止める手続きを呼ぶ（「終了（プログラムを止める）」で表す）"
@@ -78,7 +80,7 @@ class Draft:
         self.inline = set(self.st.get("inline") or [])
         self.blank = set(self.st.get("blank") or [])                 # 図にする文が無い手続き（呼び出しを対象外にする）
         self.folded = {k.split(".", 1)[1]: why for k, why in led.folded.items() if k.startswith(unit["project"] + ".")}   # 図にしない手続き（補助）→ 理由
-        self.by, self.notes = {}, []
+        self.by, self.notes, self._boxes = {}, [], None
         root = self.procs[unit["procedure"]]
         self.scope = [root["id"]]                                    # この図に入る手続き（起動点の手続きと、呼ぶ側に入れた手続き）
         self.handlers = {}                                           # 手続き → エラー処理の節（呼ぶ側の図に入れた手続きの分も）
@@ -153,58 +155,77 @@ class Draft:
                     yield from self.walk(body)
 
     def boxes(self):
-        """下書きのままの箱の数（呼ぶ側の図に入れた呼び出しは、中身で数える。対象外は数えない）"""
-        return sum(1 for it in self.walk() if it["state"] == "box"
-                   and (it["kind"] in ("seq", "interact", "if", "select", "loop") or (it["kind"] == "call" and it.get("inline") is None)))
+        """下書きのまま（直しの一覧なし）の図の箱の数。apply・点検と同じく、新しい下書きから図を組み立てて数える（繰り返す箱・エラーの判断・外部の箱も、図のとおり）"""
+        if self._boxes is None:
+            act = make(self.led, self.unit, {})[0]
+            self._boxes = sum(n["type"] in STEP_TYPES for n in act["nodes"]) if act else 0
+        return self._boxes
+
+    def holders(self):
+        """項目の並び（入れ物）: 手続き・分岐の出口・繰り返しの中・呼ぶ側の図に入れた手続き・エラー処理の節"""
+        return [self.items] + [b["body"] for x in self.walk() for b in x.get("branches") or []] \
+            + [x[k] for x in self.walk() for k in ("body", "inline") if x.get(k)] + [body for hs in self.handlers.values() for _l, body in hs]
+
+    def mergeable(self, it):
+        """merge でまとめられる呼び出し: 別の図になる共通の処理の呼び出し（呼ぶ側の図に入れた手続き・図にする文の無い手続き・枠組み・プログラムを止める手続きは除く）"""
+        return it["kind"] == "call" and it.get("inline") is None and it["state"] == "box" and not it.get("framework") \
+            and not (self.procs.get(it["to"]) or {}).get("ends")
 
     def heading(self, it, prev):
-        """項目のすぐ上（前の項目 prev のあと）の、コメントだけの行の文字（ソースの見出し）。間に文の行があれば、そこまで。無ければ空"""
+        """項目のすぐ上の、コメントだけの行の文字（ソースの見出し）。前の項目 prev のあと（無ければ 20 行上）までを下から読み、
+        文の行（かっこ・else だけの行も）で止まる。飾りの線だけの行・コメントにしたコードの行は飛ばす。無ければ空"""
         a, b = (prev["lines"][1] + 1) if prev else max(1, it["lines"][0] - 20), it["lines"][0] - 1
         rows = [t for _ln, t in self.source(it["module"], a, b)] if a <= b else []
         if self.st.get("language") in cs.VBA_FAMILY:
-            kinds = [("note", x) if not code.strip() and x else ("code", "") if code.strip() else ("", "") for code, x in map(cs.strip_comment, rows)]
+            notes = {k: x for k, (code, x) in enumerate(map(cs.strip_comment, rows), 1) if not code.strip()}
         else:
             import code_lang
-            keep, notes = code_lang.plain_lines(self.st.get("language"), rows)
-            kinds = [("note", notes[k]) if notes.get(k) else ("code", "") if k in keep else ("", "") for k in range(1, len(rows) + 1)]
-        for kind, text in reversed(kinds):                           # 下から: 空の行・かっこだけの行は飛ばし、文の行で止まる
-            if kind:
-                return text if kind == "note" else ""
+            notes = code_lang.plain_lines(self.st.get("language"), rows)[1]
+        names = {p["name"] for p in self.procs.values()}
+        for k in range(len(rows), 0, -1):
+            if k not in notes:
+                if rows[k - 1].strip():
+                    return ""
+                continue
+            text = re.sub(r"^[\s*\-=#/']+|[\s*\-=#/]+$", "", notes[k])
+            if re.search(r"[0-9A-Za-z\u3040-\u30ff\u4e00-\u9fff]", text) and not CODE_NOTE.search(text) and text.split()[0] not in names:
+                return text
         return ""
 
     def call_runs(self):
-        """まとめの案（箱が MAX_BOXES 個を超える図だけ）: [{to, times, heads, keys}]。references/code-guide.md の「同じ共通の処理を続けて呼ぶ並び」の決まりで、機械が切る:
-        並びは、分岐・繰り返し・やり取り・抜ける所・まとめられない呼び出し・呼び出しの無い見出しで切れる。並びの中は、ソースのコメントの見出しで切る。
-        見出しの呼び先は、いちばん多く呼ぶ共通の処理。呼ぶ回数が CALL_RUN に満たない見出しは、同じ呼び先の前の見出しと合わせる（前に無ければ、後ろと）。
-        CALL_RUN 回以上になった並びが案。items は、はじめの呼び出しの前の「まとまり」（値を取る）から、終わりの呼び出しまで（前の対象外の文と、あとの文は入れない）"""
+        """まとめの案（下書きのままで箱が MAX_BOXES 個を超える図だけ）: [{to, times, heads, keys, ends}]。references/code-guide.md の「同じ共通の処理を続けて呼ぶ並び」の決まりで、機械が切る:
+        並びは、分岐・繰り返し・やり取り・抜ける所・まとめられない呼び出し・別の共通の処理の呼び出し・呼び出しの無い見出しで切れる。並びの中は、ソースのコメントの見出しで切る。
+        呼ぶ回数が CALL_RUN に満たない見出しは、前の見出しと合わせる（前に無ければ、後ろと）。CALL_RUN 回以上になった並びが案。
+        items は、はじめの呼び出しのすぐ前の「まとまり」（値を取る）から、終わりの呼び出しまで。分岐の中・エラー処理の節・呼ぶ側の図に入れた手続きの中の並びにも出す"""
         if self.boxes() <= MAX_BOXES:
             return []
         proj = self.unit["project"]
-        ok = lambda it: (it["kind"] == "call" and it["state"] == "box" and it.get("inline") is None and not it.get("framework")
-                         and not (self.procs.get(it["to"]) or {}).get("ends") and bool(self.led.activity.get((proj, it["to"]))))
-        holders = [self.items] + [b["body"] for x in self.walk() for b in x.get("branches") or []] \
-            + [x[k] for x in self.walk() for k in ("body", "inline") if x.get(k)] + [body for hs in self.handlers.values() for _l, body in hs]
+        ok = lambda it: self.mergeable(it) and bool(self.led.activity.get((proj, it["to"])))
         out = []
-        for holder in holders:
-            secs = []                                                # 見出しの節 {head, items}。None は並びの切れ目
+        for holder in self.holders():
+            secs, last = [], None                                    # 見出しの節 {head, items}。None は並びの切れ目。last: 並びの呼び先
             for k, it in enumerate(holder):
                 if not (it["kind"] == "seq" or ok(it)):
                     secs.append(None)
+                    last = None
                     continue
+                if ok(it) and last not in (None, it["to"]):         # 別の共通の処理の呼び出しで切る（すぐ前の「値を取る」まとまりは、こちらに付ける）
+                    take = secs[-1]["items"].pop() if secs[-1]["items"] and secs[-1]["items"][-1]["kind"] == "seq" else None
+                    secs.append(None)
+                    if take is not None:
+                        at = next(j for j, x in enumerate(holder) if x is take)
+                        secs.append({"head": self.heading(take, holder[at - 1] if at else None), "items": [take]})
                 head = self.heading(it, holder[k - 1] if k else None)
                 if not secs or secs[-1] is None or head:
                     secs.append({"head": head, "items": []})
                 secs[-1]["items"].append(it)
-            groups = []                                              # 呼び出しのある、続く見出しの組
+                last = it["to"] if ok(it) else last
+            groups = []                                              # 呼び出しのある、続く見出し（1 つの並びの中は、同じ呼び先）
             for s in secs + [None]:
                 tos = [it["to"] for it in s["items"] if ok(it)] if s else []
-                if not tos:
-                    groups.append(None)
-                    continue
-                to = max(dict.fromkeys(tos), key=tos.count)
-                groups.append({"to": to, "times": tos.count(to), "secs": [s]})
+                groups.append({"to": tos[0], "times": len(tos), "secs": [s]} if tos else None)
             k = 0
-            while k < len(groups):                                   # 呼び出しが足りない見出しは、前（同じ呼び先）と。前に無ければ、後ろと
+            while k < len(groups):                                   # 呼び出しが足りない見出しは、前と。前に無ければ、後ろと
                 g = groups[k]
                 if g is None or g["times"] >= CALL_RUN:
                     k += 1
@@ -223,10 +244,17 @@ class Draft:
                 if g is None or g["times"] < CALL_RUN:
                     continue
                 its = [it for s in g["secs"] for it in s["items"]]
-                last = max(i for i, it in enumerate(its) if ok(it))
-                first = next(i for i, it in enumerate(its) if it["state"] == "box")
-                out.append({"to": g["to"], "times": g["times"], "heads": [s["head"] for s in g["secs"]], "keys": [it["key"] for it in its[first:last + 1]]})
+                calls = [i for i, it in enumerate(its) if ok(it)]
+                first = calls[0] - 1 if calls[0] and its[calls[0] - 1]["kind"] == "seq" and its[calls[0] - 1]["state"] == "box" else calls[0]
+                out.append({"to": g["to"], "times": g["times"], "heads": [s["head"] for s in g["secs"]], "keys": [it["key"] for it in its[first:calls[-1] + 1]],
+                            "ends": [self.said(its[i]) for i in (calls[0], calls[-1])]})
         return out
+
+    def said(self, it):
+        """呼び出しの行の、はじめの文字列（まとめた箱の補足に書く、はじめと終わりの項目の候補）"""
+        text = " ".join(t for _ln, t in self.source(it["module"], *it["lines"]))
+        m = re.search(r'"([^"]+)"|\'([^\']+)\'', text)
+        return (m.group(1) or m.group(2)) if m else ""
 
     def exec_lines(self):
         """この図が受け持つ実行文の行: {(モジュール, 行)}"""
@@ -314,11 +342,15 @@ class Draft:
             dump(body, 1)
         runs = self.call_runs()
         if runs:
-            out(f"まとめの案（箱が {self.boxes()} 個で、{MAX_BOXES} 個を超える。同じ共通の処理を {CALL_RUN} 回以上続けて呼ぶ並びを、ソースの見出しで切った。"
-                f"呼び出しが {CALL_RUN} 回に満たない見出しは、前の見出しと合わせた。使うなら merge の items に写し、何を・何項目かを名前にする。references/code-guide.md）:")
+            act = make(self.led, self.unit, {"ops": [{"op": "merge", "items": r["keys"]} for r in runs]})[0]
+            after = f"。案を全部使うと、箱 {sum(n['type'] in STEP_TYPES for n in act['nodes'])} 個" if act else ""
+            out(f"まとめの案（下書きのままで箱が {self.boxes()} 個で、{MAX_BOXES} 個を超える{after}。同じ共通の処理を {CALL_RUN} 回以上続けて呼ぶ並びを、ソースの見出しで切った。"
+                f"呼び出しが {CALL_RUN} 回に満たない見出しは、前の見出し（無ければ後ろの見出し）と合わせた。別の共通の処理の呼び出しで、並びは切れる。"
+                "使うなら merge の items に写し、何を・何項目かを名前にする。補足に、はじめと終わりの項目（画面に出る名前）を書く。references/code-guide.md）:")
             for k, r in enumerate(runs, 1):
                 where = self.led.activity.get((u["project"], r["to"]))
-                out(f"  案{k}  → {where} {r['to']}（{r['times']} 回）  見出し: {'・'.join('「' + h + '」' for h in r['heads'] if h) or '無し'}")
+                out(f"  案{k}  → {where} {r['to']}（{r['times']} 回）  見出し: {'・'.join('「' + h + '」' for h in r['heads'] if h) or '無し'}"
+                    + (f"  呼び出しの行の文字: はじめ「{r['ends'][0]}」・終わり「{r['ends'][1]}」" if all(r["ends"]) else ""))
                 out(f"        \"items\": {json.dumps(r['keys'], ensure_ascii=False)}")
         for n in self.notes:
             out("注意: " + n)
@@ -344,8 +376,7 @@ class Builder:
         return it
 
     def siblings(self, it):
-        for holder in [self.d.items] + [b["body"] for x in self.d.walk() for b in x.get("branches") or []] \
-                + [x[k] for x in self.d.walk() for k in ("body", "inline") if x.get(k)] + [body for hs in self.d.handlers.values() for _l, body in hs]:
+        for holder in self.d.holders():
             if any(x is it for x in holder):
                 return holder
         return None
@@ -390,7 +421,7 @@ class Builder:
             return self.bad(i, op, "items に、まとめる「まとまり」を2つ以上、並んでいる順に書く") if None not in its else None
         calls = [it for it in its if it["kind"] == "call"]
         if calls:                                                    # 同じ共通の処理（別の図）を続けて呼ぶ並び
-            if any(it.get("inline") is not None or it["state"] != "box" or it.get("framework") or (self.d.procs.get(it["to"]) or {}).get("ends") for it in calls):
+            if any(not self.d.mergeable(it) for it in calls):
                 return self.bad(i, op, "まとめられる呼び出しは、別の図になる共通の処理の呼び出しだけ（呼ぶ側の図に入れた手続き・図にする文の無い手続き・プログラムを止める手続きの呼び出しは、まとめられない）")
             tos = [it["to"] for it in calls]
             if max(tos.count(t) for t in tos) < CALL_RUN:
@@ -925,7 +956,7 @@ def main():
         n = sum(1 for x in act["nodes"] if x["type"] in ("process", "decision", "system", "subprocess"))
         left = sum(1 for x in act["nodes"] if x.get("unnamed"))
         print(f"activities/{aid}.activity.json を書いた:「{act['name']}」箱 {n}・線 {len(act['edges'])}・対象外にした文のまとまり {sum(o['state'] == 'excluded' for o in act['lines'])}"
-              + (f"・名前の付いていない箱 {left}" if left else "") + (f"  ※ 箱が {MAX_BOXES} 個を超える。fold・merge で減らす（同じ共通の処理を続けて呼ぶ並びは、draft にまとめの案が出る）" if n > MAX_BOXES else ""))
+              + (f"・名前の付いていない箱 {left}" if left else "") + (f"  ※ 箱が {MAX_BOXES} 個を超える。fold・merge で減らす（下書きのままで {MAX_BOXES} 個を超える図には、draft に、続けて呼ぶ並びのまとめの案が出る）" if n > MAX_BOXES else ""))
         for x in d.notes:
             print("  注意: " + x)
     sys.exit(1 if bad else 0)

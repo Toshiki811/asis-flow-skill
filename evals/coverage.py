@@ -10,8 +10,10 @@
   呼び元     点検の共通の部品（common.FAIL_HELPERS: 形の点検・読めない・根拠のページ ほか）を呼ぶ所。ファイルの種類ごとに、部品の FAIL が出るかを見る
   中継の内側 点検が 1 行で中継する、ほかのモジュールの誤りの文: 直しの一覧（apply_edits.py の self.bad・self.err）・アクティビティ図の直し（activity.py の同じ形）・
              台帳の紐付け（systems.py の link_errors・excluded_errors・folded_errors）・LLM が書いたブロックの木（code_lang.py の tree_problems）・
-             取り出した構造（code_struct.py の tree_errors と、木が読めない・形が崩れている）・用語の対応（terms.py の problems）。
-             誤りの文ごとに 1 か所（common.site で包んだ所と、self.bad の呼び出し）
+             取り出した構造（code_struct.py の tree_errors と、木が読めない・形が崩れている）・用語の対応（terms.py の problems）・
+             照合の報告と照合に出した版の記録（review.py）・業務マトリクス一覧と確認事項一覧の読み戻し（table_template.py の read_side・read_back）・
+             人の値の控え（common.py の answers.json・times.json の形）。誤りの文ごとに 1 か所（common.site で包んだ所と、self.bad の呼び出し）。
+             入れ子の関数の中の文は、その関数の名前で数える（ブロックの木の点検の多くは visit）
 控えは、環境変数 ASIS_FAIL_LOG があるとき、Report.fail・fail_if（FAIL になったときだけ）・warn・common.site が書き足す（共通の部品の中なら、呼び元の行も）。
 部品の中の FAIL も、呼び元も、それぞれ 1 か所に数える。数えないもの: 落ちないための守り（common.guarded の FAIL）。
 試験しない点検は、evals/untested_checks.md の表に、理由つきで並べる（ファイル・関数・文の一部で指す。行の番号は書かない）。
@@ -35,7 +37,9 @@ from common import FAIL_HELPERS, FAIL_LOG  # noqa: E402
 from deliver import PROMOTE  # noqa: E402
 
 FILES = ("check_flow.py", "check_layout.py", "check_extract.py")
-RELAYS = ("apply_edits.py", "activity.py", "systems.py", "code_lang.py", "code_struct.py", "terms.py")   # 中継の内側（誤りの文ごとに数える）
+RELAYS = ("apply_edits.py", "activity.py", "systems.py", "code_lang.py", "code_struct.py", "terms.py",   # 中継の内側（誤りの文ごとに数える）
+          "review.py", "table_template.py", "common.py")
+BAD_HOLDERS = ("apply_edits.py", "activity.py")                      # 誤りを溜める部品 bad（self.bad(i, op, 文)）のあるファイル
 LIST = SKILL / "evals" / "untested_checks.md"
 
 
@@ -74,13 +78,14 @@ def site_of(n):
     return None
 
 
-def relay_of(n, func):
+def relay_of(n, func, name=""):
     """中継の内側の誤りの文なら ("relay", 文の節): common.site で包んだ文（誤りを溜める部品 bad の中は除く）と、self.bad の呼び出し"""
+    holder = name in BAD_HOLDERS
     if isinstance(n, ast.Call):
         f = n.func
-        if isinstance(f, ast.Name) and f.id == "site" and n.args and func != "bad":
+        if isinstance(f, ast.Name) and f.id == "site" and n.args and not (holder and func == "bad"):
             return "relay", n.args[0]
-        if isinstance(f, ast.Attribute) and f.attr == "bad" and isinstance(f.value, ast.Name) and f.value.id == "self":
+        if holder and isinstance(f, ast.Attribute) and f.attr == "bad" and isinstance(f.value, ast.Name) and f.value.id == "self":
             return "relay", n.args[2] if len(n.args) > 2 else None
     return None
 
@@ -93,7 +98,7 @@ def sites(root=SKILL):
         funcs = [(n.lineno, n.end_lineno, n.name) for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
         within = lambda n: min((f for f in funcs if f[0] <= n.lineno <= f[1]), key=lambda f: f[1] - f[0], default=(0, 0, "（関数の外）"))[2]
         for n in ast.walk(tree):
-            hit = (relay_of(n, within(n)) if hasattr(n, "lineno") else None) if name in RELAYS else site_of(n)
+            hit = (relay_of(n, within(n), name) if hasattr(n, "lineno") else None) if name in RELAYS else site_of(n)
             if hit is None:
                 continue
             kind, arg = hit

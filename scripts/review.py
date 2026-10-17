@@ -40,7 +40,7 @@ import json
 import pathlib
 import re
 
-from common import BadJson, load, save, try_load, work_dir
+from common import BadJson, load, save, site, try_load, work_dir
 from validate import validate
 
 ORDER = {"支持": 0, "一部支持": 1, "不支持": 2}
@@ -61,7 +61,7 @@ def read_report(f):
     try:
         return load(f)
     except BadJson as e:
-        raise ValueError(f"reports/{f.name} が JSON として読めない（{str(e)[-60:]}）") from None
+        raise ValueError(site(f"reports/{f.name} が JSON として読めない（{str(e)[-60:]}）")) from None
 
 
 def flow_reports(work, F):
@@ -73,7 +73,7 @@ def flow_reports(work, F):
             continue                                                 # 下位フロー（F03-1）の報告
         tail = rest[len(F) + 1:]
         if rest != F and not re.fullmatch(r"[1-9][0-9]*|差分[1-9][0-9]*", tail):
-            raise ValueError(f"reports/{f.name}: 報告の名前が決まりと違う（review_{F}.json・review_{F}_<分冊の番号>.json・review_{F}_差分<N>.json。N は 1、2…）")
+            raise ValueError(site(f"reports/{f.name}: 報告の名前が決まりと違う（review_{F}.json・review_{F}_<分冊の番号>.json・review_{F}_差分<N>.json。N は 1、2…）"))
         out.append((f, read_report(f)))
     return out
 
@@ -83,7 +83,7 @@ def code_reports(work, aid):
     out = []
     for f in sorted((work / "reports").glob("code_review_*.json")) if (work / "reports").exists() else []:
         if "差分" in f.stem and not DIFF.search(f.stem):
-            raise ValueError(f"reports/{f.name}: 報告の名前が決まりと違う（code_review_<図の番号>_差分<N>.json。N は 1、2…）")
+            raise ValueError(site(f"reports/{f.name}: 報告の名前が決まりと違う（code_review_<図の番号>_差分<N>.json。N は 1、2…）"))
         d = read_report(f)
         if isinstance(d, dict) and aid in (d.get("activities") or []):
             out.append((f, d))
@@ -160,10 +160,10 @@ def read_record(work):
     try:
         d = load(p)
     except BadJson as e:
-        raise ValueError(f"review/{RECORD}（照合に出した版の記録）が JSON として読めない（{str(e)[-60:]}）") from None
+        raise ValueError(site(f"review/{RECORD}（照合に出した版の記録）が JSON として読めない（{str(e)[-60:]}）")) from None
     errs = validate(d, "sheets")
     if errs:
-        raise ValueError(f"review/{RECORD}（照合に出した版の記録。機械だけが書く）の形が崩れている（{'／'.join(errs[:3])}）")
+        raise ValueError(site(f"review/{RECORD}（照合に出した版の記録。機械だけが書く）の形が崩れている（{'／'.join(errs[:3])}）"))
     return d["sheets"]
 
 
@@ -245,7 +245,7 @@ def check_shapes(fid, reps):
     for f, d in reps:
         errs = validate(d, "report_code_review" if fid.startswith("A-") else "report_review")
         if errs:
-            raise ValueError(f"reports/{f.name} の形が崩れている（{'／'.join(errs[:3])}）")
+            raise ValueError(site(f"reports/{f.name} の形が崩れている（{'／'.join(errs[:3])}）"))
 
 
 def no_sheet(rec, fid, f):
@@ -274,18 +274,18 @@ def mapped(fid, reps, rec):
         if not sid:
             e = in_assumed(f)
             if e is None:
-                raise ValueError(no_sheet(rec, fid, f))
+                raise ValueError(site(no_sheet(rec, fid, f)))
             out.append((f, d, e))
             continue
         e = next((e for e in mine if e["id"] == sid), None)
         if e is None:
-            raise ValueError(f"reports/{f.name} のシートの番号 {sid} が、{fid} を照合に出した版の記録（review/{RECORD}）に無い（シートの見出しの番号を写す。別の図の番号でないか）")
+            raise ValueError(site(f"reports/{f.name} のシートの番号 {sid} が、{fid} を照合に出した版の記録（review/{RECORD}）に無い（シートの見出しの番号を写す。別の図の番号でないか）"))
         if e["kind"] == ASSUMED or (e["kind"] == "差分") != bool(diff_no(f)):
-            raise ValueError(f"reports/{f.name} のシート {sid} は「{e['kind']}」の照合（" + ("差分照合の報告は、名前を _差分<N> にする" if e["kind"] == "差分" else
-                             "全体の照合の報告は、名前に _差分 を付けない") + "）")
+            raise ValueError(site(f"reports/{f.name} のシート {sid} は「{e['kind']}」の照合（" + ("差分照合の報告は、名前を _差分<N> にする" if e["kind"] == "差分" else
+                             "全体の照合の報告は、名前に _差分 を付けない") + "）"))
         lost = sorted(str(x) for x in judged(d, fid) - set(e["nodes"]))
         if lost:
-            raise ValueError(f"reports/{f.name} が、照合に出していない箱を判定している（{'・'.join(lost[:8])}。シート {sid} に無い。箱の番号を直す）")
+            raise ValueError(site(f"reports/{f.name} が、照合に出していない箱を判定している（{'・'.join(lost[:8])}。シート {sid} に無い。箱の番号を直す）"))
         out.append((f, d, e))
     return sorted(out, key=lambda x: (x[2]["kind"] != ASSUMED, at[x[2]["id"]], x[0].name))   # 認めた版は、前の版の報告（どのシートよりも前に照合した）
 
@@ -312,7 +312,7 @@ def from_reports(work, fid, fig, rec=None, reps=None, maps=False):
             lost = [str(x["node"]) for x in d.get("findings") or [] if x.get("activity") == fid and x.get("node")
                     and x["node"] not in {n.get("id") for n in fig.get("nodes") or [] if isinstance(n, dict)}]
             if lost:
-                raise ValueError(f"reports/{f.name} の指摘が、{fid} に無い箱を指す（{'・'.join(lost[:8])}。箱の番号を直す）")
+                raise ValueError(site(f"reports/{f.name} の指摘が、{fid} に無い箱を指す（{'・'.join(lost[:8])}。箱の番号を直す）"))
     layers = [[(f, d) for f, d, _e in grp] for _e, grp in itertools.groupby(maps, key=lambda x: x[2]["id"])] if maps else [reps]
     sheet = {f.name: e["id"] for f, _d, e in maps} if maps else {}
     boxes = [n["id"] for n in fig.get("nodes") or [] if isinstance(n, dict) and n.get("type") not in ("start", "end")]
@@ -323,7 +323,7 @@ def from_reports(work, fid, fig, rec=None, reps=None, maps=False):
             for f, d in layer:
                 stray = [x for x in d.get("findings") or [] if x.get("activity") not in d["activities"]]
                 if stray:
-                    raise ValueError(f"reports/{f.name} の指摘が、報告の activities に無い図を指す（{'・'.join(sorted({str(x.get('activity')) for x in stray}))}。図の番号を直す）")
+                    raise ValueError(site(f"reports/{f.name} の指摘が、報告の activities に無い図を指す（{'・'.join(sorted({str(x.get('activity')) for x in stray}))}。図の番号を直す）"))
             hits = [(f, x) for f, d in layer for x in d.get("findings") or [] if x.get("activity") == fid]
             seen = {n for _f, d in layer for n in judged(d, fid)}
             for n in [b for b in boxes if b in seen] + sorted(seen - set(boxes), key=str):

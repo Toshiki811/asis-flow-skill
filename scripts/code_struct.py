@@ -1404,7 +1404,7 @@ def struct_of(work, proj):
     try:
         tree = load(pathlib.Path(work) / "code" / f"{proj['id']}.tree.json")
     except Exception as e:                                           # 書きかけ・閉じ忘れ（構造は作らず、誤りとして出す）
-        tree = {"bad": site(str(e))}
+        tree = {"bad": site(f"code/{proj['id']}.tree.json が読めない（{e}）")}
     if isinstance(tree, dict) and not tree.get("bad"):
         from validate import validate
         errs = validate(tree, "code_tree")

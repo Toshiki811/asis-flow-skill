@@ -1,6 +1,6 @@
 # 発火を試験しない点検
 
-点検（`check_flow.py`・`check_layout.py`・`check_extract.py`）の FAIL と、点検が中継する誤りの文（`apply_edits.py`・`activity.py`・`systems.py`・`code_lang.py`・`code_struct.py`・`terms.py`）のうち、自己点検で、誤りを仕込んで出すことをしないもの。
+点検（`check_flow.py`・`check_layout.py`・`check_extract.py`）の FAIL と、点検が中継する誤りの文（`apply_edits.py`・`activity.py`・`systems.py`・`code_lang.py`・`code_struct.py`・`terms.py`・`review.py`・`table_template.py`・`common.py`）のうち、自己点検で、誤りを仕込んで出すことをしないもの。
 
 - LLM・人が書くファイル（カード・業務分類・フロー・台帳・直しの一覧・木・用語の対応・採否表・照合の報告）を見る点検は、ここに載せない。どれも、自己点検で発火を確かめる。
 - ここに載るのは、次の 3 種類だけ。
@@ -17,11 +17,12 @@
   点検の共通の部品（`common.FAIL_HELPERS`）は、部品の中の FAIL と、呼ぶ所の両方を数える（呼ぶ所は、どの種類のファイルの点検から出たかを、呼んだ行で控える）。
   点検が 1 行で中継する誤りの文のうち、直しの一覧（`apply_edits.py`）・アクティビティ図の直しの一覧（`activity.py`）・台帳の紐付けと図にしない起動点・手続き
   （`systems.py` の `link_errors`・`excluded_errors`・`folded_errors`）・LLM が書いたブロックの木（`code_lang.py` の `tree_problems`）・取り出した構造
-  （`code_struct.py` の `tree_errors` と、木が読めない・形が崩れている）・用語の対応（`terms.py` の `problems`）は、内側の誤りの文ごとに数える
-  （`common.site` で包んだ文と、`self.bad` の呼び出し。2026-10-17 から）。
+  （`code_struct.py` の `tree_errors` と、木が読めない・形が崩れている）・用語の対応（`terms.py` の `problems`）・照合の報告と照合に出した版の記録（`review.py`）・
+  業務マトリクス一覧と確認事項一覧の読み戻し（`table_template.py` の `read_side`・`read_back`）・人の値の控え（`common.py` の answers.json・times.json の形）は、
+  内側の誤りの文ごとに数える（`common.site` で包んだ文と、`self.bad` の呼び出し。2026-10-17 から）。表の行で指すときの関数は、いちばん内側の関数の名前
+  （ブロックの木の点検の多くは `visit`）。
 - 数えないもの:
   - 落ちないための守り（`common.guarded` の「形が崩れていて、ここから先を点検できない」）。自己点検は、正しいデータと試験の写しで、これが出ないことを確かめている。
-  - 中継の内側のうち、`review.py` の報告の誤り。中継の行は 1 か所に数え、内側の文ごとには数えない。
 - 表の行は、ファイル・関数・文の一部で点検を指す（行の番号は書かない。点検の文を変えたら、ここも直す）。
 
 | ファイル | 関数 | 文の一部 | 試験しない理由 |
@@ -38,7 +39,7 @@
 | check_flow.py | `check_drawio` | mxGraphModel/root が無い | 同上 |
 | check_flow.py | `check_regenerated` | が無い（書き出していない） | 守り。書き出していない図は、図のページの点検（`check_drawio` の「ページが無い」。試験している）と同時に出る |
 | check_flow.py | `check_drawio` | assets/activity_styles.json が無い・古い | 守り。スキルの部品（assets）を消さない限り起きない |
-| check_flow.py | `check_code` | 取り出した構造の誤り | 守り。機械の取り出し（`code_struct.py`）の誤り。LLM の木の誤りは、木を構造にする前に止める（「木の点検」の試験） |
+| check_flow.py | `check_code` | 取り出した構造の誤り | 守り。機械の取り出し（`code_struct.py`）の誤り。LLM の木の誤りは、木を構造にする前に止める（「木の点検」の試験）。内側の誤りの文（`code_struct.py` の `tree_errors`）は、中継の内側として、構造を直に作って確かめる |
 | check_flow.py | `matrix_results` | 保存した計算の結果が違う式のセルが、ほかに | 同じ種類の FAIL が多いときの、残りの数の行。1 つ目の行は試験している |
 | check_flow.py | `check_matrix` | のシートが無い（テンプレートに要る） | 守り。シートを消したブックは、読み戻し（`read_back`）が先に止める |
 | check_flow.py | `check_matrix` | いまのデータと違うセルが、ほかに | 同じ種類の FAIL が多いときの、残りの数の行。1 つ目の行は試験している |

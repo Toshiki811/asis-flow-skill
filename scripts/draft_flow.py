@@ -11,7 +11,8 @@
   ラベル    カードの action（分岐は question）そのまま。30 字を超え、かっこ書きがあるときは、かっこの前までをラベルに、かっこの中を補足にする
   レーン    カードの actor を、用語の正本の名前に寄せたもの。actor が空なら、まとめた概要の手順の actor。それも無ければ空（直しの一覧の default_lane に置く）
   帳票      inputs は参照する（in）、outputs は作る（out）
-  動作の案  手順の名前の終わりの動詞から、動作の種類の案（決まり 3.22 の読み方。ACTION_VERBS）。案を見せるだけで、選ぶのは LLM（点検は、案と比べない）
+  動作の案  手順の名前の終わりの動詞から、動作の種類の案（決まり 3.22 の読み方と、12 語の意味。ACTION_VERBS）。使うシステムは、点検の札と同じ決め方。
+            案を見せるだけで、選ぶのは LLM（点検は、案と比べない）
   まとめる  概要のページ（flow_diagram・overview）の手順・分岐は、あとのページの、同じ番号の見出しの下の最初の手順・分岐にまとめる
             （見出しの題が両方にあれば、似ていること。番号が無ければ、文がほぼ同じ1件）。候補として見せ、直しの一覧の unmerge で外せる
   線        並びの順につなぐ。推定にするのは、番号の無い箇条書きの項から次の項へ進むところ・資料をまたぐところ・補足の中の作業の前後
@@ -23,14 +24,15 @@ import pathlib
 import re
 import unicodedata
 
-from common import labels, load, load_card, load_page, manifest, norm, page_json, page_units, same_text, unit_marks, when_done, work_dir
+from common import (CardItems, label_core, labels, load, load_card, load_page, manifest, node_systems, norm, page_json, page_units, same_text, system_names,
+                    unit_marks, when_done, work_dir)
 
 OVERVIEW = ("flow_diagram", "overview")                              # 概要のページ（あとのページが、同じ作業を詳しく書く）
 APPROVAL = re.compile(r"^(?:事前に|あらかじめ|必ず)?([^、。をにがは]{1,20}?)の(?:承認|決裁|許可)を(?:得|受け)る$")   # 「X の承認を得る」だけの手順: 担当は X（決まり 3.21）
 AUTOMATIC = re.compile(r"自動(?:的)?に|自動で")                                  # 「自動で」行われる手順: そのシステムのレーン（決まり 3.8）
 SMALL_HINT = re.compile(r"ボタンを押す|クリックする|実行する|起動する")   # 量「小」の案（決まり 3.22。付けるかどうかと理由は LLM）
 HUGE_HINT = re.compile(r"年\s*[1１一]\s*回|年次|決算|全員|全件|全職員|棚卸|予算の編成|予算を編成|半期|四半期|期間をかけ|数日|数週間")   # 量「特大」の手がかりの語
-ACTION_VERBS = (                                                     # 動作の種類 → 箱の名前の終わりの動詞（決まり 3.22。下書きに案として出すだけ）
+ACTION_VERBS = (                                                     # 動作の種類 → 箱の名前の終わりの動詞（決まり 3.22 と、スキーマの 12 語の意味。下書きに案として出すだけ）
     ("入力する", ("入力する", "登録する", "記入する", "記帳する")),
     ("作成する", ("作成する",)),
     ("確認する", ("確認する", "照合する", "点検する", "チェックする", "確かめる")),
@@ -45,31 +47,53 @@ ACTION_VERBS = (                                                     # 動作の
 )
 JOINS = {"確かめる": ("確かめ、", "確かめて"), "差し戻す": ("差し戻し、", "差し戻して"), "回す": ("回し、", "回して"), "送る": ("送り、", "送って"),   # 「する」で終わらない動詞の、次の動きへつなぐ形
          "受け取る": ("受け取り、", "受け取って"), "知らせる": ("知らせ、", "知らせて"), "調べる": ("調べ、", "調べて")}
-ASK_OTHERS = re.compile(r"電話|メール|問い合わせ|問合せ")               # 「電話で確かめる」は、相手に確かめる動き: 連絡する（決まり 3.22）
+ASK_OTHERS = re.compile(r"(電話|メール|ＦＡＸ|FAX|ファクス)で([^たる]*)$|問い?合わせ(?:て|、)$")   # 相手に確かめる手段のすぐあとの「確かめる」: 連絡する（決まり 3.22。
+                                                                     # 「メールで届いた請求書を確認する」のような、間に別の動きのある名前は除く）
+SHORT_VERBS = ("回す", "送る")                                        # 2 字の動詞は、助詞のすぐあとだけ（「見送る」「見回す」は別の動き）
+PARTICLES = "をにへでと、"
 TIMING = re.compile(r"タイミング|時期|頻度|毎月|毎週|毎日|毎年|月末|月初|年度末|期末|随時|都度|受けたら|届いたら")   # 開始条件の手がかりになる補足の語
 HEAD = re.compile(r"^(?:[（(]\s*([0-9０-９]{1,2})\s*[)）]|([①-⑳])|([0-9０-９]{1,2})(?=[.．、\s]))[.．、]?\s*(\S.*)$")
 PAGE_TYPE_JA = {"reference": "参考", "table": "表", "form": "様式", "toc": "目次", "cover": "表紙", "blank": "白紙", "code": "マクロ",
                 "procedure": "手順", "flow_diagram": "フロー図", "overview": "概要"}
 
 
-def action_hint(label, system=""):
-    """箱の名前の動詞から、動作の種類の案: (語の並び, 理由)。名前の終わりが ACTION_VERBS の動詞でなければ ([], "")。
-    使うシステムがあれば、作成する → 入力する・実行する → 入力する。電話・メールで確かめる → 連絡する。
-    前に、別の種類の動詞が「〜し、」「〜して」でつながっていれば、2 つの動きの案も添える"""
-    t = re.sub(r"[。．.\s]+$", "", str(label or ""))
-    verbs = [(v, a) for a, vs in ACTION_VERBS for v in vs]
-    last = max(((v, a) for v, a in verbs if t.endswith(v)), key=lambda x: len(x[0]), default=None)
-    if last is None:
-        return (["入力する"], f"「実行する」で、使うシステム「{system}」がある（システムで実行する）") if system and t.endswith("実行する") else ([], "")
-    v, a = last
-    why = f"「{v}」"
+def verb_at(t, v):
+    """t が動詞 v で終わるか（2 字の動詞は、助詞のすぐあとか、名前がその動詞だけのとき）"""
+    return t.endswith(v) and (v not in SHORT_VERBS or len(t) == len(v) or t[-len(v) - 1] in PARTICLES)
+
+
+def read_verb(v, a, before, system):
+    """動詞 v（種類 a）を、使うシステム・前の文で読み替える（決まり 3.22）: (種類, 理由)"""
     if a == "作成する" and system:
-        a, why = "入力する", f"「{v}」で、使うシステム「{system}」がある（画面で作るなら入力する。紙・ファイルを一から作るなら作成する）"
-    elif a == "確認する" and ASK_OTHERS.search(t):
-        a, why = "連絡する", f"「{ASK_OTHERS.search(t).group(0)}」で「{v}」（相手に確かめる）"
-    head = t[:-len(v)]
-    joins = [(j, b) for x, b in verbs for j in (JOINS.get(x) or (x[:-2] + "し、", x[:-2] + "して"))]
-    hits = sorted((head.find(j), j, b) for j, b in joins if j in head and b != a)
+        return "入力する", f"「{v}」で、使うシステム「{system}」がある（画面で作るなら入力する。紙・ファイルを一から作るなら作成する）"
+    if v == "実行する":
+        return "入力する", f"「{v}」で、使うシステム「{system}」がある（システムで実行する）"
+    m = ASK_OTHERS.search(before) if a == "確認する" else None
+    if m:
+        return "連絡する", f"「{m.group(1) or '問い合わせ'}」で「{v}」（相手に確かめる）"
+    return a, f"「{v}」"
+
+
+def action_hint(label, system=""):
+    """箱の名前の動詞から、動作の種類の案: (語の並び, 理由)。名前（終わりのかっこ書きと句点を除く）の終わりが ACTION_VERBS の動詞でなければ ([], "")。
+    使うシステム（点検の札と同じ決め方。下書きが渡す）があれば、作成する → 入力する・実行する → 入力する。電話・メールで確かめる → 連絡する。
+    前に、別の種類の動きが「〜し、」「〜して」でつながっていれば、2 つの動きの案も添える（前の動きも、同じ決まりで読み替える）"""
+    t = re.sub(r"[。．.\s]+$", "", label_core(label))
+    verbs = [(v, a) for a, vs in ACTION_VERBS for v in vs] + ([("実行する", "入力する")] if system else [])
+    last = max(((v, a) for v, a in verbs if verb_at(t, v)), key=lambda x: len(x[0]), default=None)
+    if last is None:
+        return [], ""
+    head = t[:-len(last[0])]
+    a, why = read_verb(*last, head, system)
+    hits = []
+    for x, b in verbs:
+        for j in JOINS.get(x) or (x[:-2] + "し、", x[:-2] + "して"):
+            at = head.find(j)
+            if at >= 0 and (x not in SHORT_VERBS or at == 0 or head[at - 1] in PARTICLES):
+                b2 = read_verb(x, b, head[:at], system)[0]
+                if b2 != a:
+                    hits.append((at, j, b2))
+    hits.sort()
     return ([hits[0][2], a], why + f"。前に「{hits[0][1].rstrip('、')}」もある（2 つの動きなら、2 語で書く）") if hits else ([a], why)
 
 
@@ -122,6 +146,7 @@ class Draft:
         self.cat = self.cats[cid]
         self.pages = [(dp["doc_id"], p) for dp in self.cat.get("pages") or [] for p in dp.get("pages") or []]
         self.terms, self.lab = Terms(self.work), labels(self.m, self.work)
+        self.items_of, self.sys_names = CardItems(self.work), system_names(self.work)   # 動作の案の「使うシステム」は、点検の札と同じ決め方（node_systems）
         self.nodes, self.seq, self.merged, self.notes, self.cards, self.actors = {}, [], {}, [], {}, []
         for doc, page in self.pages:
             self.collect(doc, page)
@@ -260,7 +285,9 @@ class Draft:
                        + (f"  〈{'・'.join(tags)}〉" if tags else ""))
             said = n["label"] + " " + q
             huge = HUGE_HINT.search(said) if n["kind"] == "step" else None
-            acts, why = action_hint(n["label"], n["system"]) if n["kind"] == "step" and self.terms.kind(lane) != "system" else ([], "")
+            src = [{"doc_id": d, "page": p, "item": it} for kk in [k] + [a for a, (to, _w) in self.merged.items() if to == k] for d, p, it in self.nodes[kk]["sources"]]
+            tagged = node_systems({"type": "process", "sources": src}, lane, self.items_of, self.sys_names)
+            acts, why = action_hint(n["label"], "・".join(tagged)) if n["kind"] == "step" and self.terms.kind(lane) != "system" else ([], "")
             extra = [f"条件: {n['condition']}" if n["condition"] else "", f"システム: {n['system']}" if n["system"] else "",
                      f"動作の案: {acts[0] if len(acts) == 1 else json.dumps(acts, ensure_ascii=False)}（{why}）" if acts else "",
                      f"量の候補: 特大（「{huge.group(0)}」。時間・日の単位でかかると読めるときだけ、理由つきで）" if huge else
