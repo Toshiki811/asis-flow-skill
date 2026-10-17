@@ -9,10 +9,11 @@
   門の WARN  .warn( のうち、納品の門が FAIL にする WARN（deliver.PROMOTE の語を含むもの）。ほかの WARN は数えない（門を止めない）
   呼び元     点検の共通の部品（common.FAIL_HELPERS: 形の点検・読めない・根拠のページ ほか）を呼ぶ所。ファイルの種類ごとに、部品の FAIL が出るかを見る
   中継の内側 点検が 1 行で中継する、ほかのモジュールの誤りの文: 直しの一覧（apply_edits.py の self.bad・self.err）・アクティビティ図の直し（activity.py の同じ形）・
-             台帳の紐付け（systems.py の link_errors・excluded_errors・folded_errors）。誤りの文ごとに 1 か所（common.site で包んだ所と、self.bad の呼び出し）
+             台帳の紐付け（systems.py の link_errors・excluded_errors・folded_errors）・LLM が書いたブロックの木（code_lang.py の tree_problems）・
+             取り出した構造（code_struct.py の tree_errors と、木が読めない・形が崩れている）・用語の対応（terms.py の problems）。
+             誤りの文ごとに 1 か所（common.site で包んだ所と、self.bad の呼び出し）
 控えは、環境変数 ASIS_FAIL_LOG があるとき、Report.fail・fail_if（FAIL になったときだけ）・warn・common.site が書き足す（共通の部品の中なら、呼び元の行も）。
 部品の中の FAIL も、呼び元も、それぞれ 1 か所に数える。数えないもの: 落ちないための守り（common.guarded の FAIL）。
-用語の対応・木の誤りの中継は、中継の 1 か所に数える（内側の誤りの文ごとには数えない）。
 試験しない点検は、evals/untested_checks.md の表に、理由つきで並べる（ファイル・関数・文の一部で指す。行の番号は書かない）。
 終了コード 1: 一覧に無いのに一度も出ない点検がある（試験を足すか、試験しない理由を書いて一覧に足す）／一覧にあるのに出た点検・
 どの点検にも当たらない一覧の行がある（一覧を直す）／門が FAIL にする語（deliver.PROMOTE）が、どの WARN の文にも無い（文を変えて語が外れた）／
@@ -34,7 +35,7 @@ from common import FAIL_HELPERS, FAIL_LOG  # noqa: E402
 from deliver import PROMOTE  # noqa: E402
 
 FILES = ("check_flow.py", "check_layout.py", "check_extract.py")
-RELAYS = ("apply_edits.py", "activity.py", "systems.py")             # 中継の内側（誤りの文ごとに数える）
+RELAYS = ("apply_edits.py", "activity.py", "systems.py", "code_lang.py", "code_struct.py", "terms.py")   # 中継の内側（誤りの文ごとに数える）
 LIST = SKILL / "evals" / "untested_checks.md"
 
 

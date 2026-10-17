@@ -11,12 +11,14 @@
   ラベル    カードの action（分岐は question）そのまま。30 字を超え、かっこ書きがあるときは、かっこの前までをラベルに、かっこの中を補足にする
   レーン    カードの actor を、用語の正本の名前に寄せたもの。actor が空なら、まとめた概要の手順の actor。それも無ければ空（直しの一覧の default_lane に置く）
   帳票      inputs は参照する（in）、outputs は作る（out）
+  動作の案  手順の名前の終わりの動詞から、動作の種類の案（決まり 3.22 の読み方。ACTION_VERBS）。案を見せるだけで、選ぶのは LLM（点検は、案と比べない）
   まとめる  概要のページ（flow_diagram・overview）の手順・分岐は、あとのページの、同じ番号の見出しの下の最初の手順・分岐にまとめる
             （見出しの題が両方にあれば、似ていること。番号が無ければ、文がほぼ同じ1件）。候補として見せ、直しの一覧の unmerge で外せる
   線        並びの順につなぐ。推定にするのは、番号の無い箇条書きの項から次の項へ進むところ・資料をまたぐところ・補足の中の作業の前後
   分岐      カードの分岐の行き先（to）に当たる手順へ線を引く。書かれていない側は、その手順を飛ばして次へ進む線を、推定で置く
 """
 import argparse
+import json
 import pathlib
 import re
 import unicodedata
@@ -28,10 +30,47 @@ APPROVAL = re.compile(r"^(?:事前に|あらかじめ|必ず)?([^、。をにが
 AUTOMATIC = re.compile(r"自動(?:的)?に|自動で")                                  # 「自動で」行われる手順: そのシステムのレーン（決まり 3.8）
 SMALL_HINT = re.compile(r"ボタンを押す|クリックする|実行する|起動する")   # 量「小」の案（決まり 3.22。付けるかどうかと理由は LLM）
 HUGE_HINT = re.compile(r"年\s*[1１一]\s*回|年次|決算|全員|全件|全職員|棚卸|予算の編成|予算を編成|半期|四半期|期間をかけ|数日|数週間")   # 量「特大」の手がかりの語
+ACTION_VERBS = (                                                     # 動作の種類 → 箱の名前の終わりの動詞（決まり 3.22。下書きに案として出すだけ）
+    ("入力する", ("入力する", "登録する", "記入する", "記帳する")),
+    ("作成する", ("作成する",)),
+    ("確認する", ("確認する", "照合する", "点検する", "チェックする", "確かめる")),
+    ("承認する", ("承認する", "決裁する", "押印する")),
+    ("提出・回付する", ("提出する", "回付する", "送付する", "差し戻す", "回す", "送る")),
+    ("受け取る", ("受け取る", "受領する", "回収する")),
+    ("出力する", ("出力する", "印刷する")),
+    ("連絡する", ("連絡する", "依頼する", "報告する", "通知する", "知らせる")),
+    ("計算する", ("計算する", "集計する")),
+    ("調べる", ("調べる", "調査する", "検討する", "選定する")),
+    ("保管する", ("保管する", "整理する", "保存する", "廃棄する")),
+)
+JOINS = {"確かめる": ("確かめ、", "確かめて"), "差し戻す": ("差し戻し、", "差し戻して"), "回す": ("回し、", "回して"), "送る": ("送り、", "送って"),   # 「する」で終わらない動詞の、次の動きへつなぐ形
+         "受け取る": ("受け取り、", "受け取って"), "知らせる": ("知らせ、", "知らせて"), "調べる": ("調べ、", "調べて")}
+ASK_OTHERS = re.compile(r"電話|メール|問い合わせ|問合せ")               # 「電話で確かめる」は、相手に確かめる動き: 連絡する（決まり 3.22）
 TIMING = re.compile(r"タイミング|時期|頻度|毎月|毎週|毎日|毎年|月末|月初|年度末|期末|随時|都度|受けたら|届いたら")   # 開始条件の手がかりになる補足の語
 HEAD = re.compile(r"^(?:[（(]\s*([0-9０-９]{1,2})\s*[)）]|([①-⑳])|([0-9０-９]{1,2})(?=[.．、\s]))[.．、]?\s*(\S.*)$")
 PAGE_TYPE_JA = {"reference": "参考", "table": "表", "form": "様式", "toc": "目次", "cover": "表紙", "blank": "白紙", "code": "マクロ",
                 "procedure": "手順", "flow_diagram": "フロー図", "overview": "概要"}
+
+
+def action_hint(label, system=""):
+    """箱の名前の動詞から、動作の種類の案: (語の並び, 理由)。名前の終わりが ACTION_VERBS の動詞でなければ ([], "")。
+    使うシステムがあれば、作成する → 入力する・実行する → 入力する。電話・メールで確かめる → 連絡する。
+    前に、別の種類の動詞が「〜し、」「〜して」でつながっていれば、2 つの動きの案も添える"""
+    t = re.sub(r"[。．.\s]+$", "", str(label or ""))
+    verbs = [(v, a) for a, vs in ACTION_VERBS for v in vs]
+    last = max(((v, a) for v, a in verbs if t.endswith(v)), key=lambda x: len(x[0]), default=None)
+    if last is None:
+        return (["入力する"], f"「実行する」で、使うシステム「{system}」がある（システムで実行する）") if system and t.endswith("実行する") else ([], "")
+    v, a = last
+    why = f"「{v}」"
+    if a == "作成する" and system:
+        a, why = "入力する", f"「{v}」で、使うシステム「{system}」がある（画面で作るなら入力する。紙・ファイルを一から作るなら作成する）"
+    elif a == "確認する" and ASK_OTHERS.search(t):
+        a, why = "連絡する", f"「{ASK_OTHERS.search(t).group(0)}」で「{v}」（相手に確かめる）"
+    head = t[:-len(v)]
+    joins = [(j, b) for x, b in verbs for j in (JOINS.get(x) or (x[:-2] + "し、", x[:-2] + "して"))]
+    hits = sorted((head.find(j), j, b) for j, b in joins if j in head and b != a)
+    return ([hits[0][2], a], why + f"。前に「{hits[0][1].rstrip('、')}」もある（2 つの動きなら、2 語で書く）") if hits else ([a], why)
 
 
 def key_of(doc, page, item):
@@ -221,7 +260,9 @@ class Draft:
                        + (f"  〈{'・'.join(tags)}〉" if tags else ""))
             said = n["label"] + " " + q
             huge = HUGE_HINT.search(said) if n["kind"] == "step" else None
+            acts, why = action_hint(n["label"], n["system"]) if n["kind"] == "step" and self.terms.kind(lane) != "system" else ([], "")
             extra = [f"条件: {n['condition']}" if n["condition"] else "", f"システム: {n['system']}" if n["system"] else "",
+                     f"動作の案: {acts[0] if len(acts) == 1 else json.dumps(acts, ensure_ascii=False)}（{why}）" if acts else "",
                      f"量の候補: 特大（「{huge.group(0)}」。時間・日の単位でかかると読めるときだけ、理由つきで）" if huge else
                      "量の案: 小（ボタンを押す・実行するだけなら、time で volume と理由）" if n["kind"] == "step" and SMALL_HINT.search(n["label"]) else "",
                      f"参照: {'・'.join(n['inputs'])}" if n["inputs"] else "", f"作る: {'・'.join(n['outputs'])}" if n["outputs"] else "",

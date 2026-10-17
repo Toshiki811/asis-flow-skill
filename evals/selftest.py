@@ -1918,6 +1918,27 @@ def tree_tests(tmp):
     case("手続きの範囲が、ほかの手続きと重なる", lambda t: t["procedures"][1]["lines"].__setitem__(0, t["procedures"][0]["lines"][1]), "重なる")
     case("起動点の名前が、根拠の行にもファイル名にも無い", lambda t: t["entries"][0].update(label="バッチ「受注取込」を実行"), "かぎかっこの中の名前")
     case("COBOL: 注釈でない行を落とす", lambda t: t["procedures"][0]["body"].pop(2), "どのノードにも入っていない行", cobol, km, "cobol")
+    case("手続きのモジュールが、このまとまりに無い", lambda t: t["procedures"][3].update(module="Report.java"), "モジュール「Report.java」が、このまとまりに無い")
+    case("手続きの行の範囲が、ソースより長い", lambda t: t["procedures"][3]["lines"].__setitem__(1, len(J) + 5), "が、ソース（")
+    case("同じ名前の手続きを 2 つ書く", lambda t: t["procedures"].append(copy.deepcopy(t["procedures"][3])), "同じ名前の手続きが2つある")
+    case("ノードの行の範囲が 1 つだけ", lambda t: main(t)[1].update(lines=main(t)[1]["lines"][:1]), "のノードの行の範囲が無い・違う")
+    case("ノードが、手続きの範囲の外", lambda t: main(t)[0].update(lines=[1, 1]), "が、手続きの範囲（")
+    case("分岐の head が、ノードの範囲の外", lambda t: main(t)[2].update(head=[main(t)[2]["lines"][1] + 1] * 2), "が、ノードの範囲の外")
+    case("繰り返しの tail が、ノードの範囲の外", lambda t: main(t)[3].update(tail=[1, 1]), "の tail [1, 1] が、ノードの範囲の外")
+    case("分岐に出口が無い", lambda t: main(t)[2].update(branches=[]), "出口（branches）が無い")
+    case("振り分けの出口の head が、前の出口と同じ行", lambda t: t["procedures"][2]["body"][1]["branches"][1].update(head=list(t["procedures"][2]["body"][1]["branches"][0]["head"])),
+         "順に並んでいない・範囲の外")
+    case("入出力の行が、ソースに無い", lambda t: t["procedures"][3]["body"][0]["io"][0].update(line=len(J) + 5), "の入出力「取込結果.txt」の行")
+    case("起動点の手続きが、木に無い", lambda t: t["entries"][0].update(procedure=f"{M}.start"), f"」の手続き「{M}.start」が、木の手続きに無い")
+    case("起動点の根拠の行が、ソースに無い", lambda t: t["entries"][0].update(line=len(J) + 5), f"の根拠の行（{len(J) + 5}）が、ソースに無い")
+    case("起動点の also の行が、ソースに無い", lambda t: t["entries"][0].update(also=len(J) + 5), f"の also の行（{len(J) + 5}）が、ソースに無い")
+    odd = {"procedures": [{"id": "M.p", "lines": [1, 10], "exec": [2, 4, 6], "body": [
+        {"kind": "seq", "lines": [4, 4], "exec": [4]}, {"kind": "seq", "lines": [2, 2], "exec": [2, 4]},
+        {"kind": "if", "lines": [5, 9], "branches": [{"body": [{"kind": "seq", "lines": [6, 6], "exec": [6]}, {"kind": "seq", "lines": [6, 12], "exec": [6]}]}]}]}]}
+    errs = cs.tree_errors(odd)
+    out.append(("取り出した構造の誤り（機械の取り出しの守り。tree_errors）: 親の範囲の外・前のノードと重なる／逆順・同じ行が 2 つのノードに" + ("" if len(errs) == 3 else f"\n{errs}"),
+                [x for x in ("親の範囲（5〜9 行）の外", "前のノードと重なっているか、順が逆", "同じ行が、木の2つのノードに入っている（[4]）") if any(x in e for e in errs)] == [
+                    "親の範囲（5〜9 行）の外", "前のノードと重なっているか、順が逆", "同じ行が、木の2つのノードに入っている（[4]）"]))
     other = copy.deepcopy(java)
     other["procedures"][0]["body"][1]["lines"] = [other["procedures"][0]["body"][1]["lines"][0]] * 2
     other["procedures"][3]["body"] = [{"kind": "seq", "lines": [x, x]} for x in range(other["procedures"][3]["lines"][0] + 1, other["procedures"][3]["lines"][0] + 4)]
@@ -2313,6 +2334,10 @@ def review_gate_tests(tmp, good):
     tm = T.Terms(tmp, {"M09": {"modules": []}})
     tm.rows = [{"project": "M09", "name": "SIME_BI", "word": "締め日", "basis": "comment"}]
     out.append(("用語の対応: 根拠がコメント・定義なのに場所が無いと、誤り", any("場所（source の module・line）が無い" in x for x in tm.problems())))
+    tm.rows = [{"project": "M08", "name": "SIME_BI", "word": "締め日", "basis": "spelling"}, {"project": "M09", "name": "KUBUN", "word": "区分"}]
+    got = tm.problems()
+    out.append(("用語の対応: プログラムのまとまりに無い project・根拠（basis）が無い行は、誤り" + ("" if len(got) >= 2 else f"\n{got}"),
+                any("terms[0]: project「M08」が、プログラムのまとまりに無い" in x for x in got) and any(x.startswith("terms[1]「KUBUN」: 根拠（basis）が無く") for x in got)))
     x = tmp / "kinds"
     shutil.copytree(good, x)
     edit(x / "flows/F01.flow.json", lambda f: f["lanes"][0].update(kind="部署"))
@@ -2979,6 +3004,20 @@ def mech_tests(tmp, good):
     d2, d3 = Draft(w, "F02"), Draft(w, "F03")
     out.append(("下書き（決まり 3.21・3.8）: 「部長の承認を得る」だけの手順は部長のレーン。「自動で連携される」手順は、そのシステムのレーン（システム処理の箱になる）",
                 d2.nodes["M04.2.s2"]["lane"] == "部長" and d3.nodes["M02.1.s4"]["lane"] == "会計システム" and "承認の相手のレーン" in d2.show()))
+    from draft_flow import ACTION_VERBS, JOINS, action_hint
+    rows = d3.show().splitlines()
+    after = lambda key: next((rows[i + 1] for i, x in enumerate(rows) if f"  {key}  " in x and i + 1 < len(rows)), "")
+    cases = [("出張旅費の金額を照合し、決裁する", "", ["確認する", "承認する"]), ("書類を受け取って保管する", "", ["受け取る", "保管する"]),
+             ("出張報告と旅程を照合し、日程を確認する", "", ["確認する"]), ("支払データを作成する", "経費精算システム", ["入力する"]), ("支払依頼書を作成する", "", ["作成する"]),
+             ("取引先にメールで確かめる", "", ["連絡する"]), ("振込を実行する", "", []), ("申請書を提出し、受付印をもらう", "", []), ("結果を確かめ、上長に知らせる。", "", ["確認する", "連絡する"])]
+    bad = [(lab, sy, action_hint(lab, sy)[0]) for lab, sy, want in cases if action_hint(lab, sy)[0] != want]
+    verbs = [v for _a, vs in ACTION_VERBS for v in vs]
+    from common import ACTIONS
+    out.append(("下書きの動作の案（決まり 3.22。案を見せるだけ）: 箱の名前の終わりの動詞から。使うシステムがあって作成する・実行する → 入力する／電話・メールで確かめる → 連絡する／"
+                "前に別の動きがつながれば 2 語。表に無い動詞・システムのレーンの手順には、案を出さない" + (f"\n{bad}" if bad else ""),
+                not bad and [a for a, _v in ACTION_VERBS] == [a for a in ACTIONS if a != "その他"] and len(verbs) == len(set(verbs))
+                and all(v in JOINS for v in verbs if not v.endswith("する")) and "動作の案: 入力する（「実行する」で、使うシステム「ファームバンキング」がある" in after("M02.1.s3")
+                and "動作の案: 連絡する（「電話」で「確認する」" in after("M02.2.s2") and "動作の案: 出力する（「印刷する」）" in after("M02.2.s1") and "動作の案" not in after("M02.1.s4")))
     from apply_edits import make
     base = {"start_condition": "", "end_condition": "", "ops": []}
     f1, e1, _d = make(w, "F02", dict(base, ops=[{"op": "exclude", "item": "M04.2.s2", "flow": "F01"}]))
@@ -4017,6 +4056,51 @@ End Sub
 """
 
 
+VBA_MANY = """Public Sub 全部を点検する()
+    Dim 値 As String
+    ' 見出しの点検
+    値 = Worksheets("台帳").Range("A1").Value
+    結果を書く "番号の見出し", (値 = "番号")
+    値 = Worksheets("台帳").Range("B1").Value
+    結果を書く "日付の見出し", (値 = "日付")
+    値 = Worksheets("台帳").Range("C1").Value
+    結果を書く "金額の見出し", (値 = "金額")
+    ' 日付の点検
+    値 = Worksheets("台帳").Range("B2").Value
+    結果を書く "日付", (値 <> "")
+    ' 金額の点検
+    値 = Worksheets("台帳").Range("C2").Value
+    結果を書く "金額", (値 <> "")
+    値 = Worksheets("台帳").Range("C3").Value
+    結果を書く "税額", (値 <> "")
+    値 = Worksheets("台帳").Range("C4").Value
+    結果を書く "合計額", (値 <> "")
+    値 = Worksheets("台帳").Range("C5").Value
+    結果を書く "支払額", (値 <> "")
+    If Worksheets("台帳").Range("D1").Value = "" Then
+        MsgBox "備考の見出しがありません"
+    End If
+    ' 備考の点検
+    値 = Worksheets("台帳").Range("D2").Value
+    結果を書く "備考", (値 <> "")
+    値 = Worksheets("台帳").Range("D3").Value
+    結果を書く "担当", (値 <> "")
+    ' 合計の点検
+    値 = Worksheets("台帳").Range("E2").Value
+    結果を書く "件数", (値 <> "")
+    値 = Worksheets("台帳").Range("E3").Value
+    結果を書く "総額", (値 <> "")
+    ' 締め
+    Worksheets("結果").Range("Z1").Value = Now
+End Sub
+
+Private Sub 結果を書く(項目 As String, 合格 As Boolean)
+    Worksheets("結果").Range("A1").Value = 項目
+    Worksheets("結果").Range("B1").Value = 合格
+End Sub
+"""
+
+
 def call_run_tests(tmp):
     """同じ共通の処理を続けて呼ぶ並びを、1つの箱にまとめる（直しの一覧の merge に、呼び出しを入れる）"""
     out, src, w = [], tmp / "run_in", tmp / "run_work"
@@ -4054,6 +4138,54 @@ def call_run_tests(tmp):
     put(main, "台帳を点検する", [{"op": "merge", "items": keys[:2]}, {"op": "name", "item": keys[0], "label": "「台帳」の見出しを確かめ、結果を書く"}])
     code, text = run("activity.py", w, "apply", "--id", main)
     out.append(("直しの一覧: 呼び出しが 3 回に満たない並びは、まとめられない", code != 0 and "3 回以上続けて呼ぶ並びだけ" in text))
+    _c, small = run("activity.py", w, "draft", "--id", main)
+    src2, w2 = tmp / "runs_in", tmp / "runs_work"
+    (src2 / "src").mkdir(parents=True)
+    (src2 / "src" / "点検.bas").write_text('Attribute VB_Name = "点検"\n' + VBA_MANY, encoding="utf-8")
+    subprocess.run([sys.executable, str(S / "inventory.py"), str(src2), "-w", str(w2)], capture_output=True, text=True)
+    for sc, args in (("render_pages.py", []), ("code_struct.py", []), ("systems.py", ["draft"])):
+        run(sc, w2, *args)
+    edit(w2 / "structure/systems.json", lambda j: [x.update(kind="euc_excel") for x in j["systems"]])
+    _c, listing = run("activity.py", w2, "list")
+    big, callee = (next((x.split()[0] for x in listing.splitlines() if f"点検.{n}" in x), "") for n in ("全部を点検する", "結果を書く"))
+    c1, d1 = run("activity.py", w2, "draft", "--id", big)
+    heads = [ln.split("見出し: ", 1)[1] for ln in d1.splitlines() if re.match(r"\s+案\d+  → ", ln)]
+    props = [json.loads(ln.split(":", 1)[1]) for ln in d1.splitlines() if ln.strip().startswith('"items":')]
+    out.append(("まとめの案（25 箱を超える図だけ）: 同じ共通の処理を続けて呼ぶ並びを、ソースの見出しで切る。呼び出しが 3 回に満たない見出しは前の見出しと（先頭なら後ろと）合わせ、"
+                "分岐・呼び出しの無い見出しで並びが切れる。はじめの「値を取る」まとまりから、終わりの呼び出しまで" + ("" if c1 == 0 else d1[-400:]),
+                c1 == 0 and "箱が 27 個で" in d1 and heads == ["「見出しの点検」・「日付の点検」", "「金額の点検」", "「備考の点検」・「合計の点検」"]
+                and d1.count(f"→ {callee} 点検.結果を書く（4 回）") == 3 and [len(k) for k in props] == [8, 8, 8]
+                and [k[0] for k in props] == ["全部を点検する.5", "全部を点検する.15", "全部を点検する.27"] and "まとめの案" not in small))
+    (w2 / "activities").mkdir(exist_ok=True)
+    (w2 / f"activities/{big}.edits.json").write_text(json.dumps({"activity": big, "name": "台帳を全部点検する", "summary": "", "questions": [],
+                                                                 "ops": [{"op": "merge", "items": k} for k in props]}, ensure_ascii=False), encoding="utf-8")
+    c2, t2 = run("activity.py", w2, "apply", "--id", big)
+    act = json.loads((w2 / f"activities/{big}.activity.json").read_text(encoding="utf-8")) if (w2 / f"activities/{big}.activity.json").exists() else {"nodes": []}
+    out.append(("まとめの案は、そのまま merge の items に写せる（3 つの案で、箱 27 → 6。まとめた箱に、呼ぶ先と回数）" + ("" if c2 == 0 else t2[-400:]),
+                c2 == 0 and [c["times"] for n in act["nodes"] for c in n.get("calls") or []] == [4, 4, 4]
+                and sum(n["type"] in ("process", "decision", "system", "subprocess") for n in act["nodes"]) == 6))
+    lines = ["Public Sub 全部を記録する()"]                         # 見出しのすぐ下が呼び出し・呼び先が 2 つ
+    for h, n, to in (("一つめ", 5, "結果を書く"), ("二つめ", 2, "結果を書く"), ("三つめ", 2, "記録する"), ("四つめ", 3, "記録する"), ("五つめ", 1, "結果を書く")):
+        lines.append(f"    ' {h}")
+        for k in range(n):
+            lines += [f'    {to} "{h}{k}", True', f'    Worksheets("台帳").Range("A{k + 1}").Value = "{h}"']
+    lines += ["End Sub", "", "Private Sub 結果を書く(項目 As String, 合格 As Boolean)", '    Worksheets("結果").Range("A1").Value = 項目', "End Sub", "",
+              "Private Sub 記録する(項目 As String, 合格 As Boolean)", '    Worksheets("記録").Range("A1").Value = 項目', "End Sub", ""]
+    src3, w3 = tmp / "runs2_in", tmp / "runs2_work"
+    (src3 / "src").mkdir(parents=True)
+    (src3 / "src" / "記録.bas").write_text('Attribute VB_Name = "記録"\n' + "\n".join(lines), encoding="utf-8")
+    subprocess.run([sys.executable, str(S / "inventory.py"), str(src3), "-w", str(w3)], capture_output=True, text=True)
+    for sc, args in (("render_pages.py", []), ("code_struct.py", []), ("systems.py", ["draft"])):
+        run(sc, w3, *args)
+    edit(w3 / "structure/systems.json", lambda j: [x.update(kind="euc_excel") for x in j["systems"]])
+    _c, listing = run("activity.py", w3, "list")
+    c3, d3 = run("activity.py", w3, "draft", "--id", next((x.split()[0] for x in listing.splitlines() if "記録.全部を記録する" in x), "A-01-1"))
+    heads = [re.sub(r"^\s+案\d+  → \S+ ", "", ln) for ln in d3.splitlines() if re.match(r"\s+案\d+  → ", ln)]
+    props = [json.loads(ln.split(":", 1)[1]) for ln in d3.splitlines() if ln.strip().startswith('"items":')]
+    out.append(("まとめの案: 見出しのすぐ下が呼び出しでも、見出しで切る。前の見出しの呼び先が違えば、後ろの見出しと合わせ、どちらとも合わない見出しはそのまま（案にしない）。"
+                "終わりの呼び出しのあとの文は入れない" + ("" if c3 == 0 else d3[-400:]),
+                c3 == 0 and heads == ["記録.結果を書く（7 回）  見出し: 「一つめ」・「二つめ」", "記録.記録する（5 回）  見出し: 「三つめ」・「四つめ」"]
+                and [(k[0], k[-1]) for k in props] == [("全部を記録する.4", "全部を記録する.17"), ("全部を記録する.20", "全部を記録する.29")]))
     return out
 
 

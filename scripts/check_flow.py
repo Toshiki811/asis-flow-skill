@@ -1916,7 +1916,8 @@ def check_activity(cx, rp):
                     if not (adir / f"{c.get('to')}.activity.json").exists():
                         rp.fail(f"{aid} {x['id']}: まとめた呼び出しの行き先のアクティビティ図（{c.get('to')}）が無い")
             if len(boxes) > MAX_BOXES:
-                rp.warn(f"{aid}: 箱が {len(boxes)} 個ある（{MAX_BOXES} 個まで）。技術的な分岐を畳む（fold）・隣り合うまとまりをまとめる（merge）")
+                rp.warn(f"{aid}: 箱が {len(boxes)} 個ある（{MAX_BOXES} 個まで）。技術的な分岐を畳む（fold）・隣り合うまとまりをまとめる（merge。"
+                        "同じ共通の処理を続けて呼ぶ並びは、activity.py draft にまとめの案が出る）")
             n.update(acts=1, boxes=len(boxes), lines=len(need), off=sum(len(o["lines"]) for o in a.get("lines") or [] if o.get("state") == "excluded"),
                      folded=sum(b.get("state") == "folded" for b in logged.values()), forks=len(forks))
     known = {u["activity"] for u in units} | {u["activity"] for u in led.units if u["kind"] == "shared" and led.off(u) is not None}   # 図にしない手続きの残りは、上で知らせた

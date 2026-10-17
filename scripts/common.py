@@ -489,7 +489,7 @@ FAIL_HELPERS = ("shape_fails", "read_checked", "evidence_pages", "question_sourc
 
 
 def site(msg, up=1):
-    """中継する点検の内側の誤りの文（直しの一覧・アクティビティ図の直し・台帳の紐付け。点検は、その誤りを 1 行で中継する）。
+    """中継する点検の内側の誤りの文（直しの一覧・アクティビティ図の直し・台帳の紐付け・ブロックの木・取り出した構造・用語の対応。点検は、その誤りを 1 行で中継する）。
     自己点検の被覆（evals/coverage.py）のために、出した場所（ファイル:行）を控え、文はそのまま返す。up: 何段上の行を控えるか（誤りを溜める部品 bad の中なら 2。呼び元の行）"""
     if FAIL_LOG in os.environ:
         Report._log(sys._getframe(up))

@@ -21,7 +21,7 @@ import re
 import sys
 
 import extract_access
-from common import MASK, io_kind, load, manifest, mask_secrets, page_json, load_page, save, work_dir  # noqa: F401（MASK・mask_secrets は、ほかから cs. で引く）
+from common import MASK, io_kind, load, manifest, mask_secrets, page_json, load_page, save, site, work_dir  # noqa: F401（MASK・mask_secrets は、ほかから cs. で引く）
 
 INLINE_MAX = 8                                                       # 呼ぶ所が1か所で、箱がこの数以下の手続きは、呼ぶ側の図に入れる
 CODE_KINDS = ("vba", "code")                                         # ページの種類（manifest の page_list[].kind）
@@ -1404,12 +1404,12 @@ def struct_of(work, proj):
     try:
         tree = load(pathlib.Path(work) / "code" / f"{proj['id']}.tree.json")
     except Exception as e:                                           # 書きかけ・閉じ忘れ（構造は作らず、誤りとして出す）
-        tree = {"bad": str(e)}
+        tree = {"bad": site(str(e))}
     if isinstance(tree, dict) and not tree.get("bad"):
         from validate import validate
         errs = validate(tree, "code_tree")
         if errs:                                                     # 形の崩れた木からは、構造を作らない（references/schemas.md の「ブロックの木」）
-            tree = {"bad": f"code/{proj['id']}.tree.json の形が崩れている: {'／'.join(errs[:5])}"}
+            tree = {"bad": site(f"code/{proj['id']}.tree.json の形が崩れている: {'／'.join(errs[:5])}")}
     return build_struct(proj["id"], proj["language"], mods, sheets=pick("vba_sheets", {}), buttons=pick("vba_buttons", []), shortcuts=pick("vba_shortcuts", []),
                         docs=[d["doc_id"] for d in proj["docs"]], tree=tree if isinstance(tree, dict) else None,
                         ribbon=pick("vba_ribbon", []), unread=pick("vba_unread", [])) if mods and d0 else None
@@ -1427,10 +1427,10 @@ def tree_errors(st):
             for n in nodes:
                 x, y = n.get("lines") or [0, 0]
                 if not (a <= x <= y <= b):
-                    errs.append(f"{p['id']}: {where}の {n.get('kind')}（{x}〜{y} 行）が、親の範囲（{a}〜{b} 行）の外")
+                    errs.append(site(f"{p['id']}: {where}の {n.get('kind')}（{x}〜{y} 行）が、親の範囲（{a}〜{b} 行）の外"))
                     continue
                 if x < last and not n.get("single"):
-                    errs.append(f"{p['id']}: {n.get('kind')}（{x}〜{y} 行）が、前のノードと重なっているか、順が逆")
+                    errs.append(site(f"{p['id']}: {n.get('kind')}（{x}〜{y} 行）が、前のノードと重なっているか、順が逆"))
                 last = max(last, x)
                 for ln in n.get("exec") or []:
                     seen[ln] = seen.get(ln, 0) + 1
@@ -1443,9 +1443,9 @@ def tree_errors(st):
         lost = [ln for ln in p.get("exec") or [] if ln not in seen]
         twice = [ln for ln, k in seen.items() if k > 1]
         if lost:
-            errs.append(f"{p['id']}: 実行文の行が、木のどのノードにも入っていない（{lost[:6]}）")
+            errs.append(site(f"{p['id']}: 実行文の行が、木のどのノードにも入っていない（{lost[:6]}）"))
         if twice:
-            errs.append(f"{p['id']}: 同じ行が、木の2つのノードに入っている（{twice[:6]}）")
+            errs.append(site(f"{p['id']}: 同じ行が、木の2つのノードに入っている（{twice[:6]}）"))
     return errs
 
 

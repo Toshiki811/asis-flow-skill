@@ -13,6 +13,7 @@ import types
 
 import code_struct as cs
 import extract_access
+from common import site
 
 
 
@@ -622,18 +623,18 @@ def tree_problems(tree, modules, lang):
         pid = f"{p.get('module')}.{p.get('name')}"
         m = mods.get(p.get("module"))
         if m is None:
-            errs.append(f"{pid}: モジュール「{p.get('module')}」が、このまとまりに無い（あるのは {'・'.join(list(mods)[:6])}）")
+            errs.append(site(f"{pid}: モジュール「{p.get('module')}」が、このまとまりに無い（あるのは {'・'.join(list(mods)[:6])}）"))
             continue
         if not span(p.get("lines")) or p["lines"][1] > len(m["lines"]):
-            errs.append(f"{pid}: 行の範囲 {p.get('lines')} が、ソース（{len(m['lines'])} 行）に合わない")
+            errs.append(site(f"{pid}: 行の範囲 {p.get('lines')} が、ソース（{len(m['lines'])} 行）に合わない"))
             continue
         if pid in ids:
-            errs.append(f"{pid}: 同じ名前の手続きが2つある（引数の違うものは、名前に引数を添えて分ける）")
+            errs.append(site(f"{pid}: 同じ名前の手続きが2つある（引数の違うものは、名前に引数を添えて分ける）"))
         ids.add(pid)
         lo, hi = p["lines"]
         for q, (x, y) in used.get(p["module"], []):
             if lo <= y and x <= hi:
-                errs.append(f"{pid}: 行の範囲（{lo}〜{hi}）が、{q}（{x}〜{y}）と重なる")
+                errs.append(site(f"{pid}: 行の範囲（{lo}〜{hi}）が、{q}（{x}〜{y}）と重なる"))
         used.setdefault(p["module"], []).append((pid, (lo, hi)))
         keep, _notes = plain_lines(lang, m["lines"])
         text = lambda a, b: " ".join(x.strip() for x in m["lines"][a - 1:b])
@@ -650,49 +651,49 @@ def tree_problems(tree, modules, lang):
             for n in nodes:
                 k = n.get("kind")
                 if not span(n.get("lines")):
-                    errs.append(f"{pid}: {where}のノードの行の範囲が無い・違う（{n.get('lines')}）")
+                    errs.append(site(f"{pid}: {where}のノードの行の範囲が無い・違う（{n.get('lines')}）"))
                     continue
                 x, y = n["lines"]
                 tag = f"{k}（{x}〜{y} 行）"
                 if not (a <= x and y <= b):
-                    errs.append(f"{pid}: {tag}が、{where}の範囲（{a}〜{b} 行）の外")
+                    errs.append(site(f"{pid}: {tag}が、{where}の範囲（{a}〜{b} 行）の外"))
                     continue
                 if x <= last:
-                    errs.append(f"{pid}: {tag}が、前のノードと重なっているか、順が逆")
+                    errs.append(site(f"{pid}: {tag}が、前のノードと重なっているか、順が逆"))
                 last = y
                 if k in ("if", "select", "loop"):
                     if n.get("leave") is not None:
-                        errs.append(f"{pid}: {tag}に leave は付けられない（seq・call・interact だけ）")
+                        errs.append(site(f"{pid}: {tag}に leave は付けられない（seq・call・interact だけ）"))
                     h = n.get("head") or [x, x]
                     if not span(h) or not (x <= h[0] and h[1] <= y):
-                        errs.append(f"{pid}: {tag}の head {h} が、ノードの範囲の外")
+                        errs.append(site(f"{pid}: {tag}の head {h} が、ノードの範囲の外"))
                         continue
                     own(h[0], h[1], tag)
                     heads = [h] + [br["head"] for br in n.get("branches") or [] if span(br.get("head"))] + ([n["tail"]] if span(n.get("tail")) else [])
                     for to in n.get("calls") or []:
                         if to not in all_ids:
-                            errs.append(f"{pid}: {tag}の calls「{to}」が、木の手続きに無い")
+                            errs.append(site(f"{pid}: {tag}の calls「{to}」が、木の手続きに無い"))
                         elif not any(str(to).split(".")[-1].split("(")[0].lower() in text(*hh).lower() for hh in heads):
-                            errs.append(f"{pid}: {tag}の条件の行に、calls の名前「{str(to).split('.')[-1]}」が無い")
+                            errs.append(site(f"{pid}: {tag}の条件の行に、calls の名前「{str(to).split('.')[-1]}」が無い"))
                     if not re.search(HEAD_WORDS[k], text(*h)):
-                        errs.append(f"{pid}: {tag}の先頭の行（{h[0]} 行）に、{ {'if': '分岐', 'select': '振り分け', 'loop': '繰り返し'}[k] }の語が無い: {text(*h)[:60]}")
+                        errs.append(site(f"{pid}: {tag}の先頭の行（{h[0]} 行）に、{ {'if': '分岐', 'select': '振り分け', 'loop': '繰り返し'}[k] }の語が無い: {text(*h)[:60]}"))
                     if k == "loop":
                         t = n.get("tail")
                         if t is not None:
                             if span(t) and h[1] < t[0] and t[1] <= y:
                                 own(t[0], t[1], tag)
                             else:
-                                errs.append(f"{pid}: {tag}の tail {t} が、ノードの範囲の外")
+                                errs.append(site(f"{pid}: {tag}の tail {t} が、ノードの範囲の外"))
                         visit(n.get("body") or [], h[1] + 1, (t[0] - 1) if span(t) else y, "繰り返し")
                     else:
                         if not n.get("branches"):
-                            errs.append(f"{pid}: {tag}に、出口（branches）が無い")
+                            errs.append(site(f"{pid}: {tag}に、出口（branches）が無い"))
                         at = h[1] + 1
                         for br in n.get("branches") or []:
                             bh = br.get("head")
                             if bh is not None:
                                 if not span(bh) or not (at <= bh[0] and bh[1] <= y):
-                                    errs.append(f"{pid}: {tag}の出口「{br.get('label')}」の head {bh} が、順に並んでいない・範囲の外")
+                                    errs.append(site(f"{pid}: {tag}の出口「{br.get('label')}」の head {bh} が、順に並んでいない・範囲の外"))
                                     continue
                                 own(bh[0], bh[1], tag)
                                 at = bh[1] + 1
@@ -703,58 +704,58 @@ def tree_problems(tree, modules, lang):
                     own(x, y, tag)
                     t = text(x, y)
                     if k == "exit" and not re.search(EXIT_WORDS, t):
-                        errs.append(f"{pid}: {tag}に、抜ける・戻る語（return・break・throw など）が無い: {t[:60]}")
+                        errs.append(site(f"{pid}: {tag}に、抜ける・戻る語（return・break・throw など）が無い: {t[:60]}"))
                     if k == "exit" and n.get("io"):
-                        errs.append(f"{pid}: {tag}に io は付けられない（読む・書くものがある return は、seq にして \"leave\": \"proc\" を添える）")
+                        errs.append(site(f"{pid}: {tag}に io は付けられない（読む・書くものがある return は、seq にして \"leave\": \"proc\" を添える）"))
                     if n.get("calls"):
-                        errs.append(f"{pid}: {tag}に calls は付けられない（if・select・loop の条件の行だけ。ほかは call のブロックにする）")
+                        errs.append(site(f"{pid}: {tag}に calls は付けられない（if・select・loop の条件の行だけ。ほかは call のブロックにする）"))
                     if n.get("leave") is not None and (k == "exit" or not re.search(EXIT_WORDS, t)):
-                        errs.append(f"{pid}: {tag}の leave: 行に、抜ける・戻る語（return など）が無い・exit のブロックには要らない: {t[:60]}")
+                        errs.append(site(f"{pid}: {tag}の leave: 行に、抜ける・戻る語（return など）が無い・exit のブロックには要らない: {t[:60]}"))
                     if k == "interact" and n.get("text") and re.sub(r"\s+", " ", n["text"]).strip().lower() not in t.lower():
-                        errs.append(f"{pid}: {tag}の text「{n['text'][:30]}」が、その行の文字に無い")
+                        errs.append(site(f"{pid}: {tag}の text「{n['text'][:30]}」が、その行の文字に無い"))
                     if k == "call":
                         to = str(n.get("to") or "")
                         if to not in all_ids:
-                            errs.append(f"{pid}: {tag}の呼び先「{to}」が、木の手続きに無い（範囲の外の呼び出しは、call でなく seq にする）")
+                            errs.append(site(f"{pid}: {tag}の呼び先「{to}」が、木の手続きに無い（範囲の外の呼び出しは、call でなく seq にする）"))
                         elif to.split(".")[-1].split("(")[0].lower() not in t.lower():
-                            errs.append(f"{pid}: {tag}の行に、呼び先の名前「{to.split('.')[-1]}」が無い: {t[:60]}")
+                            errs.append(site(f"{pid}: {tag}の行に、呼び先の名前「{to.split('.')[-1]}」が無い: {t[:60]}"))
                 for io in n.get("io") or []:
                     ln = io.get("line")
                     if not isinstance(ln, int) or not (1 <= ln <= len(m["lines"])):   # ふつうはノードの中の行。名前が定数なら、その定数を決めている行でもよい
-                        errs.append(f"{pid}: {tag}の入出力「{io.get('name')}」の行（{ln}）が、ソースに無い")
+                        errs.append(site(f"{pid}: {tag}の入出力「{io.get('name')}」の行（{ln}）が、ソースに無い"))
                     elif io.get("name") != cs.DYNAMIC and str(io.get("name")).lower() not in m["lines"][ln - 1].lower():
-                        errs.append(f"{pid}: {tag}の入出力の名前「{io.get('name')}」が、{ln} 行の文字に無い（実行するときに決まる名前は「{cs.DYNAMIC}」と書く）")
+                        errs.append(site(f"{pid}: {tag}の入出力の名前「{io.get('name')}」が、{ln} 行の文字に無い（実行するときに決まる名前は「{cs.DYNAMIC}」と書く）"))
         visit(p.get("body") or [], head[1] + 1 if span(head) else lo, hi, "手続き")
         lost = sorted(ln for ln in keep if head[1] < ln <= hi and ln not in owned)
         twice = sorted(ln for ln, w in owned.items() if len(w) > 1)
         if lost:
-            errs.append(f"{pid}: どのノードにも入っていない行がある（{len(lost)} 行: {', '.join(map(str, lost[:8]))}{' …' if len(lost) > 8 else ''}）。"
-                        f"先頭は {lost[0]} 行「{m['lines'][lost[0] - 1].strip()[:40]}」")
+            errs.append(site(f"{pid}: どのノードにも入っていない行がある（{len(lost)} 行: {', '.join(map(str, lost[:8]))}{' …' if len(lost) > 8 else ''}）。"
+                        f"先頭は {lost[0]} 行「{m['lines'][lost[0] - 1].strip()[:40]}」"))
         if twice:
-            errs.append(f"{pid}: 2つのノードに入っている行がある（{', '.join(map(str, twice[:8]))}）")
+            errs.append(site(f"{pid}: 2つのノードに入っている行がある（{', '.join(map(str, twice[:8]))}）"))
     for e in tree.get("entries") or []:
         pid = str(e.get("procedure"))
         if pid not in ids:
-            errs.append(f"起動点「{e.get('label')}」の手続き「{pid}」が、木の手続きに無い")
+            errs.append(site(f"起動点「{e.get('label')}」の手続き「{pid}」が、木の手続きに無い"))
             continue
         m = mods[all_ids[pid]]
         ln = e.get("line")
         if not isinstance(ln, int) or not (1 <= ln <= len(m["lines"])):
-            errs.append(f"起動点「{e.get('label')}」の根拠の行（{ln}）が、ソースに無い")
+            errs.append(site(f"起動点「{e.get('label')}」の根拠の行（{ln}）が、ソースに無い"))
             continue
         also = e.get("also")
         if also is not None and not (isinstance(also, int) and 1 <= also <= len(m["lines"])):
-            errs.append(f"起動点「{e.get('label')}」の also の行（{also}）が、ソースに無い")
+            errs.append(site(f"起動点「{e.get('label')}」の also の行（{also}）が、ソースに無い"))
             also = None
         here, front = (m["lines"][ln - 1] + " " + m["name"]).lower(), m["lines"][also - 1].lower() if also else ""
         for name in re.findall(r"「([^」]+)」", str(e.get("label") or "")):
             low = name.lower()                                       # also があれば、その行の文字と根拠の行の文字を、この順につないだ名前でもよい（クラスに付いた URL の前置き ＋ メソッドの URL）
             if low not in here and not any(low[:i] in front and low[i:] in here for i in range(1, len(low)) if front):
-                errs.append(f"起動点「{e.get('label')}」: かぎかっこの中の名前「{name}」が、根拠の行（{m['name']} {ln} 行）にも、ファイルの名前にも無い"
-                            + ("（also の行の文字と、根拠の行の文字を、この順につないだものでもない）" if also else "（名前の前半が別の行にあるときは、その行を also に書く）"))
+                errs.append(site(f"起動点「{e.get('label')}」: かぎかっこの中の名前「{name}」が、根拠の行（{m['name']} {ln} 行）にも、ファイルの名前にも無い"
+                            + ("（also の行の文字と、根拠の行の文字を、この順につないだものでもない）" if also else "（名前の前半が別の行にあるときは、その行を also に書く）")))
         for b in e.get("before") or []:
             if b not in ids or b == pid:
-                errs.append(f"起動点「{e.get('label')}」の before「{b}」が、木の手続きに無い（「モジュール.手続き」で書く。起動点の手続きそのものは書けない）")
+                errs.append(site(f"起動点「{e.get('label')}」の before「{b}」が、木の手続きに無い（「モジュール.手続き」で書く。起動点の手続きそのものは書けない）"))
     return errs
 
 

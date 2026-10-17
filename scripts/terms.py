@@ -16,7 +16,7 @@
 import pathlib
 import re
 
-from common import load, load_page, norm, page_json, page_units, save
+from common import load, load_page, norm, page_json, page_units, save, site
 
 FILE = "structure/code_terms.json"
 BASIS = {"comment": "コメント", "definition": "定義", "spelling": "つづり（推定）", "unknown": "不明"}
@@ -199,22 +199,22 @@ class Terms:
         for k, t in enumerate(self.rows):
             at, proj, name = f"terms[{k}]", t.get("project"), str(t.get("name") or "")
             if proj not in self.structs:
-                out.append(f"{at}: project「{proj}」が、プログラムのまとまりに無い")
+                out.append(site(f"{at}: project「{proj}」が、プログラムのまとまりに無い"))
                 continue
             if (proj, name) in seen:
-                out.append(f"{at}: 「{name}」が、2回載っている（1つの名前に、言葉は1つ）")
+                out.append(site(f"{at}: 「{name}」が、2回載っている（1つの名前に、言葉は1つ）"))
             seen.add((proj, name))
             if not t.get("basis"):
-                out.append(f"{at}「{name}」: 根拠（basis）が無く、定義の行にコメント・定数の定義も無い（つづりから読んだなら spelling、読めないなら unknown を書く）")
+                out.append(site(f"{at}「{name}」: 根拠（basis）が無く、定義の行にコメント・定数の定義も無い（つづりから読んだなら spelling、読めないなら unknown を書く）"))
             if t.get("basis") != "unknown" and not str(t.get("word") or "").strip():
-                out.append(f"{at}「{name}」: 業務の言葉（word）が空（意味が読めないなら、basis を unknown にする。一覧に「不明」として出る）")
+                out.append(site(f"{at}「{name}」: 業務の言葉（word）が空（意味が読めないなら、basis を unknown にする。一覧に「不明」として出る）"))
             if name and name not in self.whole(proj):
-                out.append(f"{at}: 名前「{name}」が、{proj} のソースに無い（もとの名前は、ソースの文字のまま書く）")
+                out.append(site(f"{at}: 名前「{name}」が、{proj} のソースに無い（もとの名前は、ソースの文字のまま書く）"))
             src = t.get("source") if isinstance(t.get("source"), dict) else {}
             if t.get("basis") in ("comment", "definition") and not (src.get("module") and src.get("line")):
-                out.append(f"{at}「{name}」: 根拠が「{BASIS[t['basis']]}」なのに、場所（source の module・line）が無い（コメント・定義のある行を書く）")
+                out.append(site(f"{at}「{name}」: 根拠が「{BASIS[t['basis']]}」なのに、場所（source の module・line）が無い（コメント・定義のある行を書く）"))
             if src.get("line") and name not in "\n".join(self.lines(proj, str(src.get("module")))[src["line"] - 1:src["line"]]):
-                out.append(f"{at}「{name}」: 定義の場所（{src.get('module')} {src.get('line')} 行）に、その名前が無い")
+                out.append(site(f"{at}「{name}」: 定義の場所（{src.get('module')} {src.get('line')} 行）に、その名前が無い"))
         return out
 
     def declared(self, proj, name):

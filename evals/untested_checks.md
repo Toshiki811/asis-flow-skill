@@ -1,6 +1,6 @@
 # 発火を試験しない点検
 
-点検（`check_flow.py`・`check_layout.py`・`check_extract.py`）の FAIL と、点検が中継する誤りの文（`apply_edits.py`・`activity.py`・`systems.py`）のうち、自己点検で、誤りを仕込んで出すことをしないもの。
+点検（`check_flow.py`・`check_layout.py`・`check_extract.py`）の FAIL と、点検が中継する誤りの文（`apply_edits.py`・`activity.py`・`systems.py`・`code_lang.py`・`code_struct.py`・`terms.py`）のうち、自己点検で、誤りを仕込んで出すことをしないもの。
 
 - LLM・人が書くファイル（カード・業務分類・フロー・台帳・直しの一覧・木・用語の対応・採否表・照合の報告）を見る点検は、ここに載せない。どれも、自己点検で発火を確かめる。
 - ここに載るのは、次の 3 種類だけ。
@@ -16,10 +16,12 @@
   納品の門が FAIL に上げる WARN（`deliver.PROMOTE` の語を含む `Report.warn`）。ほかの WARN は数えない。門の語が、どの WARN の文にも無くなれば、終了コード 1。
   点検の共通の部品（`common.FAIL_HELPERS`）は、部品の中の FAIL と、呼ぶ所の両方を数える（呼ぶ所は、どの種類のファイルの点検から出たかを、呼んだ行で控える）。
   点検が 1 行で中継する誤りの文のうち、直しの一覧（`apply_edits.py`）・アクティビティ図の直しの一覧（`activity.py`）・台帳の紐付けと図にしない起動点・手続き
-  （`systems.py` の `link_errors`・`excluded_errors`・`folded_errors`）は、内側の誤りの文ごとに数える（`common.site` で包んだ文と、`self.bad` の呼び出し。2026-10-17 から）。
+  （`systems.py` の `link_errors`・`excluded_errors`・`folded_errors`）・LLM が書いたブロックの木（`code_lang.py` の `tree_problems`）・取り出した構造
+  （`code_struct.py` の `tree_errors` と、木が読めない・形が崩れている）・用語の対応（`terms.py` の `problems`）は、内側の誤りの文ごとに数える
+  （`common.site` で包んだ文と、`self.bad` の呼び出し。2026-10-17 から）。
 - 数えないもの:
   - 落ちないための守り（`common.guarded` の「形が崩れていて、ここから先を点検できない」）。自己点検は、正しいデータと試験の写しで、これが出ないことを確かめている。
-  - 中継の内側のうち、`terms.py` の用語の対応の誤り・`code_struct.py`（`code_lang.py`）の木の誤り・`review.py` の報告の誤り。中継の行は 1 か所に数え、内側の文ごとには数えない。
+  - 中継の内側のうち、`review.py` の報告の誤り。中継の行は 1 か所に数え、内側の文ごとには数えない。
 - 表の行は、ファイル・関数・文の一部で点検を指す（行の番号は書かない。点検の文を変えたら、ここも直す）。
 
 | ファイル | 関数 | 文の一部 | 試験しない理由 |
