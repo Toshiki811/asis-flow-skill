@@ -1218,6 +1218,16 @@ def _bad_table(wb):
     ws.cell(2, 3).value = "四分"
 
 
+def _table_two_areas(wb):
+    dn = wb.defined_names.get("処理時間の表")
+    dn.attr_text = dn.attr_text + "," + dn.attr_text                     # 名前が、範囲を 2 つ指す
+
+
+def _table_lose_head(wb):
+    ws = wb["処理時間の基準"]
+    next(c for row in ws.iter_rows() for c in row if c.value == "大").value = "おおきい"
+
+
 CASES += [
     ("報告書: 採否表が無いのに、照合の報告書が out/ に残る", "check_flow.py", ["--stage", "reports"],
      lambda w: (w / "out/原典照合レビュー_採否表.md").write_text("# 古い報告書\\n", encoding="utf-8"), "があるのに、採否表（review/）が無い"),
@@ -1226,7 +1236,11 @@ CASES += [
     ("納品物: out/ に納品物が無い", "check_flow.py", ["--stage", "deliverables"], _no_deliverables, "納品物（out/ の図"),
     ("納品物: 業務マトリクス一覧（xlsx）が壊れている", "check_flow.py", ["--stage", "deliverables"], lambda w: (w / "out/業務マトリクス一覧.xlsx").write_bytes(b"not a book"),
      "業務マトリクス一覧.xlsx: 読めない（"),
-    ("マトリクス: 処理時間の基準の表に、数でない値", "check_flow.py", ["--stage", "matrix"], lambda w: edit_book(w, _bad_table), "処理時間の基準の表を読めない"),
+    ("マトリクス: 処理時間の基準の表に、数でない値", "check_flow.py", ["--stage", "matrix"], lambda w: edit_book(w, _bad_table), "処理時間の基準の表を読めない（「処理時間の基準」の基準の表に、数でない・負の値がある"),
+    ("マトリクス: 処理時間の基準の表の名前が、範囲を 2 つ指す", "check_flow.py", ["--stage", "matrix"], lambda w: edit_book(w, _table_two_areas),
+     "処理時間の基準の表を読めない（名前「処理時間の表」が、シートの中の 1 つの範囲を指していない）"),
+    ("マトリクス: 処理時間の基準の表の見出し「大」を書き換える", "check_flow.py", ["--stage", "matrix"], lambda w: edit_book(w, _table_lose_head),
+     "の範囲）に、次の見出し・動作の種類が無い: 大（"),
     ("マトリクス: 基準の表の版の記録が無い（前の版の道具で書き出したブック）", "check_flow.py", ["--stage", "matrix"],
      lambda w: edit(w / "out/業務マトリクス一覧.columns.json", lambda s: s.pop("table_version")), "基準の表の版の記録が無い"),
     ("マトリクス: 列の対応（columns.json）が無い", "check_flow.py", ["--stage", "matrix"], lambda w: (w / "out/業務マトリクス一覧.columns.json").unlink(),
@@ -3044,7 +3058,11 @@ def mech_tests(tmp, good):
              ("振込を実行する", "", []), ("申請書を提出し、受付印をもらう", "", []), ("結果を確かめ、上長に知らせる。", "", ["確認する", "連絡する"]),
              ("今回の発注を見送る", "", []), ("書類を見回す", "", []), ("書類を課長に回す", "", ["提出・回付する"]), ("伝票を回付する（経理課へ）", "", ["提出・回付する"]),
              ("支払データを作成し、内容を確認する", "経費精算システム", ["入力する", "確認する"]), ("支払データを作成し、登録する", "経費精算システム", ["入力する"]),
-             ("金額を確認し、振込を実行する", "ファームバンキング", ["確認する", "入力する"]), ("振込を実行し、結果を確認する", "ファームバンキング", ["入力する", "確認する"])]
+             ("金額を確認し、振込を実行する", "ファームバンキング", ["確認する", "入力する"]), ("振込を実行し、結果を確認する", "ファームバンキング", ["入力する", "確認する"]),
+             ("取引先に問合せて確認する", "", ["連絡する"]), ("ＦＡＸで内容を確認する", "", ["連絡する"]), ("電話で、内容を確認する", "", ["連絡する"]),
+             ("メールで受信し、内容を確認する", "", ["確認する"]), ("電話で依頼を受け、内容を確認する", "", ["確認する"]), ("メールで届く請求書を確認する", "", ["確認する"]),
+             ("書類を本社から送る", "", ["提出・回付する"]), ("書類を本社より送る", "", ["提出・回付する"]), ("発注を見送り、記録を保管する", "", ["保管する"]),
+             ("書類を確認し、電話で確かめる", "", ["確認する", "連絡する"]), ("伝票を作る", "", ["作成する"]), ("画面で伝票を作る", "経費精算システム", ["入力する"]), ("形作る", "", [])]
     cases += [(f"書類を{v}", "", [a]) for v, a in (("照合する", "確認する"), ("点検する", "確認する"), ("登録する", "入力する"), ("記入する", "入力する"), ("回収する", "受け取る"),
                                                   ("差し戻す", "提出・回付する"), ("送付する", "提出・回付する"), ("依頼する", "連絡する"), ("報告する", "連絡する"), ("集計する", "計算する"))]
     bad = [(lab, sy, action_hint(lab, sy)[0]) for lab, sy, want in cases if action_hint(lab, sy)[0] != want]
@@ -3052,17 +3070,18 @@ def mech_tests(tmp, good):
     from common import ACTIONS
     w_tag = tmp / "mech_tag"                                         # 使うシステムは、点検の札と同じ決め方（カードの system が空でも、作業の文に出てくる用語の正本のシステム）
     shutil.copytree(w, w_tag)
-    edit(w_tag / "cards/M02/p0002.json", lambda c: c["steps"][2].update(action="会計システムで再振込のデータを作成する"))
+    edit(w_tag / "cards/M02/p0002.json", lambda c: c["steps"][2].update(action="再振込のデータを作成する", quote="③ 修正後、翌営業日に会計システムで再振込のデータを作成する。"))
     tag_rows = Draft(w_tag, "F03").show().splitlines()
     tagged = next((tag_rows[i + 1] for i, x in enumerate(tag_rows) if "  M02.2.s3  " in x and i + 1 < len(tag_rows)), "")
     out.append(("下書きの動作の案（決まり 3.22。案を見せるだけ）: 箱の名前（終わりのかっこ書きを除く）の終わりの動詞から。使うシステムがあって作成する・実行する → 入力する"
-                "（2 語の前半も）／電話・メールで・問い合わせて確かめる → 連絡する（電話番号・メールで届いたものを確かめるのは、確認する）／前に別の動きがつながれば 2 語。"
-                "「見送る」は「送る」でない。表に無い動詞・システムのレーンの手順には、案を出さない。使うシステムは、点検の札と同じ決め方" + (f"\n{bad}" if bad else ""),
+                "（2 語の前半も）／電話・メール・ＦＡＸで・問い合わせて（問合せて）確かめる → 連絡する（電話番号・メールで届いたもの・受信したものを確かめるのは、確認する）／"
+                "前に別の動きがつながれば 2 語。「見送る」「形作る」は「送る」「作る」でない（「から送る」は読む）。表に無い動詞・システムのレーンの手順には、案を出さない。"
+                "使うシステムは、点検の札と同じ決め方（引用だけに出てくる名前も。下書きの「システム:」も札）" + (f"\n{bad}" if bad else ""),
                 not bad and [a for a, _v in ACTION_VERBS] == [a for a in ACTIONS if a != "その他"] and len(verbs) == len(set(verbs))
                 and all(v in JOINS for v in verbs if not v.endswith("する")) and "動作の案: 入力する（「実行する」で、使うシステム「ファームバンキング」がある" in after("M02.1.s3")
                 and "動作の案: 連絡する（「電話」で「確認する」" in after("M02.2.s2") and "動作の案: 出力する（「印刷する」）" in after("M02.2.s1")
                 and after("M02.1.s4") != "" and "動作の案" not in after("M02.1.s4") and action_hint("振込結果を会計システムで照合する", "会計システム")[0] == ["確認する"]
-                and "動作の案: 入力する（「作成する」で、使うシステム「会計システム」がある" in tagged))
+                and "動作の案: 入力する（「作成する」で、使うシステム「会計システム」がある" in tagged and "システム: 会計システム" in tagged))
     from apply_edits import make
     base = {"start_condition": "", "end_condition": "", "ops": []}
     f1, e1, _d = make(w, "F02", dict(base, ops=[{"op": "exclude", "item": "M04.2.s2", "flow": "F01"}]))
@@ -4183,8 +4202,8 @@ def call_run_tests(tmp):
     put(main, "台帳を点検する", [{"op": "merge", "items": keys[:2]}, {"op": "name", "item": keys[0], "label": "「台帳」の見出しを確かめ、結果を書く"}])
     code, text = run("activity.py", w, "apply", "--id", main)
     out.append(("直しの一覧: 呼び出しが 3 回に満たない並びは、まとめられない", code != 0 and "3 回以上続けて呼ぶ並びだけ" in text))
-    out.append(("点検: 下書きのままで 25 箱以下の図で、呼び出しの並びをまとめると WARN（まとめるのは 25 箱を超える図だけ）",
-                f"{main}: 下書きのままで箱が" in text2 and "呼び出しの並びをまとめるのは、25 箱を超える図だけ" in text2 and "0 FAIL" in text2))
+    out.append(("点検: 呼び出しの並びをまとめる前の図（ほかの直しは当てる）で 25 箱以下なのに、呼び出しの並びをまとめると WARN",
+                f"{main}: 呼び出しの並びをまとめる前の図で箱が 6 個" in text2 and "ほかの直し（畳む・まとめる）のあとでも 25 箱を超える図だけ" in text2 and "0 FAIL" in text2))
     _c, small = run("activity.py", w, "draft", "--id", main)
 
     def prep(name, fname, text, kind="euc_excel"):
@@ -4209,7 +4228,7 @@ def call_run_tests(tmp):
     w2, listing = prep("runs", "点検.bas", 'Attribute VB_Name = "点検"\n' + VBA_MANY)
     callee = next((x.split()[0] for x in listing.splitlines() if "点検.結果を書く（" in x), "")
     c1, d1, big, got = proposals(w2, listing, "全部を点検する")
-    out.append(("まとめの案（下書きのままで 25 箱を超える図だけ）: 同じ共通の処理を続けて呼ぶ並びを、ソースの見出しで切る。呼び出しが 3 回に満たない見出しは前の見出しと（先頭なら後ろと）合わせ、"
+    out.append(("まとめの案（下書きのままで 25 箱を超える図だけ）: 同じ共通の処理を続けて呼ぶ並びを、ソースの見出しで切る。呼び出しが 3 回に満たない見出しは前の見出しと（前に同じ呼び先の見出しが無ければ後ろと）合わせ、"
                 "分岐・呼び出しの無い見出しで並びが切れる。はじめの「値を取る」まとまりから、終わりの呼び出しまで。呼び出しの行の文字と、全部使ったときの箱の数を添える"
                 + ("" if c1 == 0 else d1[-400:]),
                 c1 == 0 and "下書きのままで箱が 27 個で" in d1 and "案を全部使うと、箱 6 個" in d1 and d1.count(f"→ {callee} 点検.結果を書く（4 回）") == 3
@@ -4242,6 +4261,12 @@ def call_run_tests(tmp):
                 "終わりの呼び出しのあとの文は入れない" + ("" if c3 == 0 else d3[-400:]),
                 c3 == 0 and [x[:5] for x in got] == [(7, "「一つめ」・「二つめ」", "一つめ0", "二つめ1", ("全部を記録する.4", "全部を記録する.17")),
                                                      (5, "「三つめ」・「四つめ」", "三つめ0", "四つめ2", ("全部を記録する.20", "全部を記録する.29"))]))
+    (w3 / "activities").mkdir(exist_ok=True)
+    (w3 / f"activities/{_a}.edits.json").write_text(json.dumps({"activity": _a, "name": "全部を記録する", "summary": "", "questions": [], "ops": [
+        {"op": "merge", "items": (got[0][5] if got else []) + ["全部を記録する.18", "全部を記録する.20"]}]}, ensure_ascii=False), encoding="utf-8")
+    cm, tm = run("activity.py", w3, "apply", "--id", _a)
+    out.append(("直しの一覧: 別の共通の処理の呼び出しを混ぜた merge は止める（結果を書く 7 回 ＋ 記録する 1 回。別の共通の処理の呼び出しで、並びは切れる）",
+                cm != 0 and "同じ共通の処理の呼び出しだけ（別の共通の処理の呼び出しで、並びは切れる: " in tm))
     cuts = ["Public Sub 区切りを点検する()", "    ' 前半"] + pair("A", 1) + pair("A", 2) + ["    ' 合計を出す", '    Worksheets("結果").Range("Z1").Value = 1', "    ' 後半"] \
         + pair("B", 1) + pair("B", 2) + ['    MsgBox "途中です"', "    ' 三つ目"] + pair("C", 1) + pair("C", 2) + pair("C", 3) \
         + ["    For i = 1 To 3", '        Worksheets("台帳").Cells(i, 4).Value = i', "    Next", "    ' 四つ目"] + pair("E", 1) + pair("E", 2) + ["    準備する"] \
@@ -4254,7 +4279,7 @@ def call_run_tests(tmp):
                                                      (4, "「六つ目」", "E3", "G2", ("区切りを点検する.32", "区切りを点検する.40"))]))
     inside = ["Public Sub 中を点検する()", "    On Error GoTo 失敗", '    Worksheets("結果").Cells.ClearContents'] + sum((pair("A", k) for k in range(1, 6)), []) \
         + ['    If Worksheets("台帳").Range("B1").Value <> "" Then', "        ' ----------", "        ' 分岐の中の点検", "        ' ----------"] \
-        + ["    " + x for x in pair("B", 2) + pair("B", 3)] + ['        \'結果を書く "旧項目", True'] + ["    " + x for x in pair("B", 4)] \
+        + ["    " + x for x in pair("B", 2) + pair("B", 3)] + ['        \'結果を書く "旧項目", True', "        '値 = 値 + 1", '        \'Call 結果を書く("旧項目", True)'] + ["    " + x for x in pair("B", 4)] \
         + ['        記録する "混ぜる", True'] + ["    " + x for x in pair("B", 5)] + ["    End If", "    Exit Sub", "失敗:"] \
         + [f'    結果を書く "失敗{k}", False' for k in (1, 2, 3)] + ['    記録する "失敗", False', '    MsgBox "点検できませんでした"', "End Sub"] + subs
     w5, listing = prep("runs_inside", "点検.bas", 'Attribute VB_Name = "点検"\n' + "\n".join(inside))
@@ -4266,8 +4291,8 @@ def call_run_tests(tmp):
     out.append(("まとめの案: 分岐の中・エラー処理の節の中の並びにも出す。手続きの頭の、値を取るのでないまとまりは入れない。飾りの線は見出しにしない。"
                 "コメントにしたコードの行では切らない。別の共通の処理の呼び出しで切る。3 つの案とも merge に通る" + ("" if c5 == 0 and c6 == 0 else d5[-400:] + t6[-300:]),
                 c5 == 0 and c6 == 0 and [x[:5] for x in got] == [(5, "無し", "A1", "A5", ("中を点検する.5", "中を点検する.14")),
-                                                                 (3, "「分岐の中の点検」", "B2", "B4", ("中を点検する.19", "中を点検する.25")),
-                                                                 (3, "無し", "失敗1", "失敗3", ("中を点検する.32", "中を点検する.34"))]))
+                                                                 (3, "「分岐の中の点検」", "B2", "B4", ("中を点検する.19", "中を点検する.27")),
+                                                                 (3, "無し", "失敗1", "失敗3", ("中を点検する.34", "中を点検する.36"))]))
     edge = lambda n, extra: (["Public Sub 境目を点検する()", "    On Error GoTo 失敗"] + sum((pair("A", k) for k in range(1, n + 1)), []) + extra
                              + ["    Exit Sub", "失敗:", '    MsgBox "点検できませんでした"', "End Sub"] + subs)
     w6, listing = prep("runs_edge26", "点検.bas", 'Attribute VB_Name = "点検"\n' + "\n".join(edge(12, [])))
@@ -4277,16 +4302,93 @@ def call_run_tests(tmp):
     out.append(("まとめの案の境目: 箱は、図と同じ数え方（エラーの判断・エラー処理の節の箱も数える）。26 箱なら案が出て、25 箱なら出ない" + ("" if c7 == 0 and c8 == 0 else d7[-300:] + d8[-300:]),
                 c7 == c8 == 0 and "下書きのままで箱が 26 個で" in d7 and [x[0] for x in got7] == [12] and "== 下書き" in d8 and "まとめの案" not in d8))
     py = ["import csv", "", "", "def check_all():"]
-    for head, n in (("# ---------- 見出しの点検 ----------", 4), ("# 金額の点検", 2), ("# ==========", 0), ("# 備考の点検", 8)):
+    for head, n in (("# ---------- 見出しの点検 ----------", 4), ("# 金額の点検", 0), ("# ==========", 3), ("# 備考の点検", 4), ("# ==========", 4)):
         py.append("    " + head)
         for k in range(n):
             py += [f'    value = read_cell("{k}")', f'    write_result("{k}", value)']
+    py += ["    if value:", '        write_result("a", value)', "        # 分岐のメモ", "    else:"] + [f'        write_result("b{k}", value)' for k in range(3)]
     py += ["", "", "def write_result(name, ok):", '    with open("result.txt", "a") as f:', "        f.write(name)", "", "", 'if __name__ == "__main__":', "    check_all()", ""]
     w8, listing = prep("runs_py", "check.py", "\n".join(py), kind="core")
     c9, d9, _a, got = proposals(w8, listing, "check_all")
-    out.append(("まとめの案（Python）: # の見出しの飾りの線を外す。線だけの行では切らない" + ("" if c9 == 0 else d9[-400:]),
-                c9 == 0 and [x[:2] for x in got] == [(6, "「見出しの点検」・「金額の点検」"), (8, "「備考の点検」")]))
+    out.append(("まとめの案（Python）: # の見出しの飾りの線を外す。見出しのすぐ下の線は飛ばして見出しを読み、項目の間の線では切らない。"
+                "else の行で読むのを止める（その上のコメントを、else の中の見出しにしない）" + ("" if c9 == 0 else d9[-400:]),
+                c9 == 0 and [x[:2] for x in got] == [(4, "「見出しの点検」"), (3, "「金額の点検」"), (8, "「備考の点検」"), (3, "無し")]))
+    rec = lambda k: [f'    値 = Worksheets("台帳").Range("R{k}").Value', f'    記録する "R{k}", (値 <> "")']
+    take = ["Public Sub 結果と記録を書く()", "    ' 結果の点検"] + sum((pair("A", k) for k in range(1, 8)), []) + ["    ' 記録の点検"] \
+        + sum((rec(k) for k in range(1, 8)), []) + ["End Sub"] + subs
+    w9, listing = prep("runs_take", "点検.bas", 'Attribute VB_Name = "点検"\n' + "\n".join(take))
+    c10, d10, _a, got = proposals(w9, listing, "結果と記録を書く")
+    out.append(("まとめの案: 呼び先が変わるときは、すぐ前の「値を取る」まとまりと、その見出しを、新しい並びに付ける" + ("" if c10 == 0 else d10[-400:]),
+                c10 == 0 and "案を全部使うと、箱 2 個" in d10 and [x[:5] for x in got] == [(7, "「結果の点検」", "A1", "A7", ("結果と記録を書く.4", "結果と記録を書く.17")),
+                                                                                   (7, "「記録の点検」", "R1", "R7", ("結果と記録を書く.19", "結果と記録を書く.32"))]))
+    kinds = ["Public Sub 色々を点検する()", "    ' 準備の点検", "    Application.ScreenUpdating = False"] + [f'    結果を書く "準備{k}", True' for k in (1, 2, 3)] \
+        + ["    ' 空の呼び出し"] + sum(([f'    値 = Worksheets("台帳").Range("H{k}").Value', "    何もしない"] for k in (1, 2, 3)), []) \
+        + ['    \' "台帳"の区分=1 の点検'] + sum((pair("A", k) for k in range(1, 6)), []) + ["    ' 結果を書く"] + sum((pair("B", k) for k in range(1, 6)), []) \
+        + ["    内側を点検する", "End Sub", "", "Private Sub 内側を点検する()", "    ' 内側の点検"] + sum((rec(k) for k in (1, 2, 3)), []) \
+        + ["End Sub", "", "Private Sub 何もしない()", "End Sub"] + subs
+    w10, listing = prep("runs_kinds", "点検.bas", 'Attribute VB_Name = "点検"\n' + "\n".join(kinds))
+    c11, d11, aid11, got = proposals(w10, listing, "色々を点検する")
+    (w10 / "activities").mkdir(exist_ok=True)
+    (w10 / f"activities/{aid11}.edits.json").write_text(json.dumps({"activity": aid11, "name": "色々を点検する", "summary": "", "questions": [],
+                                                                    "ops": [{"op": "merge", "items": x[5]} for x in got]}, ensure_ascii=False), encoding="utf-8")
+    c12, t12 = run("activity.py", w10, "apply", "--id", aid11)
+    act = json.loads((w10 / f"activities/{aid11}.activity.json").read_text(encoding="utf-8")) if (w10 / f"activities/{aid11}.activity.json").exists() else {"nodes": []}
+    out.append(("まとめの案: 図にする文の無い手続きの呼び出しは、並びを切る（案にしない）。はじめのまとまりが対象外なら、items は呼び出しから。"
+                "呼ぶ側の図に入れた手続きの中の並びにも出す。「\"」「=」のある日本語の見出し・手続きと同じ名前の見出しも、見出しとして読む" + ("" if c11 == 0 and c12 == 0 else d11[-400:] + t12[-300:]),
+                c11 == 0 and c12 == 0 and [x[:5] for x in got] == [(3, "「準備の点検」", "準備1", "準備3", ("色々を点検する.5", "色々を点検する.7")),
+                                                                    (5, "「\"台帳\"の区分=1 の点検」", "A1", "A5", ("色々を点検する.16", "色々を点検する.25")),
+                                                                    (5, "「結果を書く」", "B1", "B5", ("色々を点検する.27", "色々を点検する.36")),
+                                                                    (3, "「内側の点検」", "R1", "R3", ("内側を点検する.42", "内側を点検する.47"))]
+                and sorted(c["times"] for n in act["nodes"] for c in n.get("calls") or []) == [3, 3, 5, 5]))
+    loop = ["Public Sub 繰り返して点検する()"] + sum((pair("A", k) for k in range(1, 13)), []) + ["    For i = 1 To 3"] \
+        + sum(([f'        値 = Worksheets("台帳").Range("L{k}").Value', f'        結果を書く Worksheets("台帳").Range("M{k}").Value, (値 <> "")'] for k in (1, 2, 3)), []) \
+        + ["    Next", "End Sub"] + subs
+    w11, listing = prep("runs_loop", "点検.bas", 'Attribute VB_Name = "点検"\n' + "\n".join(loop))
+    c13, d13, aid13, got = proposals(w11, listing, "繰り返して点検する")
+    callee11 = next((x.split()[0] for x in listing.splitlines() if "点検.結果を書く（" in x), "")
+    (w11 / "activities").mkdir(exist_ok=True)
+    (w11 / f"activities/{aid13}.edits.json").write_text(json.dumps({"activity": aid13, "name": "繰り返して点検する", "summary": "", "questions": [],
+                                                                    "ops": [{"op": "merge", "items": x[5]} for x in got]}, ensure_ascii=False), encoding="utf-8")
+    c14, t14 = run("activity.py", w11, "apply", "--id", aid13)
+    run("activity.py", w11, "apply", "--id", callee11, "--no-edits")
+    _c, t15 = run("check_flow.py", w11, "--stage", "activity")
+    act = json.loads((w11 / f"activities/{aid13}.activity.json").read_text(encoding="utf-8")) if (w11 / f"activities/{aid13}.activity.json").exists() else {"nodes": []}
+    inner = [n for n in act["nodes"] if [c["times"] for c in n.get("calls") or []] == [3]]
+    out.append(("まとめの案: 繰り返しの中の並びにも出す。まとめると、繰り返す箱 1 つにせず、判断とまとめた箱で描く（呼ぶ先の図と回数を残す）。"
+                "呼び出しのはじめの引数が文字列でなければ、呼び出しの行の文字は出さない（シート名を拾わない）" + ("" if c13 == 0 and c14 == 0 else d13[-400:] + t14[-300:]),
+                c13 == 0 and c14 == 0 and [x[:4] for x in got] == [(12, "無し", "A1", "A12"), (3, "無し", None, None)] and len(inner) == 1 and not inner[0].get("loop")
+                and sum(n["type"] == "decision" for n in act["nodes"]) == 1 and "まとめた呼び出しの行き先" not in t15 and "呼び出しの並びをまとめる前の図で" not in t15))
+    fold = ["Public Sub 畳んで点検する()"] + sum(([f'    If Worksheets("台帳").Range("Y{k}").Value = "" Then', f'        Worksheets("台帳").Range("Y{k}").Value = 0', "    End If"]
+                                                 for k in range(1, 9)), []) + ['    MsgBox "点検します"'] + sum((pair("A", k) for k in range(1, 6)), []) + ["End Sub"] + subs
+    w12, listing = prep("runs_fold", "点検.bas", 'Attribute VB_Name = "点検"\n' + "\n".join(fold))
+    c16, d16, aid16, got = proposals(w12, listing, "畳んで点検する")
+    callee12 = next((x.split()[0] for x in listing.splitlines() if "点検.結果を書く（" in x), "")
+    ifs = [ln.split()[0] for ln in d16.splitlines() if "  分岐  " in ln]
+    (w12 / "activities").mkdir(exist_ok=True)
+    (w12 / f"activities/{aid16}.edits.json").write_text(json.dumps({"activity": aid16, "name": "畳んで点検する", "summary": "", "questions": [],
+                                                                    "ops": [{"op": "fold", "item": k, "reason": "型や空の確認"} for k in ifs] + [{"op": "merge", "items": x[5]} for x in got]},
+                                                                   ensure_ascii=False), encoding="utf-8")
+    c17, t17 = run("activity.py", w12, "apply", "--id", aid16)
+    run("activity.py", w12, "apply", "--id", callee12, "--no-edits")
+    _c, t18 = run("check_flow.py", w12, "--stage", "activity")
+    out.append(("点検: 下書きは 25 箱を超えても、畳んだあとの図（呼び出しの並びをまとめる前）で 25 箱以下なら、呼び出しの並びをまとめると WARN" + ("" if c16 == 0 and c17 == 0 else d16[-300:] + t17[-300:]),
+                c16 == 0 and c17 == 0 and "下書きのままで箱が 27 個で" in d16 and len(ifs) == 8 and [x[0] for x in got] == [5]
+                and f"{aid16}: 呼び出しの並びをまとめる前の図で箱が 19 個（25 個まで）なのに" in t18))
+    for wk, ops, warn in ((w6, [{"op": "merge", "items": x[5]} for x in got7], False),
+                          (w7, [{"op": "merge", "items": [f"境目を点検する.{k}" for k in range(4, 10)]}], True)):
+        aid_ = next((x.split()[0] for x in run("activity.py", wk, "list")[1].splitlines() if ".境目を点検する（" in x), "")
+        sub_ = next((x.split()[0] for x in run("activity.py", wk, "list")[1].splitlines() if ".結果を書く（" in x), "")
+        (wk / "activities").mkdir(exist_ok=True)
+        (wk / f"activities/{aid_}.edits.json").write_text(json.dumps({"activity": aid_, "name": "境目を点検する", "summary": "", "questions": [], "ops": ops},
+                                                                     ensure_ascii=False), encoding="utf-8")
+        ce, te = run("activity.py", wk, "apply", "--id", aid_)
+        run("activity.py", wk, "apply", "--id", sub_, "--no-edits")
+        _c, tw = run("check_flow.py", wk, "--stage", "activity")
+        out.append((f"点検の境目: まとめる前の図で {25 if warn else 26} 箱の図で、呼び出しの並びをまとめると、WARN が{'出る' if warn else '出ない'}" + ("" if ce == 0 else te[-300:]),
+                    ce == 0 and (f"{aid_}: 呼び出しの並びをまとめる前の図で箱が 25 個" in tw) == warn and ("呼び出しの並びをまとめる前の図で" in tw) == warn))
     return out
+
+
 def code_pipeline_tests(tmp):
     """プログラムのソースを含む入力を、通しで: ページ化 → 構造 → 台帳 → アクティビティ図 → フロー → 図・一覧 → 点検。そのあと、誤りを1つずつ仕込む"""
     out, src, good = [], tmp / "code_in", tmp / "code_good"

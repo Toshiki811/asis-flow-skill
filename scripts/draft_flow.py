@@ -24,7 +24,7 @@ import pathlib
 import re
 import unicodedata
 
-from common import (CardItems, label_core, labels, load, load_card, load_page, manifest, node_systems, norm, page_json, page_units, same_text, system_names,
+from common import (CardItems, label_core, labels, load, load_card, load_page, manifest, node_systems, norm, page_json, page_units, same_text, system_names, systems_in,
                     unit_marks, when_done, work_dir)
 
 OVERVIEW = ("flow_diagram", "overview")                              # 概要のページ（あとのページが、同じ作業を詳しく書く）
@@ -34,7 +34,7 @@ SMALL_HINT = re.compile(r"ボタンを押す|クリックする|実行する|起
 HUGE_HINT = re.compile(r"年\s*[1１一]\s*回|年次|決算|全員|全件|全職員|棚卸|予算の編成|予算を編成|半期|四半期|期間をかけ|数日|数週間")   # 量「特大」の手がかりの語
 ACTION_VERBS = (                                                     # 動作の種類 → 箱の名前の終わりの動詞（決まり 3.22 と、スキーマの 12 語の意味。下書きに案として出すだけ）
     ("入力する", ("入力する", "登録する", "記入する", "記帳する")),
-    ("作成する", ("作成する",)),
+    ("作成する", ("作成する", "作る")),
     ("確認する", ("確認する", "照合する", "点検する", "チェックする", "確かめる")),
     ("承認する", ("承認する", "決裁する", "押印する")),
     ("提出・回付する", ("提出する", "回付する", "送付する", "差し戻す", "回す", "送る")),
@@ -46,10 +46,10 @@ ACTION_VERBS = (                                                     # 動作の
     ("保管する", ("保管する", "整理する", "保存する", "廃棄する")),
 )
 JOINS = {"確かめる": ("確かめ、", "確かめて"), "差し戻す": ("差し戻し、", "差し戻して"), "回す": ("回し、", "回して"), "送る": ("送り、", "送って"),   # 「する」で終わらない動詞の、次の動きへつなぐ形
-         "受け取る": ("受け取り、", "受け取って"), "知らせる": ("知らせ、", "知らせて"), "調べる": ("調べ、", "調べて")}
-ASK_OTHERS = re.compile(r"(電話|メール|ＦＡＸ|FAX|ファクス)で([^たる]*)$|問い?合わせ(?:て|、)$")   # 相手に確かめる手段のすぐあとの「確かめる」: 連絡する（決まり 3.22。
-                                                                     # 「メールで届いた請求書を確認する」のような、間に別の動きのある名前は除く）
-SHORT_VERBS = ("回す", "送る")                                        # 2 字の動詞は、助詞のすぐあとだけ（「見送る」「見回す」は別の動き）
+         "受け取る": ("受け取り、", "受け取って"), "知らせる": ("知らせ、", "知らせて"), "調べる": ("調べ、", "調べて"), "作る": ("作り、", "作って")}
+ASK_OTHERS = re.compile(r"(電話|メール|ＦＡＸ|FAX|ファクス)で、?([^たるく、]*)$|問い?合わ?せ(?:て|、)$")   # 相手に確かめる手段のあとの「確かめる」: 連絡する（決まり 3.22。
+                                                                     # 間に、別の動き〔〜た・〜る・〜く・「、」〕をはさむ名前は除く: 「メールで届いた請求書を確認する」「電話で依頼を受け、内容を確認する」）
+SHORT_VERBS = ("回す", "送る", "作る")                                # 2 字の動詞は、助詞のすぐあとだけ（「見送る」「見回す」「形作る」は別の動き）
 PARTICLES = "をにへでと、"
 TIMING = re.compile(r"タイミング|時期|頻度|毎月|毎週|毎日|毎年|月末|月初|年度末|期末|随時|都度|受けたら|届いたら")   # 開始条件の手がかりになる補足の語
 HEAD = re.compile(r"^(?:[（(]\s*([0-9０-９]{1,2})\s*[)）]|([①-⑳])|([0-9０-９]{1,2})(?=[.．、\s]))[.．、]?\s*(\S.*)$")
@@ -57,9 +57,14 @@ PAGE_TYPE_JA = {"reference": "参考", "table": "表", "form": "様式", "toc": 
                 "procedure": "手順", "flow_diagram": "フロー図", "overview": "概要"}
 
 
+def after_particle(before):
+    """2 字の動詞の前が、助詞か（「から」「より」も。前に何も無いときも）"""
+    return not before or before[-1] in PARTICLES or before.endswith(("から", "より"))
+
+
 def verb_at(t, v):
     """t が動詞 v で終わるか（2 字の動詞は、助詞のすぐあとか、名前がその動詞だけのとき）"""
-    return t.endswith(v) and (v not in SHORT_VERBS or len(t) == len(v) or t[-len(v) - 1] in PARTICLES)
+    return t.endswith(v) and (v not in SHORT_VERBS or after_particle(t[:-len(v)]))
 
 
 def read_verb(v, a, before, system):
@@ -89,7 +94,7 @@ def action_hint(label, system=""):
     for x, b in verbs:
         for j in JOINS.get(x) or (x[:-2] + "し、", x[:-2] + "して"):
             at = head.find(j)
-            if at >= 0 and (x not in SHORT_VERBS or at == 0 or head[at - 1] in PARTICLES):
+            if at >= 0 and (x not in SHORT_VERBS or after_particle(head[:at])):
                 b2 = read_verb(x, b, head[:at], system)[0]
                 if b2 != a:
                     hits.append((at, j, b2))
@@ -288,7 +293,9 @@ class Draft:
             src = [{"doc_id": d, "page": p, "item": it} for kk in [k] + [a for a, (to, _w) in self.merged.items() if to == k] for d, p, it in self.nodes[kk]["sources"]]
             tagged = node_systems({"type": "process", "sources": src}, lane, self.items_of, self.sys_names)
             acts, why = action_hint(n["label"], "・".join(tagged)) if n["kind"] == "step" and self.terms.kind(lane) != "system" else ([], "")
-            extra = [f"条件: {n['condition']}" if n["condition"] else "", f"システム: {n['system']}" if n["system"] else "",
+            shown = "・".join(tagged) or n["system"]                  # 使うシステムは、点検の札と同じ決め方（カードの欄と違えば、欄も見せる）
+            extra = [f"条件: {n['condition']}" if n["condition"] else "",
+                     f"システム: {shown}" + (f"（カードの欄: {n['system']}）" if n["system"] and tagged and systems_in(n["system"], self.sys_names) != tagged else "") if shown else "",
                      f"動作の案: {acts[0] if len(acts) == 1 else json.dumps(acts, ensure_ascii=False)}（{why}）" if acts else "",
                      f"量の候補: 特大（「{huge.group(0)}」。時間・日の単位でかかると読めるときだけ、理由つきで）" if huge else
                      "量の案: 小（ボタンを押す・実行するだけなら、time で volume と理由）" if n["kind"] == "step" and SMALL_HINT.search(n["label"]) else "",

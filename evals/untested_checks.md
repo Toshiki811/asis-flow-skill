@@ -18,11 +18,12 @@
   点検が 1 行で中継する誤りの文のうち、直しの一覧（`apply_edits.py`）・アクティビティ図の直しの一覧（`activity.py`）・台帳の紐付けと図にしない起動点・手続き
   （`systems.py` の `link_errors`・`excluded_errors`・`folded_errors`）・LLM が書いたブロックの木（`code_lang.py` の `tree_problems`）・取り出した構造
   （`code_struct.py` の `tree_errors` と、木が読めない・形が崩れている）・用語の対応（`terms.py` の `problems`）・照合の報告と照合に出した版の記録（`review.py`）・
-  業務マトリクス一覧と確認事項一覧の読み戻し（`table_template.py` の `read_side`・`read_back`）・人の値の控え（`common.py` の answers.json・times.json の形）は、
+  業務マトリクス一覧と確認事項一覧の読み戻し・処理時間の基準の表（`table_template.py` の `read_side`・`read_back`・`time_table`）・人の値の控え（`common.py` の answers.json・times.json の形）は、
   内側の誤りの文ごとに数える（`common.site` で包んだ文と、`self.bad` の呼び出し。2026-10-17 から）。表の行で指すときの関数は、いちばん内側の関数の名前
   （ブロックの木の点検の多くは `visit`）。
 - 数えないもの:
   - 落ちないための守り（`common.guarded` の「形が崩れていて、ここから先を点検できない」）。自己点検は、正しいデータと試験の写しで、これが出ないことを確かめている。
+  - どのファイルにも使う、JSON として読めないときの文（`common.load`）。中継する点検の行（answers.json・times.json が読めない など）は、点検の FAIL として数える。
 - 表の行は、ファイル・関数・文の一部で点検を指す（行の番号は書かない。点検の文を変えたら、ここも直す）。
 
 | ファイル | 関数 | 文の一部 | 試験しない理由 |

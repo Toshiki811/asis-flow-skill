@@ -448,19 +448,19 @@ def time_table(wb, want):
         c0, r0, c1, r1 = range_boundaries(area.replace("$", ""))
         ws = wb[title]
     except Exception:                                                 # 範囲が 2 つ・シートが無い・番地でない
-        return None, f"名前「{want['name']}」が、シートの中の 1 つの範囲を指していない"
+        return None, site(f"名前「{want['name']}」が、シートの中の 1 つの範囲を指していない")
     head = [str(ws.cell(r0, c).value or "").strip() for c in range(c0, c1 + 1)]
     cols = {v: head.index(v) + 1 for v in want["volumes"] if v in head}
     rows = {str(ws.cell(r, c0).value or "").strip(): r for r in range(r0 + 1, r1 + 1)}
     spare = want.get("spare") or {}                                    # 無くてもよい量（列が無ければ、代わりの列を引く）
     lost = [v for v in want["volumes"] if v not in cols and v not in spare] + [a for a in want["actions"] if a not in rows]
     if lost:
-        return None, (f"「{title}」の基準の表（名前「{want['name']}」の範囲）に、次の見出し・動作の種類が無い: {'・'.join(lost)}"
-                      "（1 行目に 小・中・大、1 列目に動作の種類）")
+        return None, site(f"「{title}」の基準の表（名前「{want['name']}」の範囲）に、次の見出し・動作の種類が無い: {'・'.join(lost)}"
+                          "（1 行目に 小・中・大、1 列目に動作の種類）")
     values = {(a, v): ws.cell(rows[a], c0 + cols[v] - 1).value for a in want["actions"] for v in want["volumes"] if v in cols}
     odd = [f"{a}×{v}" for (a, v), x in values.items() if isinstance(x, bool) or not isinstance(x, (int, float)) or x < 0]
     if odd:
-        return None, f"「{title}」の基準の表に、数でない・負の値がある: {'・'.join(odd[:8])}（分を、0 以上の数で書く）"
+        return None, site(f"「{title}」の基準の表に、数でない・負の値がある: {'・'.join(odd[:8])}（分を、0 以上の数で書く）")
     return {"title": title, "col": c0, "cols": cols, "rows": rows, "values": values, "absent": [v for v in want["volumes"] if v not in cols],
             "ref": f"{quoted(title)}!${get_column_letter(c0)}${r0 + 1}:${get_column_letter(c1)}${r1}"}, None
 

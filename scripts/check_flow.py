@@ -59,7 +59,7 @@
   FAIL  図にする単位の図が無い／いまの構造・直しの一覧から作り直したものと違う／名前の付いていない箱／
         行の網羅（実行文が、どの箱にも対象外にも入っていない・2つに入っている）／分岐の網羅（判断にも畳みにもなっていない分岐・繰り返し）／
         かぎかっこの中の名前が、指したソースの行に無い／呼び出しの行き先の図が無い／確認事項の重要度が決まり 5.4 と違う
-  WARN  箱が 25 個を超える／改善案らしい語／技術の用語（配列・状態コード など）／用語の対応で、定義の行にコメントがあるのに根拠が「つづり」
+  WARN  箱が 25 個を超える／呼び出しの並びをまとめる前の図で 25 箱以下なのに、同じ共通の処理を続けて呼ぶ並びをまとめた（決まり 6.31）／改善案らしい語／技術の用語（配列・状態コード など）／用語の対応で、定義の行にコメントがあるのに根拠が「つづり」
 [drawio]
   FAIL  XML の破綻・id の重複・両端の無い線／テンプレートに無い色・形／flow.json と図の不一致（ノード・線・レーン）
   FAIL  出典の属性が無いノード／行き先の無いページリンク／フローのページが足りない
@@ -1792,7 +1792,7 @@ def check_activity(cx, rp):
     かぎかっこの中の名前が、指したソースの行にある／呼び出しの箱の行き先がある"""
     import json
 
-    from activity import MAX_BOXES, Draft, make, ordered
+    from activity import MAX_BOXES, Draft, make, ordered, without_runs
     from systems import Ledger, has_ledger
     if not has_ledger(cx.work):
         rp.info("アクティビティ図は無い（システム台帳が無い）")
@@ -1919,9 +1919,11 @@ def check_activity(cx, rp):
                 rp.warn(f"{aid}: 箱が {len(boxes)} 個ある（{MAX_BOXES} 個まで）。技術的な分岐を畳む（fold）・隣り合うまとまりをまとめる（merge。"
                         f"下書きのままで {MAX_BOXES} 個を超える図には、activity.py draft に、続けて呼ぶ並びのまとめの案が出る）")
             runs = [x["id"] for x in boxes if x.get("calls")]
-            if runs and draft.boxes() <= MAX_BOXES:
-                rp.warn(f"{aid}: 下書きのままで箱が {draft.boxes()} 個（{MAX_BOXES} 個まで）なのに、同じ共通の処理を続けて呼ぶ並びをまとめた（{'・'.join(runs[:6])}）。"
-                        f"呼び出しの並びをまとめるのは、{MAX_BOXES} 箱を超える図だけ（references/code-guide.md）。merge から呼び出しを外す")
+            before = make(led, u, without_runs(draft, edits))[0] if runs else None   # 呼び出しの並びをまとめる前の図（ほかの直しは当てる）
+            n_before = sum(x["type"] in STEP_TYPES for x in before["nodes"]) if before else 0
+            if before and n_before <= MAX_BOXES:
+                rp.warn(f"{aid}: 呼び出しの並びをまとめる前の図で箱が {n_before} 個（{MAX_BOXES} 個まで）なのに、同じ共通の処理を続けて呼ぶ並びをまとめた（{'・'.join(runs[:6])}）。"
+                        f"呼び出しの並びをまとめるのは、ほかの直し（畳む・まとめる）のあとでも {MAX_BOXES} 箱を超える図だけ（決まり 6.31）。merge から呼び出しを外す")
             n.update(acts=1, boxes=len(boxes), lines=len(need), off=sum(len(o["lines"]) for o in a.get("lines") or [] if o.get("state") == "excluded"),
                      folded=sum(b.get("state") == "folded" for b in logged.values()), forks=len(forks))
     known = {u["activity"] for u in units} | {u["activity"] for u in led.units if u["kind"] == "shared" and led.off(u) is not None}   # 図にしない手続きの残りは、上で知らせた

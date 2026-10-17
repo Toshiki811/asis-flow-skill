@@ -42,6 +42,12 @@ FOLD_REASONS = tuple(schema_enum("systems", "$defs", "folded", "properties", "re
 class Ledger:
     """台帳・構造・紐付けを、引きやすい形にしたもの"""
 
+    def page_lines(self, doc, page):
+        """ソースのページの単位（1 行が 1 単位）。読んだページは覚えておく（下書き・図を組むたびに、同じページを読み直さない）"""
+        if (doc, page) not in self.page_memo:
+            self.page_memo[(doc, page)] = page_units(load_page(page_json(self.work, doc, page)))
+        return self.page_memo[(doc, page)]
+
     def __init__(self, work, m=None):
         self.work = pathlib.Path(work)
         self.m = m or manifest(self.work)
@@ -58,6 +64,7 @@ class Ledger:
         # 図にしない手続き（補助）: 「まとまり.手続き」→ 理由。番号は取っておく（ほかの図の番号が変わらない）が、呼び出しの箱の行き先にはしない
         self.folded = {str(x.get("procedure")): str(x.get("reason") or "") for x in self.raw.get("folded_procedures") or [] if isinstance(x, dict)}
         self.units, self.activity = [], {}                           # 図にする単位（番号つき）／(まとまり, "e1" か 手続き) → 番号
+        self.page_memo = {}                                          # (資料, ページ) → ページの単位（page_lines で読んだもの）
         for s in self.systems:
             mt, k = SYS_ID.match(str(s.get("id") or "")), 0
             for p in self.projects:

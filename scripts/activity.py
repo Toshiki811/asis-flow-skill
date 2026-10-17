@@ -18,7 +18,8 @@
   エラー    On Error GoTo の所に「このあとの処理でエラーが起きたか」の判断を置き、起きた側にエラー処理の節をつなぐ
   まとめの案  下書きのままで箱が 25 個を超える図だけ: 同じ共通の処理を 3 回以上続けて呼ぶ並びを、ソースのコメントの見出しで切って、merge の items の案を出す
             （呼び出しが 3 回に満たない見出しは、前の見出しと合わせる。前に同じ呼び先の見出しが無ければ、後ろと。別の共通の処理の呼び出しで切れる。
-            分岐の中・エラー処理の節の中の並びにも出す。案を見せるだけで、使うか・名前は LLM）
+            分岐の中・繰り返しの中・エラー処理の節の中・呼ぶ側の図に入れた手続きの中の並びにも出す。案を見せるだけで、使うか・名前は LLM。
+            まとめてよいのは、呼び出しの並びをまとめる merge を外した図でも、25 個を超えるときだけ）
 直しの種類（ops[].op）: name 名付ける／merge まとめる／split 分ける／fold 畳む（技術的な分岐・繰り返しを1つの箱に）／exclude 対象外にする／include 図に戻す
 直しの一覧に誤りがあれば、何も書かずに、誤りを全部並べて終わる（終了コード 1）。
 """
@@ -30,7 +31,7 @@ import sys
 
 import code_struct as cs
 import terms as T
-from common import EFFECTS, SEV_LABEL, STEP_TYPES, load, load_page, page_json, page_units, save, severity_of, site, span_text, work_dir
+from common import EFFECTS, SEV_LABEL, STEP_TYPES, load, save, severity_of, site, span_text, work_dir
 from renumber import renumber
 from systems import Ledger, has_ledger
 from validate import blocking, validate
@@ -43,7 +44,11 @@ CALL_RUN = 3                                                         # 同じ共
 OPERATOR, EXTERNAL = "操作者", "外部"
 ERR_LABEL = "このあとの処理でエラーが起きたか"
 ENDLESS = re.compile(r"(?i)^\(?\s*(true|1|-1)?\s*\)?$|^\s*(while\s*\(\s*(true|1)\s*\)|for\s*\(\s*;\s*;\s*\)|loop|perform\s+forever)\s*\{?\s*$")
-CODE_NOTE = re.compile(r'["=;{}]|^[A-Za-z_][A-Za-z0-9_.]*\s*\(|^(?i:call|set|if|for|next|end|dim|exit|do|loop|return|def|while|var|let|const)\b')   # コメントにしたコードらしい行
+JA = re.compile(r"[\u3040-\u30ff\u4e00-\u9fff]")
+KANA = re.compile(r"[\u3040-\u309f]")
+CODE_EN = re.compile(r'[=;{}"]|[A-Za-z_]\w*\(|^(?i:call\s+\w|next(?:\s+\w+)?$|loop\b|do$|else$|end\s+(?:if|sub|function|select|with|property)$|'
+                     r'exit\s+(?:sub|function|for|do|property)$|dim\s+\w|for\s+each\s+\w+\s+in\s|if\s.+\sthen$)')   # 日本語の無いコメントの行が、コードらしいか
+CODE_JA = re.compile(r'[A-Za-z_]\w*\s*\(\s*["\'\d]|\w\(\s*["\']|\)\.[A-Za-z_]|[;{}]\s*$|^(?i:call)\s')   # 日本語の混じる行の、コードらしい所（文字列・数を渡す呼び出し・メソッドのつながり・文の終わり）
 ENDLESS_WHY = "条件の無い繰り返し（戻る線で表す。終わるのは、中の「抜ける」）"
 FRAMEWORK_NOTE = "  ※枠組みが、この起動点の手続きの前に呼ぶ（木の起動点の before）"
 QUITS_WHY = "プログラムを止める手続きを呼ぶ（「終了（プログラムを止める）」で表す）"
@@ -64,6 +69,16 @@ INTERACT_OTHER = ("操作者に知らせる", "「{}」と、操作者に知ら�
 EXTERNAL_LABEL = {("メール", "out"): "メールを送る", ("メール", "in"): "メールを受け取る", ("外部プログラム", "out"): "外部プログラムを動かす", ("外部プログラム", "in"): "外部プログラムを動かす",
                   ("外部システム", "out"): "外部システムに渡す", ("外部システム", "in"): "外部システムから受け取る"}
 EXTERNAL_IO = ("メール", "外部プログラム", "外部システム")                      # 外部のレーンの箱にする入出力（ほかは、帳票と同じ付け方）
+
+
+def code_note(text, names):
+    """コメントの文字が、コメントにしたコードらしいか（見出しにしない）。日本語の見出しに「"」「=」・手続きと同じ名前があっても、見出しのまま読む"""
+    bare = re.sub(r'"[^"]*"|\'[^\']*\'', '""', text)                   # 文字列の中は見ない
+    if not JA.search(bare):
+        return bool(CODE_EN.search(text))
+    put = re.match(r"[^\s=<>!]+\s*=\s*(.+)$", bare)                    # 代入（右に、かなが無い: 「値 = 値 + 1」。「金額=税込の点検」は見出し）
+    called = text.split()[0] in names and re.match(r"\S+(?:\s*\(|\s+.*[\",])", text)   # 手続きの名前のあとに、引数が続く
+    return bool(CODE_JA.search(text) or (put and not KANA.search(put.group(1))) or called)
 
 
 def placeholder(module, a, b):
@@ -173,7 +188,7 @@ class Draft:
 
     def heading(self, it, prev):
         """項目のすぐ上の、コメントだけの行の文字（ソースの見出し）。前の項目 prev のあと（無ければ 20 行上）までを下から読み、
-        文の行（かっこ・else だけの行も）で止まる。飾りの線だけの行・コメントにしたコードの行は飛ばす。無ければ空"""
+        文の行（かっこ・else だけの行も）で止まる。飾りの線だけの行・コメントにしたコードの行（code_note）は飛ばす。無ければ空"""
         a, b = (prev["lines"][1] + 1) if prev else max(1, it["lines"][0] - 20), it["lines"][0] - 1
         rows = [t for _ln, t in self.source(it["module"], a, b)] if a <= b else []
         if self.st.get("language") in cs.VBA_FAMILY:
@@ -188,7 +203,7 @@ class Draft:
                     return ""
                 continue
             text = re.sub(r"^[\s*\-=#/']+|[\s*\-=#/]+$", "", notes[k])
-            if re.search(r"[0-9A-Za-z\u3040-\u30ff\u4e00-\u9fff]", text) and not CODE_NOTE.search(text) and text.split()[0] not in names:
+            if re.search(r"[0-9A-Za-z\u3040-\u30ff\u4e00-\u9fff]", text) and not code_note(text, names):
                 return text
         return ""
 
@@ -196,7 +211,7 @@ class Draft:
         """まとめの案（下書きのままで箱が MAX_BOXES 個を超える図だけ）: [{to, times, heads, keys, ends}]。references/code-guide.md の「同じ共通の処理を続けて呼ぶ並び」の決まりで、機械が切る:
         並びは、分岐・繰り返し・やり取り・抜ける所・まとめられない呼び出し・別の共通の処理の呼び出し・呼び出しの無い見出しで切れる。並びの中は、ソースのコメントの見出しで切る。
         呼ぶ回数が CALL_RUN に満たない見出しは、前の見出しと合わせる（前に無ければ、後ろと）。CALL_RUN 回以上になった並びが案。
-        items は、はじめの呼び出しのすぐ前の「まとまり」（値を取る）から、終わりの呼び出しまで。分岐の中・エラー処理の節・呼ぶ側の図に入れた手続きの中の並びにも出す"""
+        items は、はじめの呼び出しのすぐ前の「まとまり」（値を取る）から、終わりの呼び出しまで。分岐の中・繰り返しの中・エラー処理の節・呼ぶ側の図に入れた手続きの中の並びにも出す"""
         if self.boxes() <= MAX_BOXES:
             return []
         proj = self.unit["project"]
@@ -251,9 +266,10 @@ class Draft:
         return out
 
     def said(self, it):
-        """呼び出しの行の、はじめの文字列（まとめた箱の補足に書く、はじめと終わりの項目の候補）"""
+        """呼び出しの、はじめの引数の文字列（まとめた箱の補足に書く、はじめと終わりの項目の候補）。はじめの引数が文字列でなければ空（シート名などを拾わない）"""
         text = " ".join(t for _ln, t in self.source(it["module"], *it["lines"]))
-        m = re.search(r'"([^"]+)"|\'([^\']+)\'', text)
+        name = (self.procs.get(it["to"]) or {}).get("name") or str(it["to"]).split(".")[-1]
+        m = re.search(re.escape(name) + r"""\s*\(?\s*(?:"([^"]+)"|'([^']+)')""", text)
         return (m.group(1) or m.group(2)) if m else ""
 
     def exec_lines(self):
@@ -265,7 +281,7 @@ class Draft:
     def source(self, module, a, b):
         out = []
         for c in cs.cite(self.st, module, a, b):
-            units = page_units(load_page(page_json(self.led.work, c["doc_id"], c["page"])))
+            units = self.led.page_lines(c["doc_id"], c["page"])
             at = next(pg["line_from"] for m in self.st["modules"] if m["name"] == module for pg in m["pages"]
                       if pg["page"] == c["page"] and (pg.get("doc_id") or m["doc_id"]) == c["doc_id"])
             out += [(at + k - 1, units[k - 1]) for k in range(c["lines"][0], c["lines"][1] + 1)]
@@ -277,7 +293,7 @@ class Draft:
             e = self.led.entry(f"{u['project']}.{u['entry']}")
         root = self.procs[u["procedure"]]
         out(f"== 下書き {u['activity']}  {u['system']['name']}  " + (f"起動点 {e['key']}「{e['label']}」" if e else "共通の処理（ほかの単位から呼ばれる）")
-            + f"  → {root['id']}（{root['module']} {root['lines'][0]}〜{root['lines'][1]} 行）")
+            + f"  → {root['id']}（{root['module']} {root['lines'][0]}〜{root['lines'][1]} 行）  下書きのままで箱 {self.boxes()} 個")
         if len(self.scope) > 1:
             out("呼ぶ側に入れた手続き: " + "・".join(self.scope[1:]))
         out("項目（キー・種類・行・機械が拾ったこと）。行の頭の数字は、モジュールの行の番号:")
@@ -424,7 +440,10 @@ class Builder:
             if any(not self.d.mergeable(it) for it in calls):
                 return self.bad(i, op, "まとめられる呼び出しは、別の図になる共通の処理の呼び出しだけ（呼ぶ側の図に入れた手続き・図にする文の無い手続き・プログラムを止める手続きの呼び出しは、まとめられない）")
             tos = [it["to"] for it in calls]
-            if max(tos.count(t) for t in tos) < CALL_RUN:
+            if len(set(tos)) > 1:
+                return self.bad(i, op, f"呼び出しをまとめる merge は、同じ共通の処理の呼び出しだけ（別の共通の処理の呼び出しで、並びは切れる: {'・'.join(dict.fromkeys(tos))}。"
+                                       "references/code-guide.md）")
+            if len(tos) < CALL_RUN:
                 return self.bad(i, op, f"呼び出しをまとめられるのは、同じ共通の処理を {CALL_RUN} 回以上続けて呼ぶ並びだけ（値を取る → 共通の処理に渡す、の繰り返し）")
         holder = self.siblings(its[0])
         idx = [next((k for k, x in enumerate(holder) if x is it), None) for it in its]
@@ -572,7 +591,7 @@ class Builder:
         a, b = (it["lines"] if a is None else (a, b))
         out = []
         for c in cs.cite(self.d.st, it["module"], a, b):
-            text = span_text(page_units(load_page(page_json(self.d.led.work, c["doc_id"], c["page"]))), [c["lines"][0], c["lines"][0]]) or ""
+            text = span_text(self.d.led.page_lines(c["doc_id"], c["page"]), [c["lines"][0], c["lines"][0]]) or ""
             out.append(dict(c, quote=text.strip(), from_image=False))
         return out
 
@@ -713,8 +732,8 @@ class Builder:
     def loop(self, it, follow, cx, lane):
         nid = it["key"]
         live = [x for x in it["body"] if x["state"] != "excluded" and x["kind"] != "label"]
-        simple = len(live) == 1 and live[0]["kind"] == "seq" and live[0]["state"] == "box"
-        if simple or not live:                                       # 中身が箱1つ（か、図にする文が無い）: 繰り返す箱1つ
+        simple = len(live) == 1 and live[0]["kind"] == "seq" and live[0]["state"] == "box" and not live[0].get("calls")
+        if simple or not live:                                       # 中身が箱1つ（か、図にする文が無い）: 繰り返す箱1つ。呼び出しをまとめた箱は、判断と戻りの線で描く（呼ぶ先の図を残す）
             if not live:
                 self.own(it, None, "excluded", self.all_exec(it))
                 self.owned[-1]["reason"] = "繰り返しの中に、図にする文が無い"
@@ -789,6 +808,12 @@ def operator_name(edits, led, unit):
         if len(actors) == 1:
             return actors.pop()
     return OPERATOR
+
+
+def without_runs(draft, edits):
+    """直しの一覧から、呼び出しの並びをまとめる merge（items に呼び出しがあるもの）を外したもの。まとめてよいかは、この図の箱の数で決める（決まり 6.31）"""
+    runs = lambda op: isinstance(op, dict) and op.get("op") == "merge" and any((draft.by.get(k) or {}).get("kind") == "call" for k in op.get("items") or [] if isinstance(k, str))
+    return dict(edits, ops=[op for op in edits.get("ops") or [] if not runs(op)])
 
 
 def make(led, unit, edits):
@@ -888,17 +913,12 @@ def main():
     if a.cmd == "list":
         for u in ordered(led):
             key = f"{u['project']}.{u['entry']}" if u["kind"] == "entry" else ""
-            st = led.structs[u["project"]]
-            by = {x["id"]: x for x in st["procedures"]}
-            p = by[u["procedure"]]
-
-            def boxes(pid, seen):                                    # 呼ぶ側の図に入れる手続きの分も数える
-                more = {c["to"] for c in by[pid]["calls"] if c.get("to") in (st.get("inline") or []) and c["to"] not in seen}
-                return by[pid]["boxes"] + sum(boxes(x, seen | more | {pid}) - 1 for x in more)
+            p = next(x for x in led.structs[u["project"]]["procedures"] if x["id"] == u["procedure"])
             off = led.off(u)
+            boxes = f"下書きのままで箱 {Draft(led, u).boxes()}・" if off is None else ""   # 下書き・点検と同じ数え方（図を組んで数える）
             state = f"図にしない（{off}）" if off is not None else "図あり" if (adir / f"{u['activity']}.activity.json").exists() else \
                 "直しの一覧あり" if (adir / f"{u['activity']}.edits.json").exists() else "未"
-            print(f"{u['activity']}  {u['system']['name']}  {'起動点 ' + key if key else '共通の処理'}  {u['procedure']}（箱の見込み {boxes(p['id'], set())}・実行文 {len(p['exec'])} 行）  {state}")
+            print(f"{u['activity']}  {u['system']['name']}  {'起動点 ' + key if key else '共通の処理'}  {u['procedure']}（{boxes}実行文 {len(p['exec'])} 行）  {state}")
         todo = [u["activity"] for u in ordered(led) if led.off(u) is None]
         if a.group > 0 and todo:                                     # 組は、呼ばれる側から先の順に切る（前の組の図の名前を、呼び出しの箱に使える）
             print(f"\n組（{a.group} 枚ずつ。上の組から順に渡す）:")

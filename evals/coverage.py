@@ -11,7 +11,7 @@
   中継の内側 点検が 1 行で中継する、ほかのモジュールの誤りの文: 直しの一覧（apply_edits.py の self.bad・self.err）・アクティビティ図の直し（activity.py の同じ形）・
              台帳の紐付け（systems.py の link_errors・excluded_errors・folded_errors）・LLM が書いたブロックの木（code_lang.py の tree_problems）・
              取り出した構造（code_struct.py の tree_errors と、木が読めない・形が崩れている）・用語の対応（terms.py の problems）・
-             照合の報告と照合に出した版の記録（review.py）・業務マトリクス一覧と確認事項一覧の読み戻し（table_template.py の read_side・read_back）・
+             照合の報告と照合に出した版の記録（review.py）・業務マトリクス一覧と確認事項一覧の読み戻しと処理時間の基準の表（table_template.py の read_side・read_back・time_table）・
              人の値の控え（common.py の answers.json・times.json の形）。誤りの文ごとに 1 か所（common.site で包んだ所と、self.bad の呼び出し）。
              入れ子の関数の中の文は、その関数の名前で数える（ブロックの木の点検の多くは visit）
 控えは、環境変数 ASIS_FAIL_LOG があるとき、Report.fail・fail_if（FAIL になったときだけ）・warn・common.site が書き足す（共通の部品の中なら、呼び元の行も）。
