@@ -253,13 +253,15 @@ def page_data(mdl, rid, res, sids, tasks, X):
                 kinds = [d["kind"] for d in x["diffs"] if sid in d["sites"] and d["kind"] != "記載なし"]
                 mark = "△ " + "・".join(dict.fromkeys(kinds))
             coarse = "粗: ほかの拠点の " + str(max(x["grain"]["counts"].values())) + " 作業に当たる" if x and sid in x["grain"]["coarse"] else ""
-            tip = [f"{names[sid]}｜{n.get('lane', '')}｜{n.get('label', '')}"]
+            tip = [f"{names[sid]}｜{mdl.role_name(sid, k)}｜{n.get('label', '')}"]           # 担当・システム・帳票は、比べる用語の名前（日本語）で
             if n.get("detail"):
                 tip.append(f"補足: {n['detail']}")
-            if n.get("systems"):
-                tip.append("システム: " + "・".join(n["systems"]))
-            if n.get("files"):
-                tip.append("帳票: " + "・".join(f["name"] for f in n["files"]))
+            ys = [mdl.group_name(y) for y in sorted(mdl.systems(sid, k)) if n.get("lane_kind") != "system"]
+            if ys:
+                tip.append("システム: " + "・".join(ys))
+            ds = sorted(mdl.group_name(d) for d in mdl.documents(sid, k))
+            if ds:
+                tip.append("帳票: " + "・".join(ds))
             if n.get("src"):
                 tip.append("出典: " + "・".join(n["src"]))
             if x:

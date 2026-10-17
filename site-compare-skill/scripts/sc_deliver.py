@@ -85,7 +85,8 @@ def look(cmp):
     bad = []
     code, out = run("sc_check.py", cmp, "--report", str(cmp / "out" / "チェック_比較.txt"))
     if code:
-        bad.append(("機械チェック（sc_check）に FAIL がある", "out/チェック_比較.txt の FAIL を直す"))
+        first = [x.strip()[len("FAIL"):].strip()[:110] for x in out.splitlines() if x.startswith("FAIL")][:3]
+        bad.append(("機械チェック（sc_check）に FAIL がある" + "".join(f"\n      ・{x}" for x in first), "out/チェック_比較.txt の FAIL を直す"))
     code, out = run("sc_layout.py", cmp, "--no-png", "--report", str(cmp / "out" / "チェック_配置.txt"))
     if code:
         bad.append(("配置の点検（sc_layout）に FAIL がある", "out/チェック_配置.txt。行を子の行に分ける・タスクを見直す"))

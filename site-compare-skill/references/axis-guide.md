@@ -27,7 +27,7 @@
 - 材料: `python3 {SKILL}/scripts/sc_axis.py material -w {CMP}`（拠点ごとの分類とフローの要約）。中身を詳しく見るときは `python3 {SKILL}/scripts/sc_match.py material -w {CMP} --row <行>`
 
 ### 決め方
-1. 下書きの行ごとに、ほかの拠点のフローを当てる。当て方（relation）: `same`／`part`（この行の業務の一部）／`split`（1 本のフローが 2 つ以上の行にまたがる。`parts[].nodes` に、この行に入れる箱の鍵を書く）／`none`（記載なし）／`out_of_scope`（その拠点で対象外）。same 以外は `reason` を書く（none は、何を探して無かったか）。
+1. 下書きの行ごとに、ほかの拠点のフローを当てる。当て方（relation）: `same`／`part`（この行の業務の一部）／`split`（1 本のフローが 2 つ以上の行にまたがる。`parts[].nodes` に、この行に入れる箱の鍵を書く）／`none`（記載なし）／`out_of_scope`（その拠点で対象外）。same 以外は `reason` を書く（none は、何を探して無かったか）。`reason` は日本語で（納品物の「業務種別の対応」に出る。英語のフローの名前・原文の引用は書かない）。
 2. 下位フローのある分類は、ふつう `expand: true`（開いて 1 本で比べる）。拠点どうしで下位フローの単位がそろっていて、子ごとに比べるほうが分かりやすいときだけ、子の行を足す（親は `expand: false`、子の行の `parent` に親の行の ID、ID は `B03-1`）。
 3. どの行にも当たらない業務は、行を足す: 基準ありは `origin: not_in_baseline`（基準の拠点は none）、基準なしは `origin: merged`。行の名前は、その拠点の分類の名前（日本語でなければ訳し、`name_from` にもとを書く）。足す行は、その拠点で前にある業務の行のすぐあとに置く（rows の並びが、表と図の並び）。
 4. 日本語でない拠点のフローには、日本語の名前を `parts[].title` に書く。

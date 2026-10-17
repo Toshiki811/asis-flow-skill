@@ -21,7 +21,8 @@
 [verify]    対応の照合: 行ごとに採否表がある・採否表が報告の写しのまま・どの主張も、いまの中身で照合済み（照合のあとに変わった主張は差分照合）・
             指摘に採否がある・採用した指摘を反映した・支持率（支持 ÷ いまの主張の数）が 95% 以上
 [outputs]   納品物: 拠点比較.xlsx と拠点比較フロー.drawio が、いまのデータから作り直したものと同じ（違えば書き出し直す）・配置の点検（重なり・貫通）・
-            納品物の文字に、箱の鍵（F03:P-001）・資料 ID（M01）・決まっていない用語（? の付いた名前）が無い・拠点の列の名前・タスクとレーンの名前が日本語
+            納品物の文字に、箱の鍵（F03:P-001）・資料 ID（M01）・決まっていない用語（? の付いた名前）・英語（3 語以上続く英字。資料名と、拠点の用語の
+            原文の名前は除く）が無い
 """
 import argparse
 import pathlib
@@ -60,7 +61,10 @@ class Ctx:
 
 
 def shape(rp, data, kind, where):
+    """形の点検（どのファイルにも使う部品）。自己点検の被覆（evals/coverage.py）のために、FAIL のときは呼び元の行も控える"""
     errs = validate(data, kind)
+    if errs:
+        A.site("", up=2)
     for e in errs[:10]:
         rp.fail(f"{where}: 形が違う — {e}")
     if len(errs) > 10:
@@ -648,6 +652,30 @@ def check_verify(cx, rp):
 
 LEAK = [(re.compile(r"F[0-9]+(?:-[0-9]+)*:(?:P|D|S|F|SUB)-[0-9]{3}"), "箱の鍵"), (re.compile(r"(?<![A-Za-z0-9])M[0-9]{2,}(?![A-Za-z0-9])"), "資料 ID"),
         (re.compile(r"(?<![A-Za-z0-9])\?[^\s　]"), "決まっていない用語（用語の組に無い名前）")]
+LATIN_RUN = re.compile(r"[A-Za-z][A-Za-z0-9'’&\-]*(?:[ ,]+[A-Za-z][A-Za-z0-9'’&\-]*){2,}")   # 英字の語が 3 つ以上続く所（英語の文・英語の名前）
+
+
+def proper_names(cx):
+    """英字のままでよい名前: 資料名（出典の表示）と、拠点の担当・システム・帳票の原文の名前（用語の対応に出す）"""
+    out = set()
+    for s in cx.ids:
+        for n in ((cx.snap(s) or {}).get("nodes") or {}).values():
+            out.update(n.get("src") or [])
+            out.add(n.get("lane") or "")
+            out.update(n.get("systems") or [])
+            out.update(f.get("name", "") for f in n.get("files") or [])
+    for g in (try_load(cx.cmp / "terms.json")[0] or {}).get("groups") or []:
+        out.add(g.get("name", ""))
+        out.update(m.get("term", "") for m in g.get("members") or [])
+    return [norm(x) for x in out if x]
+
+
+def english(v, names):
+    """納品物の文字の中の、固有名でない英語（3 語以上続く所）。無ければ None"""
+    for m in LATIN_RUN.finditer(v):
+        if not any(norm(m.group(0)) in x for x in names):
+            return m.group(0)
+    return None
 
 
 def check_outputs(cx, rp):
@@ -691,11 +719,15 @@ def check_outputs(cx, rp):
             labels.append(re.sub(r"<[^>]+>", "", v))
         if el.tag == "object" and el.get("tooltip"):
             labels.append(el.get("tooltip"))
+    names = proper_names(cx)
     for v in labels:
         for pat, what in LEAK:
             if pat.search(v):
                 rp.fail(f"{FIG}: 図の文字に{what}が出ている（「{v[:30]}」）")
                 break
+        w = english(v, names)
+        if w:
+            rp.fail(f"{FIG}: 図の文字に英語が出ている（「{w[:30]}」。納品物は日本語。英語の名前・原文の引用を書いた所を日本語にする）")
 
 
 def scan_book(cx, rp, book):
@@ -704,6 +736,7 @@ def scan_book(cx, rp, book):
     except ImportError:
         return
     wb = openpyxl.load_workbook(book)
+    names = proper_names(cx)
     for ws in wb.worksheets:
         for row in ws.iter_rows():
             for c in row:
@@ -715,6 +748,9 @@ def scan_book(cx, rp, book):
                     if pat.search(v):
                         rp.fail(f"{BOOK_NAME}「{ws.title}」{c.coordinate}: {what}が出ている（「{v[:30]}」）")
                         break
+                w = english(v, names)
+                if w:
+                    rp.fail(f"{BOOK_NAME}「{ws.title}」{c.coordinate}: 英語が出ている（「{w[:30]}」。納品物は日本語。英語の名前・原文の引用を書いた所を日本語にする）")
 
 
 BOOK_NAME = "拠点比較.xlsx"
