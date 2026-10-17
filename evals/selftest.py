@@ -5710,6 +5710,35 @@ def unit_tests():
     return out
 
 
+def size_tests(tmp, good):
+    """25 ステップを超えるフロー: 大きさだけでは下位フローに分けない（決まり 2.10）。点検は INFO で知らせるだけで、図は 1 枚に描く"""
+    from common import STEP_TYPES
+    w = tmp / "size"
+    shutil.copytree(good, w)
+    fp = w / "flows" / "F02.flow.json"
+    f = json.loads(fp.read_text(encoding="utf-8"))
+    src = node(f, "P-001")["sources"]
+    new = [{"id": f"P-1{k:02d}", "type": "process", "lane": ["L2", "L1", "L2", "L2", "L3"][k % 5], "label": f"書類の項目{k + 1}を確かめる", "sources": src} for k in range(22)]
+    new[8:8] = [{"id": "D-101", "type": "decision", "lane": "L2", "label": "項目に漏れがあるか", "sources": src}]
+    chain = [n["id"] for n in new]
+    f["edges"] = [e for e in f["edges"] if e["from"] != "start"] + [{"from": "start", "to": chain[0]}, {"from": chain[-1], "to": "P-001"}] \
+        + [{"from": x, "to": y, **({"label": "なし"} if x == "D-101" else {})} for x, y in zip(chain, chain[1:])] + [{"from": "D-101", "to": "P-104", "label": "あり"}]
+    f["nodes"] = f["nodes"][:1] + new + f["nodes"][1:]
+    fp.write_text(json.dumps(f, ensure_ascii=False, indent=1), encoding="utf-8")
+    n = sum(x["type"] in STEP_TYPES for x in f["nodes"])
+    _c1, o1 = run("check_flow.py", w, "--stage", "flow")
+    c2, _o2 = run("build_drawio.py", w)
+    lay = json.loads((w / "out" / "業務フロー_as-is.layout.json").read_text(encoding="utf-8")) if c2 == 0 else {"pages": []}
+    c3, o3 = run("check_flow.py", w, "--stage", "drawio")
+    c4, o4 = run("check_layout.py", w, "--no-png")
+    mine = [x for x in o1.splitlines() if x.startswith(("INFO  F02:", "WARN  F02:")) and "ステップが" in x]
+    return [("25 ステップを超えるフロー: 大きさだけでは下位フローに分けよ、と言わない。INFO で知らせるだけ（決まり 2.10）",
+             n == 32 and mine == [f"INFO  F02: ステップが {n} 個（1 ページの目安 25 個を超える）。大きさだけでは分けない。"
+                                  "節・項ごとに、きっかけが別の手続きが並んでいれば、下位フローに分ける（決まり 2.10）"]),
+            ("25 ステップを超えるフロー: 図は分けずに 1 枚に描き、図の点検・配置の点検が通る",
+             c2 == 0 and [pg["id"] for pg in lay["pages"] if "F02" in pg["id"]] == ["flow-F02"] and c3 == 0 and "0 FAIL" in o3 and c4 == 0 and "0 FAIL" in o4)]
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("-w", "--work", required=True, help="fixture を描画済みの作業フォルダ")
@@ -5755,7 +5784,7 @@ def main():
             ("階層と業務分類に、結び付きと根拠が載る", "詳しくしている" in (good / "out" / "階層と業務分類.md").read_text(encoding="utf-8")),
             ("まとめた確認事項は、対象のノードを並べて載る", "| P-001・P-002 |" in (good / "out" / "確認事項一覧.md").read_text(encoding="utf-8")),
         ]
-        for name, passed in looks + matrix_looks(good) + title_tests(tmp, good) + axis_tests(tmp) + heading_tests(tmp) + pointer_tests(tmp, good) + draft_tests(tmp) + form_tests(tmp, good) + unit_tests() + code_tests() + vba_stmt_tests() + io_fix_tests() + lang_tests() + code_pipeline_tests(tmp) + call_run_tests(tmp) + narrow_tests(tmp) + template_tests(tmp, good) + time_tests(tmp, good) + two_actions_tests(tmp, good) + shown_tests(tmp, good) + supply_tests(tmp, good) + review_tests(tmp, good) + big_tests(tmp, good) + volume_tests() + access_tests(tmp) + direct_tests(tmp) + sample_fix_tests(tmp) + tree_tests(tmp) + tree_rule_tests(tmp) + review_fix_tests(tmp) + schema_tests(tmp, good) + review_gate_tests(tmp, good) + output_check_tests(tmp, good) + answer_tests(tmp, good) + gate_tests(tmp, good) + mech_tests(tmp, good):
+        for name, passed in looks + matrix_looks(good) + title_tests(tmp, good) + axis_tests(tmp) + heading_tests(tmp) + pointer_tests(tmp, good) + draft_tests(tmp) + form_tests(tmp, good) + unit_tests() + code_tests() + vba_stmt_tests() + io_fix_tests() + lang_tests() + code_pipeline_tests(tmp) + call_run_tests(tmp) + narrow_tests(tmp) + template_tests(tmp, good) + time_tests(tmp, good) + two_actions_tests(tmp, good) + shown_tests(tmp, good) + supply_tests(tmp, good) + review_tests(tmp, good) + big_tests(tmp, good) + volume_tests() + access_tests(tmp) + direct_tests(tmp) + sample_fix_tests(tmp) + tree_tests(tmp) + tree_rule_tests(tmp) + review_fix_tests(tmp) + schema_tests(tmp, good) + review_gate_tests(tmp, good) + output_check_tests(tmp, good) + answer_tests(tmp, good) + gate_tests(tmp, good) + mech_tests(tmp, good) + size_tests(tmp, good):
             print(f"{'OK  ' if passed else 'SKIP' if passed is None else 'NG  '} {name}")   # None は、道具が無くて飛ばした（合格に数えない）
             ok = ok and passed is not False
             skipped += passed is None
