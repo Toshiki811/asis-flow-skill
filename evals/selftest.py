@@ -5736,6 +5736,15 @@ def size_tests(tmp, good):
     g["edges"] = [e for e in g["edges"] if e["from"] not in cut and e["to"] not in cut] + [{"from": "P-114", "to": "P-001"}]
     (edge / "flows" / "F02.flow.json").write_text(json.dumps(g, ensure_ascii=False, indent=1), encoding="utf-8")
     c5, o5 = run("check_flow.py", edge, "--stage", "flow")
+    many = tmp / "size_lanes"                                        # レーンが 9 本（目安 8 本を超える）。足したレーンに、伸ばした箱を 1 つずつ置く
+    shutil.copytree(w, many)
+    h = json.loads(fp.read_text(encoding="utf-8"))
+    extra = [("L4", "上長", "role"), ("L5", "経理部", "dept"), ("L6", "経理課長", "role"), ("L7", "管理部", "dept"), ("L8", "経費精算システム", "system"), ("L9", "会計システム", "system")]
+    h["lanes"] += [{"id": i, "name": name, "kind": kind} for i, name, kind in extra]
+    for (i, _name, _kind), x in zip(extra, [x for x in h["nodes"] if x["id"] in ("P-100", "P-102", "P-103", "P-105", "P-106", "P-107")]):
+        x["lane"] = i
+    (many / "flows" / "F02.flow.json").write_text(json.dumps(h, ensure_ascii=False, indent=1), encoding="utf-8")
+    _c6, o6 = run("check_flow.py", many, "--stage", "flow")
     c2, _o2 = run("build_drawio.py", w)
     lay = json.loads((w / "out" / "業務フロー_as-is.layout.json").read_text(encoding="utf-8")) if c2 == 0 else {"pages": []}
     c3, o3 = run("check_flow.py", w, "--stage", "drawio")
@@ -5747,6 +5756,9 @@ def size_tests(tmp, good):
              n == 32 and c1 == 0 and not split and mine == [f"INFO  F02: ステップが {n} 個（1 ページの目安 25 個を超える）。大きさだけでは分けない。"
                                                           "節・項ごとに、きっかけが別の手続きが並んでいれば、下位フローに分ける（決まり 2.10）"]
              and "F02: ステップが" not in o1b and c5 == 0 and "ステップが" not in o5 and "FAIL  F02" not in o5),
+            ("レーンが 8 本を超えるフロー: レーンの数だけでは分けよ、と言わない。INFO で知らせるだけ（決まり 2.10）",
+             "INFO  F02: レーンが 9 本（1 ページの目安 8 本を超える）。レーンの数だけでは分けない（決まり 2.10）" in o6
+             and not [x for x in o6.splitlines() if x.startswith(("FAIL", "WARN")) and ("分け" in x or "レーンが" in x)]),
             ("25 ステップを超えるフロー: 図は分けずに 1 枚に描き、図の点検・配置の点検が通る",
              c2 == 0 and [pg["id"] for pg in lay["pages"] if "F02" in pg["id"]] == ["flow-F02"] and c3 == 0 and "0 FAIL" in o3 and c4 == 0 and "0 FAIL" in o4)]
 

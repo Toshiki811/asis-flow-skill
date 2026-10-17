@@ -106,7 +106,7 @@ NUMBERS_FILE = "納品の数"                                              # 納
 BASELINE_FILE = "現状の処理時間.json"                                    # 納品の門が書く、現状の処理時間の写し（BPR の比較の基準。表の版つき）
 RECORDS = ("チェック_*.txt", "照合シート_*.pdf", "差分照合シート_*.pdf", "原典照合レビュー_採否表.md", f"{NUMBERS_FILE}.md", f"{NUMBERS_FILE}.json", BASELINE_FILE)
 REVIEW_MIN = 0.95                                                    # 原典照合の支持率の下限（業務フロー・アクティビティ図それぞれ）。下回れば、図を直して照合し直す
-MAX_STEPS, MAX_LANES = 25, 8                                         # 1 ページの図の目安（作業の箱の数・レーンの数）。業務フローは、ステップの数だけでは分けない（決まり 2.10）
+MAX_STEPS, MAX_LANES = 25, 8                                         # 1 ページの図の目安（作業の箱の数・レーンの数）。業務フローは、ステップ・レーンの数だけでは分けない（決まり 2.10）
 
 
 class BadJson(ValueError):
