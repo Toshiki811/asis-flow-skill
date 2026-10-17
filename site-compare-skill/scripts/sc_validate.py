@@ -19,7 +19,7 @@ from sc_common import ASSETS, SKILL_DIR
 
 import validate as V                                                 # asis の検証器
 
-KINDS = ["sites", "applies", "snap", "terms", "axis", "match", "result", "numbers", "report_match", "report_verify", "review", "versions", "answers"]
+KINDS = ["sites", "applies", "snap", "terms", "axis", "match", "result", "numbers", "report_match", "report_verify", "review", "versions", "answers"]   # answers は asis と同じ形
 FILES = {"sites": "sites.json", "applies": "applies.json", "snap": "snap/*.json", "terms": "terms.json", "axis": "axis.json",
          "match": "rows/*.match.json", "result": "rows/*.result.json", "numbers": "numbers.json", "report_match": "reports/match_*.json",
          "report_verify": "reports/verify_*.json", "review": "review/*.review.json", "versions": "review/versions.json", "answers": "answers.json"}

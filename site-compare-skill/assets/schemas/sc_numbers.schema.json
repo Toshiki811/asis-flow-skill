@@ -1,0 +1,12 @@
+{
+ "title": "通し番号",
+ "file": "numbers.json",
+ "description": "機械だけが書く。タスクの番号（T-001）と確認事項の番号（Q-001）を、行とタスクの ID・出どころと ID で引き継ぐ（いま無いものの番号も残す）",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["next", "assigned"],
+ "properties": {
+  "next": {"type": "integer", "minimum": 1}, "assigned": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^T-[0-9]{3,}$"}, "description": "「行|タスク」→ T 番号"},
+  "qnext": {"type": "integer", "minimum": 1}, "qassigned": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^Q-[0-9]{3,}$"}, "description": "「出どころ|ID」→ Q 番号"}
+ }
+}

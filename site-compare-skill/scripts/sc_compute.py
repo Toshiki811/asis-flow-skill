@@ -9,7 +9,8 @@
   並び      基準あり: 基準の拠点のタスクを、基準の箱の並びで。ほかのタスクは、それを持つ拠点で線をたどって前にある基準のタスクのあと
             （無ければ、あとにある基準のタスクの前）。基準なし: 前後を支持する拠点の数で並べる（輪は、平均の位置で切る）
   区分      記載のある拠点が 1 つ → 拠点固有／比べる拠点に全部記載があり、差が無い → 共通／ほか → 差異あり
-  記号      ○ 差なし／△ その拠点が差に関わる／— 記載なし／対象外。比べる相手は、基準（無ければ、記載のある最初の拠点）
+  記号      ○ 差なし／△ その拠点が差に関わる／— 記載なし／対象外。拠点の組ごとに比べ、基準があれば基準と違う拠点に △（基準が粗くて決まらない組は、
+            その両方）。基準が無ければ、いちばん多くの拠点と違う拠点に △
   差の種類  担当（レーンの組）・システム・帳票は「同じ／違う／片方だけ記載」（片方だけ記載は差に数えない）。1 つの箱で書いた拠点（粗い側）の
             担当・システム・帳票が、詳しい拠点のものに含まれていれば同じ。判断は、行き先が別のタスクに分かれる判断の数（粗い側とは比べない）。
             順序は、線でたどれる前後が拠点で逆。内容は LLM が書いたもの。記載なし
@@ -124,8 +125,10 @@ def order_tasks(mdl, rid, tasks, graphs):
             ab = [s for s in sids if before(graphs[s][2], mem[s], a, b)]
             ba = [s for s in sids if before(graphs[s][2], mem[s], b, a)]
             if ab and ba:
-                ref = base if base in ab + ba else None
-                odd = (ba if ref in ab else ab) if ref else ab + ba
+                if base in ab + ba:
+                    odd = ba if base in ab else ab
+                else:
+                    odd = ab if len(ab) < len(ba) else ba if len(ba) < len(ab) else ab + ba
                 for t in (a, b):
                     conflicts.setdefault(t, set()).update(odd)
     return order, conflicts
@@ -154,42 +157,45 @@ def cross_decisions(mdl, sid, keys, task_of, edges):
     return n
 
 
+def involved_sites(pairs, present, base):
+    """差のある組 [(a, b)] から、記号 △ を付ける拠点。基準があれば、基準と違う拠点（と、基準では決まらない組の両方）。
+    基準が無ければ、いちばん多くの拠点と違う拠点（同じ数なら、その全部）"""
+    if not pairs:
+        return []
+    if base in present:
+        off = {a if b == base else b for a, b in pairs if base in (a, b)}
+        rest = {x for a, b in pairs if base not in (a, b) and a not in off and b not in off for x in (a, b)}
+        return [s for s in present if s in off | rest]
+    cnt = {s: sum(1 for a, b in pairs if s in (a, b)) for s in present}
+    top = max(cnt.values())
+    return [s for s in present if cnt[s] == top]
+
+
 def task_diffs(mdl, rid, t, present, compared, conflicts, edges_of):
-    """差: [{kind, state, sites, text}]・片方だけ記載: [...]・記号"""
+    """差: [{kind, state, sites, text}]・片方だけ記載: [...]。拠点の組ごとに比べる（粗い側との比べ方は compare_sets）"""
     mem = t.get("members") or {}
-    ref = mdl.baseline if mdl.baseline in present else (present[0] if present else None)
+    base = mdl.baseline if mdl.baseline in present else None
     diffs, onesided = [], []
     cnt = {s: len(mem.get(s) or []) for s in present}
+    pairs = [(a, b) for i, a in enumerate(present) for b in present[i + 1:]]
+    coarse = lambda a, b: cnt[a] == 1 and cnt[b] > 1
     for kind, fn in (("担当", lambda s, ks: {mdl.role(s, k) for k in ks}),
                      ("システム", lambda s, ks: set().union(*[mdl.systems(s, k) for k in ks]) if ks else set()),
                      ("帳票", lambda s, ks: set().union(*[mdl.documents(s, k) for k in ks]) if ks else set())):
-        bad, one = [], []
-        rset = fn(ref, mem.get(ref) or []) if ref else set()
-        for s in present:
-            if s == ref:
-                continue
-            sset = fn(s, mem.get(s) or [])
-            st = compare_sets(sset, rset, cnt[s] == 1 and cnt[ref] > 1, cnt[ref] == 1 and cnt[s] > 1)
-            text = f"{mdl.names[s]}: {'・'.join(sorted(mdl.group_name(x) for x in sset)) or '記載なし'}／{mdl.names[ref]}: {'・'.join(sorted(mdl.group_name(x) for x in rset)) or '記載なし'}"
-            if st == "違う":
-                bad.append((s, text))
-            elif st == "片方だけ記載":
-                one.append((s, text))
+        sets = {s: fn(s, mem.get(s) or []) for s in present}
+        name = lambda s: f"{mdl.names[s]}: {'・'.join(sorted(mdl.group_name(x) for x in sets[s])) or '記載なし'}"
+        bad = [(a, b) for a, b in pairs if compare_sets(sets[a], sets[b], coarse(a, b), coarse(b, a)) == "違う"]
+        one = [s for s in present if not sets[s] and any(sets[o] for o in present)]
         if bad:
-            diffs.append({"kind": kind, "state": "違う", "sites": [s for s, _ in bad], "text": "／".join(x for _, x in bad)})
+            sites = involved_sites(bad, present, base)
+            diffs.append({"kind": kind, "state": "違う", "sites": sites, "text": "／".join(dict.fromkeys(name(x) for a, b in bad for x in (a, b)))})
         if one:
-            onesided.append({"kind": kind, "state": "片方だけ記載", "sites": [s for s, _ in one], "text": "／".join(x for _, x in one)})
-    if ref:
-        dref = cross_decisions(mdl, ref, mem.get(ref) or [], mdl.task_of(rid, ref), edges_of[ref])
-        bad = []
-        for s in present:
-            if s == ref or cnt[s] == 1 and cnt[ref] > 1 or cnt[ref] == 1 and cnt[s] > 1:
-                continue
-            d = cross_decisions(mdl, s, mem.get(s) or [], mdl.task_of(rid, s), edges_of[s])
-            if d != dref:
-                bad.append((s, f"{mdl.names[s]}: 判断 {d}／{mdl.names[ref]}: 判断 {dref}"))
-        if bad:
-            diffs.append({"kind": "判断", "state": "違う", "sites": [s for s, _ in bad], "text": "／".join(x for _, x in bad)})
+            onesided.append({"kind": kind, "state": "片方だけ記載", "sites": one, "text": "／".join(name(s) for s in present)})
+    dec = {s: cross_decisions(mdl, s, mem.get(s) or [], mdl.task_of(rid, s), edges_of[s]) for s in present}
+    bad = [(a, b) for a, b in pairs if not coarse(a, b) and not coarse(b, a) and dec[a] != dec[b]]
+    if bad:
+        diffs.append({"kind": "判断", "state": "違う", "sites": involved_sites(bad, present, base),
+                      "text": "／".join(dict.fromkeys(f"{mdl.names[x]}: 判断 {dec[x]}" for a, b in bad for x in (a, b)))})
     if conflicts.get(t["id"]):
         ss = [s for s in mdl.order if s in conflicts[t["id"]]]
         diffs.append({"kind": "順序", "state": "違う", "sites": ss, "text": "前後のタスクとの順が、" + "・".join(mdl.names[s] for s in ss) + " で逆"})
@@ -198,7 +204,7 @@ def task_diffs(mdl, rid, t, present, compared, conflicts, edges_of):
     absent = [s for s in compared if s not in present]
     if absent and present:
         diffs.append({"kind": "記載なし", "state": "記載なし", "sites": absent, "text": "・".join(mdl.names[s] for s in absent) + " の資料に記載なし"})
-    return diffs, onesided, ref
+    return diffs, onesided, base
 
 
 # ---------- 複雑性 ----------

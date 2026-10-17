@@ -1,0 +1,16 @@
+{
+ "title": "計算の結果",
+ "file": "rows/<行>.result.json",
+ "description": "sc_compute.py だけが書く（手で直さない。点検が、計算し直したものと比べる）",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["row", "name", "group", "group_name", "parent", "mode", "basis", "ref", "sites", "tasks", "spread", "requests"],
+ "properties": {
+  "row": {"$ref": "sc_common#/$defs/row_id"}, "name": {"type": "string"}, "group": {"type": ["string", "null"]}, "group_name": {"type": "string"},
+  "parent": {"type": ["string", "null"]}, "mode": {"type": "string"}, "basis": {"enum": ["aligned", "raw"]}, "ref": {"type": ["string", "null"]},
+  "sites": {"type": "object", "description": "拠点 → 当て方・フローの名前・複雑性（原典・そろえた・数えた物）・粒度差・差の大きさ"},
+  "tasks": {"type": "array", "description": "並び順のタスク: 番号・名前・区分・記号・差の種類・差・片方だけ記載・粒度・箱"},
+  "spread": {"type": ["string", "null"]},
+  "requests": {"type": "array", "description": "追加の資料の依頼"}
+ }
+}
