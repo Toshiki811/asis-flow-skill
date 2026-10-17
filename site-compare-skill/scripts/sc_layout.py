@@ -9,12 +9,38 @@
 PNG は、目で全ページを見るためのもの（帯のそろい・空き枠・内訳の枠・色）。納品の門は、PNG が新しくそろっていなければ止まる。
 """
 import argparse
+import os
 import pathlib
 import sys
 
 from sc_common import FIG, Report, load, work_dir
 
 from check_layout import drawio_cli, export_png, page_problems
+
+
+def preview(cmp, fig, rp):
+    """下見の画像を out/下見/ に（draw.io と同じ描画エンジン mxGraph が使えればそれで、無ければ Pillow の近似。どちらも納品物にしない）"""
+    import preview_mx
+    out_dir = cmp / "out" / "下見"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for q in out_dir.glob("*.png"):                                  # 2 つの描き方で名前の形が違うので、前の分は消す
+        q.unlink()
+    if preview_mx.usable():
+        try:
+            pages = preview_mx.render(fig, out_dir)
+            made = [p["png"] for p in pages if p.get("png")]
+            for p in pages:
+                if p.get("error"):
+                    rp.info(f"{FIG}［{p.get('name', '')}］: 下見を描けない（{p['error']}）")
+            rp.info(f"下見の画像 {len(made)} 枚 → out/下見/（draw.io と同じ描画エンジン mxGraph の近似。字の幅・帳票の折れ角が違う。納品物にしない。全ページを Read で開いて目で見る）")
+            for p in made:
+                rp.info(f"  {p}")
+            return
+        except preview_mx.PreviewError as e:
+            rp.info(f"mxGraph の下見を描けなかった（{e}）。Pillow の近似で描く")
+    import sc_preview
+    out = sc_preview.render(fig, out_dir)
+    rp.info(f"下見の画像 {len(out)} 枚 → out/下見/（Pillow の近似。線のラベル・字の折り返しは draw.io と違う。納品物にしない。mxGraph の下見は python3 {preview_mx.SKILL / 'scripts' / 'preview_mx.py'} --probe）")
 
 
 def main():
@@ -41,13 +67,13 @@ def main():
             else:
                 rp.warn(f"{FIG}［{pg['name']}］: {text}")
     if a.preview:
-        import sc_preview
-        out = sc_preview.render(fig, (cmp / "out" / "下見").resolve() if (cmp / "out" / "下見").mkdir(parents=True, exist_ok=True) is None else None)
-        rp.info(f"下見の画像 {len(out)} 枚 → out/下見/（正確な描画ではない。納品物にしない）")
+        preview(cmp, fig, rp)
     elif not a.no_png:
         cli = drawio_cli()
         if cli is None:
             rp.warn("draw.io のコマンドが見つからないので PNG を作れない（draw.io デスクトップを入れる。無い環境の下見は --preview）")
+            if os.environ.get("ASIS_NO_PREVIEW") != "1":
+                preview(cmp, fig, rp)
         else:
             made = 0
             for pg in lay["pages"]:

@@ -12,6 +12,7 @@
 """
 import argparse
 import json
+import os
 import pathlib
 import re
 import shutil
@@ -26,7 +27,8 @@ from common import q_targets  # noqa: E402
 
 
 def run(script, work, *args):
-    r = subprocess.run([sys.executable, str(S / script), "-w", str(work), *args], capture_output=True, text=True)
+    env = dict(os.environ, ASIS_NO_PREVIEW="1")                      # draw.io の無い試験で、下見の描画（preview_mx）に時間を使わない
+    r = subprocess.run([sys.executable, str(S / script), "-w", str(work), *args], capture_output=True, text=True, env=env)
     return r.returncode, r.stdout + r.stderr
 
 

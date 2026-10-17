@@ -17,6 +17,7 @@ PNG は必ず自分の目で全ページ見る（Read で開く）。機械は�
 終了コード: FAIL があれば 1。
 """
 import argparse
+import os
 import pathlib
 import shutil
 import subprocess
@@ -180,6 +181,30 @@ def main():
                 except ImportError:
                     pass
     rp.info(f"点検したページ {sum(len(load(lp)['pages']) for lp in layouts)}")
+    if not a.no_png and cli is None and os.environ.get("ASIS_NO_PREVIEW") != "1":   # draw.io が無いとき: 近似の下見（納品物にしない）
+        import preview_mx
+        if preview_mx.usable():
+            prev = []
+            for lp in layouts:
+                lay = load(lp)
+                try:
+                    pages = preview_mx.render(lp.with_name(lay["file"]), work / "out" / "下見")
+                except preview_mx.PreviewError as e:
+                    rp.info(f"{lay['file']}: 下見の画像を作れなかった（{e}）")
+                    continue
+                prev += [p["png"] for p in pages if p.get("png")]
+                for p in pages:
+                    if p.get("error"):
+                        rp.info(f"{lay['file']}［{p.get('name', '')}］: 下見を描けない（{p['error']}）")
+            for q in stale_pngs(work / "out" / "下見", layouts):
+                q.unlink()
+            if prev:
+                rp.info(f"下見の画像 {len(prev)} 枚 → {work / 'out' / '下見'}（draw.io と同じ描画エンジン mxGraph の近似。字の幅・帳票の折れ角が違う。"
+                        "納品物にしない。全ページを Read で開いて目で見る）")
+                for p in prev:
+                    rp.info(f"  {p}")
+        else:
+            rp.info("下見の描画も使えない（node・Playwright・mxgraph が要る。python3 scripts/preview_mx.py --probe）")
     if cli:
         stale = stale_pngs(work / "out" / "png", layouts)
         for q in stale:

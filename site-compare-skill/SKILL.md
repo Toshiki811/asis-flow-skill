@@ -49,7 +49,7 @@ asis-flow-skill が要る（このスキルは asis の部品と検証器を使�
 | 5 | `sc_match.py` | タスクの対応の材料（`material`）・下書き（`draft`）・記載なしの候補（`candidates`） |
 | 6 | `sc_compute.py` | 並び・区分・記号・差の種類・粒度と内訳・複雑性・差の大きさ・追加の資料の依頼・通し番号 |
 | 7 | `sc_verify.py` | 照合シート（`sheet`。版を控え、見出しに［V-<n>］。`--claims` で差分照合）・採否表の下書き（`draft`） |
-| 8 | `sc_book.py` / `sc_drawio.py` / `sc_layout.py` | Excel／draw.io の書き出し／配置の点検と PNG（`--preview` は draw.io の無い環境の下見。納品物にしない） |
+| 8 | `sc_book.py` / `sc_drawio.py` / `sc_layout.py` | Excel／draw.io の書き出し／配置の点検と PNG（draw.io の無い環境では `--preview` で下見。node・Playwright・mxgraph があれば draw.io と同じ描画エンジンの近似、無ければ Pillow の粗い近似。納品物にしない） |
 | 9 | `sc_deliver.py` | **納品の門。** 書き出しと点検を決まった順に回し直し、全部通ったら `納品物/`・`作業の記録/` に写す |
 
 要るもの: asis-flow-skill が要るもの（`pip3 install pymupdf python-pptx openpyxl pillow oletools`・LibreOffice か Microsoft Office・PNG の書き出しに draw.io デスクトップ）。Python 3.9 以上。

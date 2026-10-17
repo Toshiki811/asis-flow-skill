@@ -48,6 +48,7 @@ def wanted(name):
 
 
 def run(script, *args, env=None):
+    env = dict(env or os.environ, ASIS_NO_PREVIEW="1")               # draw.io の無い試験で、下見の描画（preview_mx）に時間を使わない
     r = subprocess.run([sys.executable, str(S / script), *map(str, args)], capture_output=True, text=True, env=env)
     return r.returncode, r.stdout + r.stderr
 

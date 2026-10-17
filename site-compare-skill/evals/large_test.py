@@ -43,6 +43,7 @@ def say(ok, name, detail=""):
 
 def run(script, *args, env=None):
     t = time.time()
+    env = dict(env or os.environ, ASIS_NO_PREVIEW="1")
     r = subprocess.run([sys.executable, str(S / script), *map(str, args)], capture_output=True, text=True, env=env)
     return r.returncode, r.stdout + r.stderr, time.time() - t
 

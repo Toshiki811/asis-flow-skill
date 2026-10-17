@@ -97,7 +97,7 @@ python3 evals/fixture_tools.py build /tmp/sc_work   # 架空の 3 拠点の比�
 | `scripts/sc_terms.py`・`sc_axis.py`・`sc_match.py` | 用語の対応・比べる行・タスクの対応の下書きと材料（記載なしの候補も） |
 | `scripts/sc_rows.py`・`sc_compute.py` | 比較のデータを引く部品／並び・区分・記号・差の種類・粒度・複雑性・差の大きさ・追加の資料の依頼の計算 |
 | `scripts/sc_verify.py` | 照合シート（版の控え・差分照合）・採否表の下書き |
-| `scripts/sc_book.py`・`sc_drawio.py`・`sc_layout.py`・`sc_preview.py` | Excel／draw.io の書き出し／配置の点検と PNG／draw.io の無い環境の下見（Pillow。納品物にしない） |
+| `scripts/sc_book.py`・`sc_drawio.py`・`sc_layout.py`・`sc_preview.py` | Excel／draw.io の書き出し／配置の点検と PNG（draw.io の無い環境では `--preview` で下見: asis の `preview_mx.py`＝draw.io と同じ描画エンジン mxGraph を Chromium で動かした近似。それも無ければ Pillow の粗い近似。どちらも納品物にしない）／Pillow の下見 |
 | `scripts/sc_deliver.py` | 納品の門 |
 | `evals/` | 架空の 3 拠点の資料の生成（`make_fixture.py`）・期待データ・組み立て（`fixture_tools.py`）・自己点検・大量の試験・点検の発火の被覆（`coverage.py`・`untested_checks.md`）・評価用の依頼文 |
 
@@ -113,6 +113,6 @@ python3 evals/fixture_tools.py build /tmp/sc_work   # 架空の 3 拠点の比�
 
 - 実物の拠点のマニュアルでの通し（LLM の工程: 書き分け・用語の対応・比べる行・タスクの対応・照合）。試したのは、架空の 3 拠点と、それを複製した大量の試験だけ。
   架空の 3 拠点では、作り方を知らないエージェントが SKILL.md だけで工程 1b〜9 を通した（照合は別のプロセスの担当。支持率 89% → 指摘を採用して差分照合し 100%）。そこで出た指摘（粗い箱に含める作業の線引き・指摘に同意しないときの進め方・サブエージェントの無い環境・出典の区切り・図のページ名の行の ID・進み具合のコマンドの道 など）は直した。拠点ごとの as-is（工程 1）から通したことは、まだ無い。
-- draw.io デスクトップでの PNG の書き出しと目視（作った環境に draw.io が無い。下見は Pillow の近似。納品の門は、PNG が無ければ止まる）。
+- draw.io デスクトップでの PNG の書き出し（作った環境に draw.io が無い。目視は、draw.io と同じ描画エンジンによる下見で行った。納品の門は、draw.io の PNG が無ければ止まる）。
 - 複雑性の境と重みが、実物の拠点の「大中小」の感覚と合うか。
 - 英語以外の日本語でない資料（ベトナム語・タイ語など）の文の切り方（asis の手入れで足したのは、英文の文末と略語だけ）。
