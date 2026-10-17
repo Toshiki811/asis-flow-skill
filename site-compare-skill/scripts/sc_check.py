@@ -14,7 +14,8 @@
 [terms]     用語の対応（terms.json）: 比べる箱に出る用語が、ちょうど 1 つの組にある・組の ID と種類・same_name は名前が同じ・訳と言い換えは理由・
             同じ拠点の 2 つの用語を 1 つの組にしない・担当と帳票の組の名前は日本語
 [axis]      比べる行（axis.json）: 基準の有無と mode・行と業務分類の ID・全拠点が 1 回ずつ・当て方と箱の有無・理由・フローと箱が写しにある・
-            名前は日本語（日本語でない拠点は、フローの名前の日本語 title）・作業の箱が、ちょうど 1 つの行か not_compared に入る・origin
+            名前は日本語（日本語でない拠点は、フローの名前の日本語 title）・作業の箱が、ちょうど 1 つの行か not_compared に入る・origin・
+            行ごとのタスクの対応の材料が上限（4 万字）まで
 [rows]      タスクの対応（rows/<行>.match.json）: 行ごとにある・拠点の欄・箱がその行の作業の箱・箱がちょうど 1 つのタスクに入る・名前は日本語の動詞で終える・
             粒度の決まり（どの拠点も 2 つ以上の箱なら joined に理由）・記載なしは機械の候補を全部確かめる・内容の差の拠点と根拠の箱
 [compute]   計算の結果（rows/<行>.result.json）が、いまのデータから計算し直したものと同じ（違えば sc_compute.py）
@@ -58,6 +59,19 @@ class Ctx:
 
     def uses_shared(self, sid):
         return bool(self.sites.get("shared")) and self.site(sid).get("uses_shared", True)
+
+
+class SiteReport(Report):
+    """同じ種類の畳み（画面は同じ種類を 10 件まで）を、拠点の名前を除いた文で決める（拠点が多くても、同じ誤りは 1 つの種類に畳む）"""
+
+    def __init__(self, title, names, fold=10):
+        super().__init__(title, fold)
+        self.site_names = sorted((n for n in names if n), key=len, reverse=True)
+
+    def _kind(self, msg):
+        for n in self.site_names:
+            msg = msg.replace(n, "")
+        return Report._kind(msg)
 
 
 def shape(rp, data, kind, where):
@@ -436,6 +450,13 @@ def check_axis(cx, rp):
                 rp.fail(f"axis.json: {cx.names[s]}の箱 {k}「{n['label'][:20]}」が {'・'.join(got)} の 2 か所に入っている（ちょうど 1 つの行か not_compared に）")
         for f, ks in left.items():
             rp.fail(f"axis.json: {cx.names[s]}のフロー {f}「{snap['flows'][f]['name']}」の作業の箱 {len(ks)} がどの行にも入っていない（行に当てるか、not_compared に理由。{', '.join(ks[:4])}）")
+    import sc_match
+    from sc_common import MATERIAL_CAP
+    for r in ax["rows"]:
+        size = sc_match.material_size(mdl, r["id"])
+        if size > MATERIAL_CAP:
+            rp.fail(f"axis.json {r['id']}「{r['name']}」: タスクの対応の材料が {size:,} 字（上限 {MATERIAL_CAP:,} 字。1 体に渡せない）。下位フローの切れ目で子の行"
+                    f"（{r['id']}-1…）に分ける（切れ目が無ければ parts.nodes で箱を分ける。references/compare-rules.md 3.6）")
 
 
 # ---------- [rows] ----------
@@ -770,7 +791,7 @@ def main():
     a = ap.parse_args()
     cmp = work_dir(a.work)
     cx = Ctx(cmp, a.fast)
-    rp = Report("拠点間比較の点検（sc_check）", fold=None if a.all_lines else 10)
+    rp = SiteReport("拠点間比較の点検（sc_check）", cx.names.values(), fold=None if a.all_lines else 10)
     for st in (STAGES if a.stage == "all" else [a.stage]):
         with A.guarded(rp, st):
             CHECKS[st](cx, rp)

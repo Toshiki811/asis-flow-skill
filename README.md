@@ -4,6 +4,8 @@
 
 進め方は、棚卸し → ページ画像化 → 階層の事前チェック → LLM がページ画像を見て読取 → 用語・資料の紐付け・業務分類の確定 → フロー化 → draw.io 書き出し → 機械チェック → 画像で目視 → 原典照合レビュー → 報告書 → 納品の門、の順。手順は [SKILL.md](SKILL.md)、決まりは [references/flow-rules.md](references/flow-rules.md) にある。
 
+拠点ごと（海外拠点・支店）のマニュアルを比べて、拠点間の業務の差を出すときは、このスキルを拡張した [site-compare-skill/](site-compare-skill/README.md)（拠点間比較）を使う。拠点ごとの as-is はこのスキルで作り、比較の側で、用語・業務種別・タスクを突き合わせ、拠点タスク一覧・拠点のタスク別業務フロー・複雑性ヒートマップを出す。
+
 ## 考え方
 
 - **原典に書いてあることだけを図にする。** 書いていないことは補わず、推定として印を付けて確認事項に出す。
@@ -143,6 +145,7 @@ python3 evals/excel_check.py -w /tmp/fx_work             # 計算した値・数
 | `scripts/diff_runs.py` | 2回の結果の揺れを測る（カード・フロー・アクティビティ図・階層と分類と用語・台帳と用語の対応） |
 | `scripts/harvest_template.py` | draw.io のテンプレート（業務フロー・アクティビティ図）から、スタイルを抜く |
 | `scripts/table_template.py` | 表（xlsx）のテンプレートを確かめる・流し込む・既定を作り直す・基準の表の無いテンプレートに補う（`build_matrix.py`・`build_reports.py` が使う） |
+| `site-compare-skill/` | 拠点間比較のスキル（このスキルの部品を使う別のスキル。[README](site-compare-skill/README.md)） |
 | `evals/` | 動作確認用の入力の生成・期待データ・自己点検・大量入力のテスト・評価用の依頼文・実物のサンプルでの確認（`real_samples.py`）・Excel での確認（`excel_check.py`）・点検の発火の被覆（`coverage.py`。試験しない点検の一覧は `untested_checks.md`） |
 
 ## カスタマイズ

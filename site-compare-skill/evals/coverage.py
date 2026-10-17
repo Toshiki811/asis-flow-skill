@@ -125,7 +125,9 @@ def main():
     if a.log:
         log, broken = pathlib.Path(a.log), False
     else:
-        log = pathlib.Path(tempfile.mkstemp(prefix="sc_fail_", suffix=".log", dir=a.work if a.work and os.path.isdir(a.work) else None)[1])
+        if a.work:
+            pathlib.Path(a.work).mkdir(parents=True, exist_ok=True)
+        log = pathlib.Path(tempfile.mkstemp(prefix="sc_fail_", suffix=".log", dir=a.work or None)[1])
         cmd = [sys.executable, str(SKILL / "evals" / "selftest.py")] + (["-w", a.work] if a.work else [])
         r = subprocess.run(cmd, env=dict(os.environ, **{FAIL_LOG: str(log)}), capture_output=True, text=True)
         broken = r.returncode != 0

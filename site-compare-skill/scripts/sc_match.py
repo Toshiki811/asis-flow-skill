@@ -65,6 +65,11 @@ def material(mdl, rid):
     return out
 
 
+def material_size(mdl, rid):
+    """行の材料の字数（タスクの対応の担当に渡す分。sc_axis.py plan と点検が使う）"""
+    return sum(len(x) + 1 for x in material(mdl, rid))
+
+
 def draft(mdl, rid):
     base = next((s for s in mdl.order if s == mdl.baseline and (mdl.site_part(rid, s) or {}).get("parts")), None) or \
         next((s for s in mdl.order if (mdl.site_part(rid, s) or {}).get("parts")), None)

@@ -224,20 +224,21 @@ def page_data(mdl, rid, res, sids, tasks, X):
         for x in res["tasks"]:
             for k in (by.get(x["id"], {}).get("members") or {}).get(sid) or []:
                 tof[k] = x["id"]
+        starts = [k for k in nodes if (mdl.node(sid, k) or {}).get("type") == "start"]
+        ends = [k for k in nodes if (mdl.node(sid, k) or {}).get("type") == "end" and split_key(k)[1] == "end"]
         cur = "START"
         for k in nodes:
             n = mdl.node(sid, k) or {}
             t = n.get("type")
-            if t == "start":
-                b = "START"
-            elif t == "end" and split_key(k)[1] == "end" and not any(a == k for a, *_ in edges) and k == nodes[-1]:
-                b = "END"
+            if t == "start":                                         # 行に 2 本以上のフローを当てた拠点は、2 本目からの開始を、続く箱の帯に
+                nxt = next((b2 for a, b2, *_ in edges if a == k), None)  # （開始を全部いちばん上に並べると、開始の線が重なって走る）
+                b = "START" if k == starts[0] else tof.get(nxt, cur)
             elif k in tof:
                 b = tof[k]
             else:
                 b = cur                                              # 帯の無い箱（別のフローへ進む箱・途中の終了）は、前の箱の帯に
             if t == "end" and split_key(k)[1] == "end":
-                b = "END"
+                b = "END" if k == ends[-1] else cur                  # いちばん下の帯には、最後のフローの終了だけ
             cur = b if b != "END" else cur
             local[b].setdefault(sid, []).append(k)
             g = mdl.role(sid, k) if t not in ("start", "end") else None
@@ -302,7 +303,7 @@ def page_data(mdl, rid, res, sids, tasks, X):
                 if mk not in ("—", "対象外"):
                     continue
                 others = [mdl.role(s2, k) for s2, ks in (by[b].get("members") or {}).items() for k in ks]
-                want = max(set(others), key=others.count) if others else None
+                want = max(dict.fromkeys(others), key=others.count) if others else None   # 同じ数なら、拠点の順で先のもの（set の順は実行ごとに変わる）
                 lane = lane_of.get((sid, want)) or next(l["id"] for l in fl["lanes"] if l["id"].startswith(f"{sid}."))
                 pid = f"{sid}.none.{b}"
                 fl["nodes"].append({"id": pid, "type": "process", "lane": lane, "label": "（記載なし）"})

@@ -11,7 +11,6 @@
   ほかの拠点は「none・理由なし」で置く（決めるまで点検が FAIL）。行の名前は、もとの分類の名前（日本語でなければ訳す）。
 """
 import argparse
-import json
 import sys
 
 from sc_common import MATERIAL_CAP, STEP_TYPES, is_jp, load_snap, ordered_sites, save, site_names, sites_of, try_load, work_dir
@@ -94,16 +93,13 @@ def main():
         print(f"\n材料 {total:,} 字" + (f"（上限 {a.cap:,} 字を超える。業務分類ごとに分けて決める）" if total > a.cap else ""))
         return
     if a.cmd == "plan":
+        import sc_match
         big = 0
         for r in mdl.rows():
-            sizes = []
-            for sid in mdl.order:
-                ks = mdl.row_nodes(r["id"], sid)[0]
-                chars = sum(len(json.dumps(mdl.node(sid, k), ensure_ascii=False)) // 3 for k in ks)
-                sizes.append((sid, len(ks), chars))
-            tot = sum(x[2] for x in sizes)
+            sizes = [(sid, len(mdl.row_nodes(r["id"], sid)[0])) for sid in mdl.order]
+            tot = sc_match.material_size(mdl, r["id"])
             big += tot > a.cap
-            print(f"{r['id']} {r['name']}｜" + "・".join(f"{names[s]} 箱 {n}" for s, n, _c in sizes) + f"｜材料 約 {tot:,} 字"
+            print(f"{r['id']} {r['name']}｜" + "・".join(f"{names[s]} 箱 {n}" for s, n in sizes) + f"｜材料 {tot:,} 字"
                   + ("｜★大きすぎる。下位フローの切れ目で子の行（B03-1…）に分ける" if tot > a.cap else ""))
         print(f"\n行 {len(mdl.rows())}・材料が上限（{a.cap:,} 字）を超える行 {big}。行 1 つ（同じフローを分け合う行はまとめて）を 1 体のサブエージェントに渡す")
         return

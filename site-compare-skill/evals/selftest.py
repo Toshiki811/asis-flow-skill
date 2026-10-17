@@ -240,9 +240,10 @@ def stable(base, root):
     d = copy(base, root, "stable")
     before = {p.name: p.read_bytes() for p in (d / "rows").glob("*.result.json")}
     fig0, mark0 = (d / "out" / "拠点比較フロー.drawio").read_text(encoding="utf-8"), (d / "out" / "拠点比較.mark").read_text(encoding="utf-8")
-    rebuild(d)
+    for script in ("sc_compute.py", "sc_book.py", "sc_drawio.py"):         # ハッシュの種を変えて（set の順に頼ると割れる）
+        run(script, "-w", d, env=dict(os.environ, PYTHONHASHSEED="4"))
     after = {p.name: p.read_bytes() for p in (d / "rows").glob("*.result.json")}
-    say(before == after, "揺れ: 計算し直しても、計算の結果が同じ")
+    say(before == after, "揺れ: 計算し直しても（ハッシュの種を変えても）、計算の結果が同じ")
     say(fig0 == (d / "out" / "拠点比較フロー.drawio").read_text(encoding="utf-8"), "揺れ: 書き出し直しても、draw.io が同じ")
     say(mark0 == (d / "out" / "拠点比較.mark").read_text(encoding="utf-8"), "揺れ: 書き出し直しても、Excel の中身の印が同じ")
     shutil.rmtree(d)
@@ -493,6 +494,8 @@ CASES = [
     ("行に入れた箱がフローに無い", "axis", ax_site("B01", "SG", lambda x: x["parts"][0].update(nodes=["F01:P-009"])), "箱 F01:P-009 が、フロー F01"),
     ("1 つの箱が 2 つの行に", "axis", ax_site("B02", "SG", lambda x: x["parts"][0]["nodes"].append("F01:P-001")), "の 2 か所に入っている"),
     ("基準に無い作業の箱を落とす（どの行にも無い）", "axis", ax_site("B02", "SG", lambda x: x["parts"][0].update(nodes=["F01:SUB-001"])), "がどの行にも入っていない"),
+    ("行の材料が上限を超える", "axis", J("snap/TK.json", lambda s: s["nodes"]["F03:P-002"].update(detail="支払データの項目を確かめる。" * 3200)),
+     "タスクの対応の材料が"),
     ("比べないフローが写しに無い", "axis", J("axis.json", lambda a: a["not_compared"].append({"site": "TK", "flow": "F09", "nodes": None, "reason": "総則"})),
      "not_compared: 東京支店のフロー F09 が写しに無い"),
     # [rows]
