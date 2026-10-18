@@ -220,7 +220,8 @@ class Builder:
             nm = self.lane_name(i, op, p.get("lane"))
             if not str(p.get("label", "")).strip():
                 self.bad(i, op, "parts の label が空")
-            out.append(dict({"label": str(p.get("label", "")).strip(), "lane": nm, "inferred": bool(p.get("inferred"))},
+            out.append(dict({"label": str(p.get("label", "")).strip(), "lane": nm, "inferred": bool(p.get("inferred")),
+                             "detail": str(p.get("detail") or "").strip()},                  # 部分ごとの補足（書かなければ、手順の補足は最初の部分に付く）
                             **(self.timing(i, dict(op, reason=op.get("reason") or "部分ごとに指定"), p) or {})))
         if any(a["lane"] == b["lane"] for a, b in zip(out, out[1:])):
             return self.bad(i, op, "続く2つが同じレーン。分けるのは、文の途中で担当が変わるときだけ（同じ担当の作業は、1つのノードのままにする）")
@@ -237,6 +238,7 @@ class Builder:
         self.nodes[k]["gate"] = {x: str(op.get(x) or "").strip() for x in ("question", "yes", "no")}
         self.nodes[k]["gate"]["no"] = self.nodes[k]["gate"]["no"] or opposite(self.nodes[k]["gate"]["yes"]) or ELSE   # 行わない側は、反対の語（決まり 3.4）
         self.nodes[k]["gate"]["no_to"] = op.get("no_to", "next")
+        self.nodes[k]["gate"]["lane"] = self.lane_name(i, op, op.get("lane")) if op.get("lane") else ""   # 判断する人（書かなければ、その先の手順のレーン）
 
     def op_branch(self, i, op):
         k = self.need(i, op, "item")
@@ -293,13 +295,18 @@ class Builder:
         if not (src.get("doc_id") and isinstance(src.get("page"), int) and (src.get("lines") or str(src.get("quote", "")).strip())):
             return self.bad(i, op, "source（続くことが書かれた場所: doc_id・page と、lines か quote）を書く")
         after = self.need(i, op, "after") if op.get("after") else None
-        self.links.append({"flow": to, "after": after, "source": src, "label": str(op.get("label") or "").strip()})
+        lane = self.lane_name(i, op, op.get("lane")) if op.get("lane") else ""   # 別のフローへ進む箱の担当（書かなければ、前の箱と同じ）
+        self.links.append({"flow": to, "after": after, "source": src, "label": str(op.get("label") or "").strip(), "lane": lane})
 
     # ---- フローに組み立てる ----
 
     def card_item(self, doc, page, item):
         c = self.d.cards.get((doc, page)) or {}
-        return next((x for place in ("steps", "decisions") for x in c.get(place) or [] if x.get("id") == item), {})
+        it = next((x for place in ("steps", "decisions") for x in c.get(place) or [] if x.get("id") == item), None)
+        if it is None:                                               # 図の箱（図だけのページ）: 引用は箱の字
+            g = next((x for x in (c.get("diagram") or {}).get("nodes") or [] if x.get("id") == item), None)
+            return {"quote": str(g.get("label", "")), "from_image": False} if g else {}
+        return it
 
     def source(self, doc, page, item):
         it = self.card_item(doc, page, item)
@@ -323,13 +330,14 @@ class Builder:
             base = {"key": k, "doc": n["doc"], "page": n["page"], "origin": n["origin"], "mark": n["mark"], "group": n["group"], "actor": n["actor"],
                     "sources": [self.source(*s) for s in n["sources"]] + ([self.plain(n["added"])] if n.get("added") else []), "fork": n.get("fork")}
             if n.get("gate"):
-                out.append(dict(base, id=k + "?", type="decision", label=n["gate"]["question"], lane="", gate=n["gate"], follows=k))
+                out.append(dict(base, id=k + "?", type="decision", label=n["gate"]["question"], lane=n["gate"].get("lane", ""), gate=n["gate"], follows=k))
             label, aside = short_label(n["label"]) if not n.get("relabeled") else (n["label"], "")
             detail = n.get("detail", "・".join(x for x in (n["condition"] if not n.get("gate") and not n.get("target") else "", aside) if x))   # 使うシステムは、札（systems）に出る
             if n.get("parts"):
                 for j, p in enumerate(n["parts"], 1):
                     out.append(dict(base, id=f"{k}#{j}", type="process", label=p["label"], lane=p["lane"], lane_set=True, part=j, soft=p["inferred"],
-                                    detail=detail if j == 1 else "", reference=n.get("reference", "") if j == 1 else "", files=j == 1,
+                                    detail=p.get("detail") or (detail if j == 1 and not any(q.get("detail") for q in n["parts"]) else ""),
+                                    reference=n.get("reference", "") if j == 1 else "", files=j == 1,
                                     **{f: p.get(f) or n.get(f) for f in TIME_FIELDS}))
             else:
                 out.append(dict(base, id=k, type="decision" if n["kind"] == "decision" else "process", label=label, lane=n["lane"],
@@ -478,7 +486,7 @@ class Builder:
             sid = f"link{k}"
             at = last[ln["after"]] if ln["after"] else next((x["from"] for x in edges if x["to"] == "end" and x["from"] != "start"), order[-1]["id"])
             src = ln["source"]
-            subs.append({"id": sid, "type": "subprocess", "lane": by[at]["lane"], "label": ln["label"] or f"{d.cats[ln['flow']].get('name')}に進む", "link_flow": ln["flow"],
+            subs.append({"id": sid, "type": "subprocess", "lane": ln.get("lane") or by[at]["lane"], "label": ln["label"] or f"{d.cats[ln['flow']].get('name')}に進む", "link_flow": ln["flow"],
                          "sources": [self.plain(src)]})
             for x in [x for x in edges if x["from"] == at and by[at]["type"] != "decision"]:      # at → 次 を、at → リンク → 次 にする
                 x["from"] = sid
@@ -651,7 +659,13 @@ class Builder:
                   f"書かれていない側は、{to}に進むと仮に置いた", edge=(a, b))
             elif why == "note":
                 which = b if by.get(b, {}).get("origin") == "note" else a
-                q(f"m-note-{k}", "記載なし", f"{name(which)}は、補足（注記・囲み）に書かれた作業です。{name(a)}のあと、{'終了' if b not in node or node[b]['type'] == 'end' else name(b)}の前に行いますか。",
+                if which == b:                                       # 補足の作業が線の先: 「a のあと、b の次の箱の前」
+                    nxt = next((x["to"] for x in fl["edges"] if x["from"] == b), None)
+                    after, before = name(a), "終了" if nxt is None or nxt not in node or node[nxt]["type"] == "end" else name(nxt)
+                else:                                                # 補足の作業が線の元: 「a の前の箱のあと、b の前」
+                    prv = next((x["from"] for x in fl["edges"] if x["to"] == a), None)
+                    after, before = ("開始" if prv is None or prv not in node or node[prv]["type"] == "start" else name(prv)), ("終了" if b not in node or node[b]["type"] == "end" else name(b))
+                q(f"m-note-{k}", "記載なし", f"{name(which)}は、補足（注記・囲み）に書かれた作業です。{after}のあと、{before}の前に行いますか。",
                   "補足が掛かる手順のあと（分からなければ、書かれた順）に置いた", edge=(a, b))
             elif why == "doc":
                 q(f"m-doc-{k}", "資料間の順序", f"{name(a)}のあとに、別の資料に書かれた{name(b)}を行いますか。", "資料の並びの順に置いた", edge=(a, b))
@@ -686,7 +700,11 @@ class Builder:
             if None in ids or None in edge or (edge and len(edge) != 2):
                 self.err.append(site(f"questions[{i}]（{qid}）: items・edge が指す項目が、下書きに無い"))
                 continue
-            ids = list(dict.fromkeys(first[k] for k in ids))
+            parts = {}                                               # 分けた手順を指す問いは、分けた部分の全部を指す（担当を仮に決めたのは、どの部分も同じ）
+            for n in order:
+                if n.get("part"):
+                    parts.setdefault(n["key"], []).append(n["id"])
+            ids = list(dict.fromkeys(j for k in ids for j in (parts.get(k) or [first[k]])))
             if edge:
                 y["edge"] = [first[edge[0]], first[edge[1]]]
             elif len(ids) == 1:

@@ -105,6 +105,8 @@ DELIVERABLES = (f"{FLOW_FIG}*.drawio", ACT_FIG, MATRIX_BOOK) + REPORTS
 NUMBERS_FILE = "納品の数"                                              # 納品の門が書く数（out/納品の数.md・.json）
 BASELINE_FILE = "現状の処理時間.json"                                    # 納品の門が書く、現状の処理時間の写し（BPR の比較の基準。表の版つき）
 RECORDS = ("チェック_*.txt", "照合シート_*.pdf", "差分照合シート_*.pdf", "原典照合レビュー_採否表.md", f"{NUMBERS_FILE}.md", f"{NUMBERS_FILE}.json", BASELINE_FILE)
+API = 1                                                              # ほかのスキル（site-compare-skill）が使う部品の版。部品の名前・引数・戻り値を変えたら上げる
+OUTPUT_FONT = "Yu Gothic UI"                                         # 納品物の字の書体（図のセル・表のブック・下見）。テンプレートが書体を決めていれば、そちらを残す
 REVIEW_MIN = 0.95                                                    # 原典照合の支持率の下限（業務フロー・アクティビティ図それぞれ）。下回れば、図を直して照合し直す
 MAX_STEPS, MAX_LANES = 25, 8                                         # 1 ページの図の目安（作業の箱の数・レーンの数）。業務フローは、ステップ・レーンの数だけでは分けない（決まり 2.10）
 
@@ -351,18 +353,43 @@ def load_markers(path=None):
     return out
 
 
-BULLET = re.compile(r"^(?:[・･\-–—●○■□◆◇▶➤➲*＊]|[①-⑳]|[(（]?[0-9０-９]{1,2}[)）.．、]|[(（][ア-ンa-zA-Z][)）])")   # 箇条書きの頭
+BULLET = re.compile(r"^(?:[・･\-–—●○■□◆◇▶➤➲*＊•▪◦‣]|[①-⑳]|[(（]?[0-9０-９]{1,2}[)）.．、]|[(（][ア-ンa-zA-Z][)）])")   # 箇条書きの頭
+CJK = re.compile(r"[぀-ヿ㐀-鿿豈-﫿＀-￯]")   # かな・漢字・全角（日本語の行か）
+LATIN_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"“(\[])")             # 英文の文末（文末の記号のあとの空白。次が大文字・数字・かっこ）
+LATIN_ABBR = ("No.", "no.", "Nos.", "Mr.", "Ms.", "Mrs.", "Dr.", "e.g.", "i.e.", "etc.", "approx.", "vs.", "Fig.", "fig.", "p.", "pp.", "Co.", "Ltd.", "Inc.", "St.", "Dept.")
+
+
+def latin(text):
+    """日本語の字が無く、ローマ字のある文（英語・ベトナム語などの資料の行）"""
+    return not CJK.search(text) and re.search(r"[A-Za-zÀ-ỹĐđ]", text) is not None
+
+
+def latin_split(text):
+    """英文を文末で切る（略語の点では切らない）。日本語の字のある文は切らない"""
+    if not latin(text):
+        return [text]
+    out, start = [], 0
+    for m in LATIN_END.finditer(text):
+        if text[start:m.start()].endswith(LATIN_ABBR):
+            continue
+        out.append(text[start:m.start()])
+        start = m.end()
+    return out + [text[start:]]
 
 
 def _cut(pj, breaks=()):
-    """機械抽出の文字を文の単位に切った並び: (文, 外字の箇条書きの印で始まっていたか)"""
-    out, buf, lead = [], "", False
+    """機械抽出の文字を文の単位に切った並び: (文, 外字の箇条書きの印で始まっていたか)。
+    日本語の資料は「。．」と短い行で切る。日本語の字の無い行（英語などの資料）は、行をつなぐときに空白をはさみ、英文の文末（. ! ? のあと）と、
+    4 語までの短い行（見出し）でも切る"""
+    out, buf, lead, joint = [], "", False, False
 
     def flush(split):
-        nonlocal buf, lead
+        nonlocal buf, lead, joint
         parts = [x for x in (re.split(r"(?<=[。．])", buf) if split else [buf]) if x.strip()]
+        if split:
+            parts = [y for x in parts for y in latin_split(x) if y.strip()]
         out.extend((x, lead and k == 0) for k, x in enumerate(parts))
-        buf, lead = "", False
+        buf, lead, joint = "", False, False
     for raw in page_text(pj).split("\n"):
         for ln in raw.split(" | "):                                  # Excel は1行に複数のセル
             ln = ln.strip()
@@ -373,8 +400,9 @@ def _cut(pj, breaks=()):
             lead = lead or mark                                      # 印だけの行のあとに文が続くときは、その文の印
             if not ln:
                 continue
-            buf += ln
-            if ln.endswith(("。", "．")) or len(norm(ln)) <= 12:
+            buf += (" " if joint and latin(ln) else "") + ln         # 英文の行の折り返しは、語の切れ目（日本語の行は、そのままつなぐ）
+            joint = latin(ln)
+            if ln.endswith(("。", "．")) or len(norm(ln)) <= 12 or (joint and (ln.endswith((".", "!", "?", ":")) or len(ln.split()) <= 4)):   # 英文の短い行（4 語まで）は見出し
                 flush(True)
     if buf.strip():
         flush(True)
@@ -1687,3 +1715,36 @@ def node_details(fl, m, questions, items_of):
                     "note": any(items_of(s.get("doc_id"), s.get("page")).get(s.get("item"), {}).get("origin") == "note" for s in ss),
                     "questions": q_node.get(n["id"], [])})
     return out
+
+
+JP_FALLBACK = ("Noto Sans CJK JP", "IPAPGothic", "IPAGothic", "TakaoPGothic", "VL PGothic")   # 書体が無い機械で、代わりに使う和文の書体（先にあるもの）
+_FONT_ENV = {}
+
+
+def font_env(font=OUTPUT_FONT):
+    """図を画像にする draw.io・Chromium に渡す環境変数。書体（OUTPUT_FONT）が無い機械（コンテナの Linux）では、fontconfig で
+    その書体の名前を、ある和文の書体に置き換える（置き換えないと、和文が中国語の字形の書体で描かれる）。書体がある機械・fontconfig の無い機械は、そのまま"""
+    import shutil
+    import subprocess
+    import tempfile
+    if font not in _FONT_ENV:
+        _FONT_ENV[font] = {}
+        if shutil.which("fc-match") and shutil.which("fc-list"):
+            try:
+                got = subprocess.run(["fc-match", "-f", "%{family}", font], capture_output=True, text=True, timeout=30).stdout
+                have = subprocess.run(["fc-list", ":", "family"], capture_output=True, text=True, timeout=30).stdout
+            except (OSError, subprocess.TimeoutExpired):
+                got, have = font, ""
+            fams = {f.strip() for line in have.splitlines() for f in line.split(",")}
+            alt = next((f for f in JP_FALLBACK if f in fams), None)
+            if font not in got.split(",") and alt:
+                base = os.environ.get("FONTCONFIG_FILE") or "/etc/fonts/fonts.conf"
+                conf = pathlib.Path(tempfile.gettempdir()) / "asis_fonts" / "fonts.conf"
+                conf.parent.mkdir(parents=True, exist_ok=True)
+                conf.write_text('<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n<fontconfig>\n'
+                                f'  <include ignore_missing="yes">{base}</include>\n'
+                                f'  <match target="pattern"><test name="family"><string>{font}</string></test>'
+                                f'<edit name="family" mode="assign" binding="strong"><string>{alt}</string></edit></match>\n'
+                                '</fontconfig>\n', encoding="utf-8")
+                _FONT_ENV[font] = {"FONTCONFIG_FILE": str(conf)}
+    return dict(os.environ, **_FONT_ENV[font])

@@ -128,7 +128,7 @@ def summaries(fig):
              "pages": sorted({f"{s.get('doc_id')} {s.get('page')}" + (f" {s['lines'][0]}-{s['lines'][-1]}" if isinstance(s.get("lines"), list) and s["lines"] else "")
                               for s in n.get("sources") or [] if isinstance(s, dict)}),
              "edges": sorted([line(e, f"→{e.get('to')}") for e in edges if e.get("from") == i] + [line(e, f"←{e.get('from')}") for e in edges if e.get("to") == i])}
-        for k in ("systems", "direction", "attach_to", "calls", "loop", "folded", "activity"):   # 種類によって無い項目は、写しにも入れない
+        for k in ("systems", "direction", "attach_to", "calls", "loop", "folded", "activity", "action"):   # 種類によって無い項目は、写しにも入れない（action = 動作の種類。照合の指摘で直るので控える）
             if n.get(k) not in (None, "", []):
                 s[k] = json.dumps(n[k], ensure_ascii=False, sort_keys=True) if isinstance(n[k], (dict, list)) else str(n[k])
         if files.get(i):
@@ -139,7 +139,7 @@ def summaries(fig):
 
 SEEN_JA = {"type": "種類", "label": "名前", "lane": "レーン", "detail": "補足", "inferred": "推定の印", "link": "リンク先", "pages": "出典のページ", "edges": "線",
            "systems": "使うシステム", "direction": "帳票の向き", "attach_to": "付く箱", "calls": "呼び出し", "loop": "繰り返し", "folded": "畳んだ手続き",
-           "activity": "アクティビティ図へのリンク", "files": "付いている帳票", "start": "開始条件", "end": "終了条件", "excluded": "対象外の項目と理由",
+           "activity": "アクティビティ図へのリンク", "action": "動作の種類", "files": "付いている帳票", "start": "開始条件", "end": "終了条件", "excluded": "対象外の項目と理由",
            "unused": "使わないページと理由"}
 
 
@@ -344,6 +344,17 @@ def from_reports(work, fid, fig, rec=None, reps=None, maps=False):
     return list(verdict.values()), findings
 
 
+LATER_KEYS = ("action",)                                             # あとから控えに足した項目。その項目の無い（前の版の）控えとは、比べない
+
+
+def same_view(was, now):
+    """箱の要約が、控えと同じか（控えに無い、あとから足した項目は見ない）"""
+    if not isinstance(was, dict) or not isinstance(now, dict):
+        return was == now
+    keys = set(was) | {k for k in now if k not in LATER_KEYS or k in was}
+    return all(was.get(k) == now.get(k) for k in keys)
+
+
 def unreviewed(fid, fig, maps):
     """照合していない箱: [(番号, 何が違うか)]。箱は、報告が実際に判定した版（シートに載せただけでは数えない。認めた版は全部の箱）の
     どれかと、いまの図が同じなら照合済み。どの報告も判定していない箱は、最初の全体の照合のときから変わっていなければ、
@@ -360,17 +371,18 @@ def unreviewed(fid, fig, maps):
     out = []
     for i, now in summaries(fig).items():
         seen = looked.get(i) or []
-        if now in seen:
+        if any(same_view(w, now) for w in seen):
             continue
         was = seen[-1] if seen else (first or {}).get("nodes", {}).get(i)
-        if not seen and was == now:
+        if not seen and same_view(was, now):
             continue
-        if i in last and last[i]["nodes"][i] == now:
+        if i in last and same_view(last[i]["nodes"][i], now):
             out.append((i, f"シート {last[i]['id']} に載せたが、報告が判定していない"))
         elif not isinstance(was, dict):
             out.append((i, "照合のあとに足した"))
         else:
-            out.append((i, "・".join(SEEN_JA.get(k, k) for k in sorted(set(now) | set(was)) if was.get(k) != now.get(k)) + "が変わった"))
+            keys = set(was) | {k for k in now if k not in LATER_KEYS or k in was}
+            out.append((i, "・".join(SEEN_JA.get(k, k) for k in sorted(keys) if was.get(k) != now.get(k)) + "が変わった"))
     return out
 
 

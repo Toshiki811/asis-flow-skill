@@ -47,7 +47,7 @@ import unicodedata
 
 from build_reports import KIND, Reports
 from common import (ACT_JOIN, ACTIONS, REL_LABEL, STEP_TYPES, SYSTEM_KIND, TYPE_ACTION, VOLUME_SPARE, VOLUMES, Answers, BadJson, Times, answer_gaps, category_path, flow_key, load, locate, node_clues, node_details, order_of, own_number,
-                    question_ids, step_order_by_branch, system_ledger, time_basis, tree_nodes, whole, work_dir, unlinked_note, ASSETS)
+                    question_ids, step_order_by_branch, system_ledger, time_basis, tree_nodes, whole, work_dir, unlinked_note, ASSETS, OUTPUT_FONT)
 from table_template import (Cell, Template, TemplateError, circled, clean, fill as fill_template, lock_of, manual_back, remembered,
                             side_path, time_table)
 from validate import blocking
@@ -217,7 +217,7 @@ LEGEND = [
                    "目次に無く足した、のどれとして扱ったかと、その理由。"),
 ]
 TIME_SHEET = "処理時間の基準"
-LOOK = {"font": "游ゴシック", "size": 9, "border": True, "head_fill": "D9E1F2", "head_font": dict(sz=10, b=True), "order": [s for s in SHEETS[:-1] if s != SHEETS[3]] + [TIME_SHEET, SHEETS[-1]],   # 起動点一覧は入れない（アクティビティ図の1ページ目にある。様式に置けば出る）
+LOOK = {"font": OUTPUT_FONT, "size": 9, "border": True, "head_fill": "D9E1F2", "head_font": dict(sz=10, b=True), "order": [s for s in SHEETS[:-1] if s != SHEETS[3]] + [TIME_SHEET, SHEETS[-1]],   # 起動点一覧は入れない（アクティビティ図の1ページ目にある。様式に置けば出る）
         "step_width": 30, "omit": {"システム一覧": ["起動点"]}, "aligns": {"処理時間の行": dict(horizontal="center", vertical="center")},
         "heads": {"きっかけ": "開始条件", "成果": "終了条件", "処理時間の合計": "処理時間の合計（分・全作業）", "件数": "件数（人が入れる）", "略称": "資料の題名"},
         "widths": {"業務マトリクス": [20, 34, 24, 34, 26, 26, 12, 10, 12], TIME_SHEET: [20, 7, 7, 7, 7, 80],

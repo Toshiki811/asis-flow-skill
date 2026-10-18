@@ -12,6 +12,7 @@
 """
 import argparse
 import json
+import os
 import pathlib
 import re
 import shutil
@@ -26,7 +27,8 @@ from common import q_targets  # noqa: E402
 
 
 def run(script, work, *args):
-    r = subprocess.run([sys.executable, str(S / script), "-w", str(work), *args], capture_output=True, text=True)
+    env = dict(os.environ, ASIS_NO_PREVIEW="1")                      # draw.io の無い試験で、下見の描画（preview_mx）に時間を使わない
+    r = subprocess.run([sys.executable, str(S / script), "-w", str(work), *args], capture_output=True, text=True, env=env)
     return r.returncode, r.stdout + r.stderr
 
 
@@ -4876,6 +4878,21 @@ def template_tests(tmp, good):
     r = subprocess.run([sys.executable, str(S / "table_template.py"), "check"], capture_output=True, text=True)
     out.append(("テンプレート（xlsx）: assets/ の 2 つが、既定の作り方（table_template.py default）と同じ。確かめ（check）が FAIL 0" + ("" if r.returncode == 0 else r.stdout[-400:]),
                 same and r.returncode == 0 and "0 FAIL" in r.stdout))
+    import zipfile
+    import build_drawio as BD
+
+    def faces(path):                                                  # ブックの書体（名前の無い書体は None）
+        xml = zipfile.ZipFile(path).read("xl/styles.xml").decode("utf-8")
+        fonts = re.findall(r"<font>(.*?)</font>|<font/>", re.search(r"<fonts[^>]*>(.*?)</fonts>", xml, re.S).group(1), re.S)
+        return {(re.search(r'<name val="([^"]*)"', f) or [None, None])[1] for f in fonts}
+    books = [assets / n for _k, (_s, _l, n) in TT.books().items()] + [good / "out" / "業務マトリクス一覧.xlsx", good / "out" / "確認事項一覧.xlsx"]
+    figs = sorted((good / "out").glob("*.drawio"))
+    cells = [c for f in figs for c in re.findall(r"<mxCell [^>]*>", f.read_text(encoding="utf-8")) if 'vertex="1"' in c or 'edge="1"' in c]
+    bad = [c for c in cells if "fontFamily=Yu Gothic UI;" not in c]
+    out.append((f"書体: テンプレート・書き出した表（{', '.join(sorted(str(faces(b)) for b in books))}）と図のどのセル（{len(cells)}・外れ {bad[:1]}）も Yu Gothic UI。"
+                "テンプレートが書体を決めていれば、それを残す",
+                all(faces(b) == {"Yu Gothic UI"} for b in books) and figs and cells and not bad
+                and BD.with_font("text;fontFamily=Meiryo;") == "text;fontFamily=Meiryo;" and BD.with_font("") == "fontFamily=Yu Gothic UI;"))
     tok = lambda ws, t: next(x for row in ws.iter_rows() for x in row if x.value == t)
 
     def swap_cols(ws, a, b, rows):
@@ -5564,6 +5581,23 @@ def volume_tests():
              and time_basis({"type": "process"}) == ("その他", "中", ""))]
 
 
+def skill_dir_tests():
+    """リポジトリの .claude/skills（Claude Code がスキルを探す場所）: asis-flow-skill が、本物の SKILL.md へのリンクで入っている"""
+    base = SKILL / ".claude" / "skills"
+    want = {"asis-flow-skill": SKILL / "SKILL.md"}                  # site-compare-skill は別のリポジトリ
+    names = lambda p: re.search(r"^name:\s*(\S+)", p.read_text(encoding="utf-8")[:300], re.M)
+    found = sorted(p.name for p in base.iterdir()) if base.is_dir() else []
+    linked = found == sorted(want) and all((base / n / "SKILL.md").resolve() == t.resolve() and (m := names(base / n / "SKILL.md")) and m.group(1) == n
+                                            for n, t in want.items())
+    asis = base / "asis-flow-skill"
+    links = [p for p in asis.iterdir() if p.is_symlink()] if asis.is_dir() else []
+    no_loop = bool(links) and not asis.is_symlink() and all(p.exists() and not SKILL.resolve().is_relative_to(p.resolve()) for p in links)
+    named = {d for d in re.findall(r"`(?:python3 )?([A-Za-z_]+)/", (SKILL / "SKILL.md").read_text(encoding="utf-8")) if (SKILL / d).is_dir()}
+    return [("スキルの置き場所: .claude/skills に asis-flow-skill だけがあり、SKILL.md が本物（直下）に解け、name がフォルダの名前と同じ", linked),
+            ("スキルの置き場所: asis-flow-skill は本物のフォルダで、中身のリンクはどれも先があり、直下（.claude を含む）を指さない（輪にしない）。SKILL.md が名指しするフォルダが全部ある",
+             no_loop and bool(named) and all((asis / d).exists() for d in named))]
+
+
 def unit_tests():
     """部品が単体で正しく動くか"""
     from common import Report, bare_number, printed_numbers, question_ids, quote_match
@@ -5579,6 +5613,14 @@ def unit_tests():
     nons = ["金額は十万円までとする。", "承認が必要である。", "入力欄が表示されている。", "担当者が提出できる。", "内容に誤りがある。", "手続きは規程による。"]
     out.append(("作業らしい文: 「る」で終わる作業（確かめる・送る・入れる）を拾い、状態・可能・受け身・決まりの言い回しは拾わない",
                 all(action_like(s) for s in acts) and not any(action_like(s) for s in nons)))
+    from common import page_units
+    en = page_units({"text": ["Claim and approval", "Step 3. Review the application", "form and confirm the name, e.g. ABC. The officer then",
+                              "registers the case. If duplicates are found:", "• escalate to the supervisor.", "• Otherwise continue."]})
+    ja = page_units({"text": ["申請者は、経費申請書を作成し、", "領収書を添付する。", "※ 5万円以上は見積書を添付すること。"]})
+    out.append(("英文の行: 折り返しを空白でつなぎ、文末（略語の点は除く）・• の箇条書き・4 語までの見出しで切る。日本語の行は、いままでどおり",
+                en == ["Claim and approval", "Step 3.", "Review the application form and confirm the name, e.g. ABC.", "The officer then registers the case.",
+                       "If duplicates are found:", "• escalate to the supervisor.", "• Otherwise continue."]
+                and ja == ["申請者は、経費申請書を作成し、領収書を添付する。", "※ 5万円以上は見積書を添付すること。"]))
     out.append(("目次と業務の木: 木の根を 1 段目に置いた木（目次は章が 1 段目）でも、段の差をそろえて突き合わせる",
                 got.get("H1.1") is toc[0] and got.get("H1.2") is toc[1] and got.get("H1.2.1") is toc[2] and "H1" not in got))
     out.append(("刷られた番号の飾りを外す（- 13 -・P.13・13/20。3-2 はそのまま）",
@@ -5808,7 +5850,7 @@ def main():
             ("階層と業務分類に、結び付きと根拠が載る", "詳しくしている" in (good / "out" / "階層と業務分類.md").read_text(encoding="utf-8")),
             ("まとめた確認事項は、対象のノードを並べて載る", "| P-001・P-002 |" in (good / "out" / "確認事項一覧.md").read_text(encoding="utf-8")),
         ]
-        for name, passed in looks + matrix_looks(good) + title_tests(tmp, good) + axis_tests(tmp) + heading_tests(tmp) + pointer_tests(tmp, good) + draft_tests(tmp) + form_tests(tmp, good) + unit_tests() + code_tests() + vba_stmt_tests() + io_fix_tests() + lang_tests() + code_pipeline_tests(tmp) + call_run_tests(tmp) + narrow_tests(tmp) + template_tests(tmp, good) + time_tests(tmp, good) + two_actions_tests(tmp, good) + shown_tests(tmp, good) + supply_tests(tmp, good) + review_tests(tmp, good) + big_tests(tmp, good) + volume_tests() + access_tests(tmp) + direct_tests(tmp) + sample_fix_tests(tmp) + tree_tests(tmp) + tree_rule_tests(tmp) + review_fix_tests(tmp) + schema_tests(tmp, good) + review_gate_tests(tmp, good) + output_check_tests(tmp, good) + answer_tests(tmp, good) + gate_tests(tmp, good) + mech_tests(tmp, good) + size_tests(tmp, good):
+        for name, passed in looks + matrix_looks(good) + title_tests(tmp, good) + axis_tests(tmp) + heading_tests(tmp) + pointer_tests(tmp, good) + draft_tests(tmp) + form_tests(tmp, good) + unit_tests() + code_tests() + vba_stmt_tests() + io_fix_tests() + lang_tests() + code_pipeline_tests(tmp) + call_run_tests(tmp) + narrow_tests(tmp) + template_tests(tmp, good) + time_tests(tmp, good) + two_actions_tests(tmp, good) + shown_tests(tmp, good) + supply_tests(tmp, good) + review_tests(tmp, good) + big_tests(tmp, good) + volume_tests() + skill_dir_tests() + access_tests(tmp) + direct_tests(tmp) + sample_fix_tests(tmp) + tree_tests(tmp) + tree_rule_tests(tmp) + review_fix_tests(tmp) + schema_tests(tmp, good) + review_gate_tests(tmp, good) + output_check_tests(tmp, good) + answer_tests(tmp, good) + gate_tests(tmp, good) + mech_tests(tmp, good) + size_tests(tmp, good):
             print(f"{'OK  ' if passed else 'SKIP' if passed is None else 'NG  '} {name}")   # None は、道具が無くて飛ばした（合格に数えない）
             ok = ok and passed is not False
             skipped += passed is None

@@ -894,6 +894,10 @@ def make_default(spec, look, path):
 
     wb = Workbook()
     wb.remove(wb.active)
+    if name is not None:                                             # ブックの既定の書体（何も書いていないセル・足した行・列の幅の単位）も同じ書体に
+        from openpyxl.utils.indexed_list import IndexedList
+        wb._fonts = IndexedList([Font(name=name, size=11)])
+        wb._named_styles["Normal"].font = Font(name=name, size=11)
     head_font = Font(bold=True) if name is None else mk(look["head_font"])
     body_font = None if name is None else Font(name=name, size=size)
     for title in look["order"]:

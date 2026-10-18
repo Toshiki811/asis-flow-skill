@@ -55,7 +55,7 @@ description: 業務マニュアル・手順書・規程類（PowerPoint・PDF・
 | 6 | `draft_flow.py` / `apply_edits.py` | フローを「機械が下書き、LLM が直しの一覧」で作る（既定。`references/flow-edits-guide.md`）: カードから下書きを作って見せる／直しの一覧（`flows/<ID>.edits.json`）を当てて `flow.json` を作る |
 | — | `harvest_template.py` / `table_template.py` / `diff_runs.py` | draw.io のテンプレートを替えたとき／表（xlsx）のテンプレートを確かめる（`check`）・既定を作り直す（`default`）とき／2回の結果の揺れを測るとき（カード・フロー・アクティビティ図・階層と分類・台帳） |
 
-要るもの: `pip3 install pymupdf python-pptx openpyxl pillow oletools`。Office 文書の描画に Microsoft Office（macOS）か LibreOffice、PNG の書き出しに draw.io デスクトップ。`python3 scripts/office_to_pdf.py --probe` で使える方法が分かる。Python 3.9 以上。
+要るもの: `pip3 install pymupdf python-pptx openpyxl pillow oletools`。Office 文書の描画に Microsoft Office（macOS）か LibreOffice、PNG の書き出しに draw.io デスクトップ（無い環境では、`check_layout.py` が mxGraph＋Chromium の近似で `out/下見/` に下見を描く。`python3 scripts/preview_mx.py --probe`。下見で目視はできるが、納品物の PNG にはならない）。`python3 scripts/office_to_pdf.py --probe` で使える方法が分かる。Python 3.9 以上。
 
 ## 手順
 

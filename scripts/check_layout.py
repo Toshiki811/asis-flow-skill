@@ -17,11 +17,13 @@ PNG は必ず自分の目で全ページ見る（Read で開く）。機械は�
 終了コード: FAIL があれば 1。
 """
 import argparse
+import os
 import pathlib
 import shutil
+import signal
 import subprocess
 
-from common import Report, load, work_dir
+from common import Report, font_env, load, work_dir
 from validate import validate
 
 MAC_CLI = "/Applications/draw.io.app/Contents/MacOS/draw.io"
@@ -31,11 +33,22 @@ def drawio_cli():
     return shutil.which("drawio") or shutil.which("draw.io") or (MAC_CLI if pathlib.Path(MAC_CLI).exists() else None)
 
 
-def export_png(cli, drawio, index, png, scale=1.0):
+def export_png(cli, drawio, index, png, scale=1.0, tries=2, limit=180):
+    """1 ページを PNG に。書体が無い機械では、代わりの和文の書体で描く（common.font_env）。
+    draw.io（Electron）は、まれに止まったまま返らない: 時間で切り、子のプロセスごと止めて、もう一度回す"""
     png.parent.mkdir(parents=True, exist_ok=True)
-    r = subprocess.run([cli, "-x", "-f", "png", "-p", str(index), "-s", str(scale), "-o", str(png), str(drawio)],
-                       capture_output=True, text=True, timeout=300)
-    return png.exists(), (r.stderr or r.stdout).strip()[-200:]
+    msg = ""
+    for _ in range(tries):
+        p = subprocess.Popen([cli, "-x", "-f", "png", "-p", str(index), "-s", str(scale), "-o", str(png), str(drawio)],
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True, env=font_env())
+        try:
+            out, err = p.communicate(timeout=limit)
+            return png.exists(), (err or out).strip()[-200:]
+        except subprocess.TimeoutExpired:
+            os.killpg(p.pid, signal.SIGKILL)                         # 画面の無い環境の仮の画面（Xvfb）も、同じ組で止まる
+            p.communicate()
+            msg = f"draw.io が {limit} 秒で終わらない（{tries} 回試した）"
+    return False, msg
 
 
 def seg_hits_rect(p, q, r, pad=2):
@@ -180,6 +193,30 @@ def main():
                 except ImportError:
                     pass
     rp.info(f"点検したページ {sum(len(load(lp)['pages']) for lp in layouts)}")
+    if not a.no_png and cli is None and os.environ.get("ASIS_NO_PREVIEW") != "1":   # draw.io が無いとき: 近似の下見（納品物にしない）
+        import preview_mx
+        if preview_mx.usable():
+            prev = []
+            for lp in layouts:
+                lay = load(lp)
+                try:
+                    pages = preview_mx.render(lp.with_name(lay["file"]), work / "out" / "下見")
+                except preview_mx.PreviewError as e:
+                    rp.info(f"{lay['file']}: 下見の画像を作れなかった（{e}）")
+                    continue
+                prev += [p["png"] for p in pages if p.get("png")]
+                for p in pages:
+                    if p.get("error"):
+                        rp.info(f"{lay['file']}［{p.get('name', '')}］: 下見を描けない（{p['error']}）")
+            for q in stale_pngs(work / "out" / "下見", layouts):
+                q.unlink()
+            if prev:
+                rp.info(f"下見の画像 {len(prev)} 枚 → {work / 'out' / '下見'}（draw.io と同じ描画エンジン mxGraph の近似。字の幅・帳票の折れ角が違う。"
+                        "納品物にしない。全ページを Read で開いて目で見る）")
+                for p in prev:
+                    rp.info(f"  {p}")
+        else:
+            rp.info("下見の描画も使えない（node・Playwright・mxgraph が要る。python3 scripts/preview_mx.py --probe）")
     if cli:
         stale = stale_pngs(work / "out" / "png", layouts)
         for q in stale:

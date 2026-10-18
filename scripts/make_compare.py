@@ -19,7 +19,7 @@
 差分照合（--nodes）: 照合のあとに変わった・足した箱（check_flow.py --stage review が挙げる）だけを照合し直すためのシート。
 1ページ目に、照合し直す箱の一覧（図の中で赤枠）。続けて、その箱の出典ページだけ（赤枠と一覧も、その箱だけ）。使わなかったページの一覧は付けない。
 差分照合のシートは、番号ごとに残す（照合した記録として、納品の門が作業の記録に写す）。
-先に check_layout.py を実行しておく（フロー図の PNG を使う）。
+先に check_layout.py を実行しておく（フロー図の PNG を使う。draw.io が無い環境では out/下見/ の近似の画像を使う）。
 """
 import argparse
 import io
@@ -37,8 +37,9 @@ CROP_MARGIN = 170          # 赤枠のノードのまわりに残す余白（図
 BIG_MB = 10                # 照合シート1本が、これを超えたら知らせる（レビュー担当が Read で開ける大きさ）
 RED = (0.8, 0.1, 0.1)
 KIND = NODE_LABEL
-JP_FONTS = ["/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc", "/System/Library/Fonts/Hiragino Sans GB.ttc",
-            "/Library/Fonts/Arial Unicode.ttf", "C:/Windows/Fonts/meiryo.ttc", "C:/Windows/Fonts/YuGothR.ttc",
+JP_FONTS = ["C:/Windows/Fonts/YuGothR.ttc",                          # 納品物の書体の家族を先に（PDF の部品は TTC の中の書体を選べないので、先頭の書体）
+            "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc", "/System/Library/Fonts/Hiragino Sans GB.ttc",
+            "/Library/Fonts/Arial Unicode.ttf", "C:/Windows/Fonts/meiryo.ttc",
             "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"]
 FONT = {"fontname": "japan"}                                         # 和文の書体ファイルが見つかれば差し替える（半角の字間が詰まる）
 
@@ -91,7 +92,11 @@ def flow_images(work):
         if errs:
             raise SystemExit(f"{lp.name} の形が崩れている（{'／'.join(errs[:3])}）。build_drawio.py で書き出し直す")
         for pg in lay["pages"]:
-            out[pg["id"]] = (pg, work / "out" / "png" / f"{lp.name[:-len('.layout.json')]}_p{pg['index']:02d}_{pg['id']}.png")
+            name = f"{lp.name[:-len('.layout.json')]}_p{pg['index']:02d}_{pg['id']}.png"
+            png = work / "out" / "png" / name
+            if not png.exists() and (work / "out" / "下見" / name).exists():   # draw.io が無い環境: 近似の下見（配置と同じ大きさなので赤枠は合う）
+                png = work / "out" / "下見" / name
+            out[pg["id"]] = (pg, png)
     return out
 
 
@@ -153,6 +158,8 @@ class Sheets:
     def node_list(self, page, k, uses):
         """左下: このページを出典にしたノードと、その引用"""
         y = TOP + FLOW_H + 22
+        put(page, MARGIN, y - 16, f"開始: {self.fl.get('start_condition') or '（空）'}　／　終了: {self.fl.get('end_condition') or '（空）'}", size=8,
+            color=(0.3, 0.3, 0.3), width=LEFT_W, max_lines=1)              # 図の情報欄が切り出しで見えないことがあるので、文字でも出す
         put(page, MARGIN, y - 6, "このページを出典にしたノード（番号・種別・ラベル ／「引用」）", size=9, color=(0.3, 0.3, 0.3), max_lines=1)
         y += 8
         items = self.items_of(*k)
@@ -228,8 +235,11 @@ class Sheets:
             put(page, MARGIN, y, "なし（割り当てたページはすべて、どれかのノードの出典になっている）", size=10)
         for k in unused:
             others = [f for f in self.cited.get(k, []) if f != self.F]       # 点検（check_flow.py）と同じ見方で書く
+            mine = [x for x in fl.get("excluded_items") or [] if (x.get("doc_id"), x.get("page")) == k]
             why = (f"ほかのフロー（{'・'.join(others)}）の出典になっている" if others
                    else why_unused(k, self.reasons, self.item_why) or "理由の記録なし（check_flow.py が FAIL にする）")
+            if mine:                                                 # このフローの手順もあるページ: 入れなかった理由は、下の一覧（同じ作業として入れた・ほかのフローで描く など）
+                why = f"このフローに当たる手順 {len(mine)} 件は、下の「フローに入れなかった手順」に理由つきで載せた" + (f"。ほかに {why}" if others else "")
             y = put(page, MARGIN, y, f"{self.src({'doc_id': k[0], 'page': k[1]})}　{self.dmap.get(k[0], {}).get('rel_path', '')}　— {why}",
                     size=10, width=wide, max_lines=2) + 4
         y += 20
@@ -310,6 +320,8 @@ def main():
     cat_pages = {c["id"]: [(ps["doc_id"], p) for ps in c.get("pages") or [] for p in ps.get("pages") or []]
                  for c in (load(work / "taxonomy.json", {}) or {}).get("categories") or []}
     images = flow_images(work)
+    if any("下見" in png.parts for _pg, png in images.values()):
+        print("フロー図の PNG が無いので、下見の画像（mxGraph の近似）でシートを作る（納品の PNG は draw.io のある環境で check_layout.py）")
     only = set(a.only.split(",")) if a.only else None
     flows, skipped = load_flows(work), []
     for fl in flows:

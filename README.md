@@ -4,6 +4,8 @@
 
 進め方は、棚卸し → ページ画像化 → 階層の事前チェック → LLM がページ画像を見て読取 → 用語・資料の紐付け・業務分類の確定 → フロー化 → draw.io 書き出し → 機械チェック → 画像で目視 → 原典照合レビュー → 報告書 → 納品の門、の順。手順は [SKILL.md](SKILL.md)、決まりは [references/flow-rules.md](references/flow-rules.md) にある。
 
+拠点ごと（海外拠点・支店）のマニュアルを比べて、拠点間の業務の差を出すときは、このスキルを拡張した [site-compare-skill](https://github.com/Toshiki811/site-compare-skill)（拠点間比較。別のリポジトリで非公開。このスキルの部品を使うので、このリポジトリのとなりに並べて複製する）を使う。拠点ごとの as-is はこのスキルで作り、比較の側で、用語・業務種別・タスクを突き合わせ、拠点タスク一覧・拠点のタスク別業務フロー・複雑性ヒートマップを出す。
+
 ## 考え方
 
 - **原典に書いてあることだけを図にする。** 書いていないことは補わず、推定として印を付けて確認事項に出す。
@@ -39,9 +41,23 @@ pip3 install pymupdf python-pptx openpyxl pillow oletools
 - Office 文書（pptx・xlsx・docx）をページ画像にするのに、次のどちらかが要る。`python3 scripts/office_to_pdf.py --probe` で使える方法が出る。
   - **LibreOffice**（`brew install --cask libreoffice`）: 画面を出さずに動くので確認ダイアログで止まらない。大量の入力・無人で回すときはこちら。Excel は1シート＝1ページで出る。あれば自動でこちらを使う。
   - **Microsoft Office（macOS）**: AppleScript で動かす。見た目は最も原本に近い。初回に macOS が「制御を許可するか」を尋ねる。Office が確認ダイアログ（アクセスの許可・起動時の案内・回復したファイルなど）を出すと止まるので、人が画面を見ていられるときに使う。止まったときは、その資料に理由を残して先へ進む。
-- 図の PNG 書き出しに draw.io デスクトップ（`brew install --cask drawio`）。
+- 図の PNG 書き出しに draw.io デスクトップ（`brew install --cask drawio`）。無い環境では、`check_layout.py` が下見の画像を `out/下見/` に描く（draw.io と同じ描画エンジン mxGraph を Chromium で動かした近似。node・Playwright と `npm install --no-save --prefix <このフォルダ> mxgraph@4.2.2` が要る。`python3 scripts/preview_mx.py --probe` で使えるか分かる）。下見は納品物にしない（納品の門は draw.io の PNG を求める）。
+- 納品物（図のセル・表のブック）の字は **Yu Gothic UI**（`scripts/common.py` の `OUTPUT_FONT`。テンプレートが書体を決めていれば、そちらを残す）。Yu Gothic UI は Windows の書体で、Mac・Linux には無い（別の書体で表示される）。書体の無い機械で PNG を書き出すときは、`check_layout.py` が fontconfig で和文の書体（Noto Sans CJK JP・IPA P ゴシック）に置き換える（置き換えないと、和文が中国語の字形で描かれる）。
 - PDF・画像だけの入力なら、Office も LibreOffice も要らない。
 - Python 3.9 以上。
+
+### スキルとして入れる
+
+- このリポジトリを開いた Claude Code（クラウドのセッションも）は、`.claude/skills/` から asis-flow-skill を読む。`/asis-flow-skill` が `/` の候補に出る（何もしなくてよい）。`.claude/skills/asis-flow-skill/` の中身は、直下の `SKILL.md`・`scripts` などへのリンク。
+- site-compare-skill の入れ方は、そのリポジトリの README を見る。
+- セッションの途中で `.claude/skills/` ができたとき（リポジトリを取り込み直したときなど）は、`/reload-skills` を打つ。
+- ほかのプロジェクトからも使うときは、自分の機械の `~/.claude/skills` にリンクを張る。その機械のセッションだけに効く（クラウドのセッションは、手元の `~/.claude/skills` を読まない）。
+
+  ```bash
+  ln -s <このリポジトリ> ~/.claude/skills/asis-flow-skill
+  ```
+
+- Windows で複製するときは、シンボリックリンクを有効にしてから複製する（開発者モードと `git config --global core.symlinks true`）。無効だと、リンクがただの文字のファイルになり、スキルが出ない。
 
 ## 動作確認
 
