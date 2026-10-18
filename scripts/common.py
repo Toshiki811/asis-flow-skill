@@ -107,7 +107,7 @@ BASELINE_FILE = "現状の処理時間.json"                                    
 RECORDS = ("チェック_*.txt", "照合シート_*.pdf", "差分照合シート_*.pdf", "原典照合レビュー_採否表.md", f"{NUMBERS_FILE}.md", f"{NUMBERS_FILE}.json", BASELINE_FILE)
 OUTPUT_FONT = "Yu Gothic UI"                                         # 納品物の字の書体（図のセル・表のブック・下見）。テンプレートが書体を決めていれば、そちらを残す
 REVIEW_MIN = 0.95                                                    # 原典照合の支持率の下限（業務フロー・アクティビティ図それぞれ）。下回れば、図を直して照合し直す
-MAX_STEPS, MAX_LANES = 25, 8                                         # 1 ページの図の目安（作業の箱の数・レーンの数）。超えたら分ける
+MAX_STEPS, MAX_LANES = 25, 8                                         # 1 ページの図の目安（作業の箱の数・レーンの数）。業務フローは、ステップ・レーンの数だけでは分けない（決まり 2.10）
 
 
 class BadJson(ValueError):
