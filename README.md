@@ -46,6 +46,19 @@ pip3 install pymupdf python-pptx openpyxl pillow oletools
 - PDF・画像だけの入力なら、Office も LibreOffice も要らない。
 - Python 3.9 以上。
 
+### スキルとして入れる
+
+- このリポジトリを開いた Claude Code（クラウドのセッションも）は、`.claude/skills/` から 2 つのスキルを読む。`/asis-flow-skill`・`/site-compare-skill` が `/` の候補に出る（何もしなくてよい）。`.claude/skills/` の中身はリンクで、本物は直下（asis-flow-skill）と `site-compare-skill/`。
+- セッションの途中で `.claude/skills/` ができたとき（リポジトリを取り込み直したときなど）は、`/reload-skills` を打つ。
+- ほかのプロジェクトからも使うときは、自分の機械の `~/.claude/skills` にリンクを張る。その機械のセッションだけに効く（クラウドのセッションは、手元の `~/.claude/skills` を読まない）。
+
+  ```bash
+  ln -s <このリポジトリ> ~/.claude/skills/asis-flow-skill
+  ln -s <このリポジトリ>/site-compare-skill ~/.claude/skills/site-compare-skill
+  ```
+
+- Windows で複製するときは、シンボリックリンクを有効にしてから複製する（開発者モードと `git config --global core.symlinks true`）。無効だと、リンクがただの文字のファイルになり、スキルが出ない。
+
 ## 動作確認
 
 ```bash

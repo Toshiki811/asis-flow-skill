@@ -5581,6 +5581,23 @@ def volume_tests():
              and time_basis({"type": "process"}) == ("その他", "中", ""))]
 
 
+def skill_dir_tests():
+    """リポジトリの .claude/skills（Claude Code がスキルを探す場所）: 2 つのスキルが、本物の SKILL.md へのリンクで入っている"""
+    base = SKILL / ".claude" / "skills"
+    want = {"asis-flow-skill": SKILL / "SKILL.md", "site-compare-skill": SKILL / "site-compare-skill" / "SKILL.md"}
+    names = lambda p: re.search(r"^name:\s*(\S+)", p.read_text(encoding="utf-8")[:300], re.M)
+    found = sorted(p.name for p in base.iterdir()) if base.is_dir() else []
+    linked = found == sorted(want) and all((base / n / "SKILL.md").resolve() == t.resolve() and (m := names(base / n / "SKILL.md")) and m.group(1) == n
+                                            for n, t in want.items())
+    asis = base / "asis-flow-skill"
+    links = [p for p in asis.iterdir() if p.is_symlink()] if asis.is_dir() else []
+    no_loop = bool(links) and not asis.is_symlink() and all(p.exists() and not SKILL.resolve().is_relative_to(p.resolve()) for p in links)
+    named = {d for d in re.findall(r"`(?:python3 )?([A-Za-z_]+)/", (SKILL / "SKILL.md").read_text(encoding="utf-8")) if (SKILL / d).is_dir()}
+    return [("スキルの置き場所: .claude/skills に asis-flow-skill・site-compare-skill の 2 つがあり、SKILL.md が本物（直下・site-compare-skill/）に解け、name がフォルダの名前と同じ", linked),
+            ("スキルの置き場所: asis-flow-skill は本物のフォルダで、中身のリンクはどれも先があり、直下（.claude を含む）を指さない（輪にしない）。SKILL.md が名指しするフォルダが全部ある",
+             no_loop and bool(named) and all((asis / d).exists() for d in named))]
+
+
 def unit_tests():
     """部品が単体で正しく動くか"""
     from common import Report, bare_number, printed_numbers, question_ids, quote_match
@@ -5780,7 +5797,7 @@ def main():
             ("階層と業務分類に、結び付きと根拠が載る", "詳しくしている" in (good / "out" / "階層と業務分類.md").read_text(encoding="utf-8")),
             ("まとめた確認事項は、対象のノードを並べて載る", "| P-001・P-002 |" in (good / "out" / "確認事項一覧.md").read_text(encoding="utf-8")),
         ]
-        for name, passed in looks + matrix_looks(good) + title_tests(tmp, good) + axis_tests(tmp) + heading_tests(tmp) + pointer_tests(tmp, good) + draft_tests(tmp) + form_tests(tmp, good) + unit_tests() + code_tests() + vba_stmt_tests() + io_fix_tests() + lang_tests() + code_pipeline_tests(tmp) + call_run_tests(tmp) + narrow_tests(tmp) + template_tests(tmp, good) + time_tests(tmp, good) + two_actions_tests(tmp, good) + shown_tests(tmp, good) + supply_tests(tmp, good) + review_tests(tmp, good) + big_tests(tmp, good) + volume_tests() + access_tests(tmp) + direct_tests(tmp) + sample_fix_tests(tmp) + tree_tests(tmp) + tree_rule_tests(tmp) + review_fix_tests(tmp) + schema_tests(tmp, good) + review_gate_tests(tmp, good) + output_check_tests(tmp, good) + answer_tests(tmp, good) + gate_tests(tmp, good) + mech_tests(tmp, good):
+        for name, passed in looks + matrix_looks(good) + title_tests(tmp, good) + axis_tests(tmp) + heading_tests(tmp) + pointer_tests(tmp, good) + draft_tests(tmp) + form_tests(tmp, good) + unit_tests() + code_tests() + vba_stmt_tests() + io_fix_tests() + lang_tests() + code_pipeline_tests(tmp) + call_run_tests(tmp) + narrow_tests(tmp) + template_tests(tmp, good) + time_tests(tmp, good) + two_actions_tests(tmp, good) + shown_tests(tmp, good) + supply_tests(tmp, good) + review_tests(tmp, good) + big_tests(tmp, good) + volume_tests() + skill_dir_tests() + access_tests(tmp) + direct_tests(tmp) + sample_fix_tests(tmp) + tree_tests(tmp) + tree_rule_tests(tmp) + review_fix_tests(tmp) + schema_tests(tmp, good) + review_gate_tests(tmp, good) + output_check_tests(tmp, good) + answer_tests(tmp, good) + gate_tests(tmp, good) + mech_tests(tmp, good):
             print(f"{'OK  ' if passed else 'SKIP' if passed is None else 'NG  '} {name}")   # None は、道具が無くて飛ばした（合格に数えない）
             ok = ok and passed is not False
             skipped += passed is None

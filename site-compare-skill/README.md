@@ -50,12 +50,7 @@
 
 asis-flow-skill と同じものが要る（`pip3 install pymupdf python-pptx openpyxl pillow oletools`・Office 文書に LibreOffice か Microsoft Office・PNG の書き出しに draw.io デスクトップ。Python 3.9 以上）。asis-flow-skill の [セットアップ](../README.md#セットアップ) を見る。
 
-Claude Code のスキルとして使うときは、2 つともシンボリックリンクで入れる（このスキルは、リンクを解いた 1 つ上のフォルダの asis-flow-skill を使う）:
-
-```bash
-ln -s <このリポジトリ> ~/.claude/skills/asis-flow-skill
-ln -s <このリポジトリ>/site-compare-skill ~/.claude/skills/site-compare-skill
-```
+Claude Code のスキルとしては、このリポジトリを開けば、`.claude/skills/` から asis-flow-skill と 2 つとも読まれる（クラウドのセッションも。`/site-compare-skill` が `/` の候補に出る）。セッションの途中で `.claude/skills/` ができたときは `/reload-skills`。ほかのプロジェクトからも使うときは、2 つとも自分の機械の `~/.claude/skills` にリンクを張る（このスキルは、リンクを解いた 1 つ上のフォルダの asis-flow-skill を使う。Windows の注意も）。asis-flow-skill の [スキルとして入れる](../README.md#スキルとして入れる) を見る。
 
 asis-flow-skill を別の場所に置くときは、環境変数 `ASIS_FLOW_SKILL` にその場所を書く（探す順: `ASIS_FLOW_SKILL` → 1 つ上のフォルダ → となりの `asis-flow-skill`）。
 
