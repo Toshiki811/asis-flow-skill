@@ -2039,7 +2039,7 @@ def check_review(cx, rp):
         if not s["figs"] or not s["judged"]:
             continue
         rate, name = s["tot"]["支持"] / s["nodes"] if s["nodes"] else 1, {"flow": "業務フロー", "activity": "アクティビティ図"}[kind]
-        line = f"{name}の支持率 {rate:.0%}（支持 {s['tot']['支持']} ÷ 開始・終了を除く全ノード {s['nodes']}。判定 {s['judged']}）"
+        line = f"{name}の支持率 {int(rate * 1000) / 10:g}%（支持 {s['tot']['支持']} ÷ 開始・終了を除く全ノード {s['nodes']}。判定 {s['judged']}）"
         NUMBERS.setdefault("review", {})[kind] = {"figures": s["figs"], "reviewed": s["figs"] - len(s["rest"]), "nodes": s["nodes"], "judged": s["judged"],
                                                   "support": s["tot"]["支持"], "partial": s["tot"]["一部支持"], "against": s["tot"]["不支持"]}
         if rate < REVIEW_MIN:

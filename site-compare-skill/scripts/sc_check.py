@@ -674,9 +674,10 @@ def check_verify(cx, rp):
                 rp.fail(f"review/{rid}.review.json {f['id']}: 対応・理由（action）が無い")
     if total:
         rate = ok / total
-        rp.info(f"対応の照合の支持率 {rate:.0%}（支持 {ok} ÷ いまの主張 {total}）")
+        shown_rate = f"{int(rate * 1000) / 10:g}%"    # 切り捨て（94.7% を 95% と出して「95% 未満」と並べない）
+        rp.info(f"対応の照合の支持率 {shown_rate}（支持 {ok} ÷ いまの主張 {total}）")
         if rate < REVIEW_MIN:
-            rp.fail(f"対応の照合の支持率が {rate:.0%}（{REVIEW_MIN:.0%} 未満）。不支持・一部支持の多い行のタスクを直して、照合し直す")
+            rp.fail(f"対応の照合の支持率が {shown_rate}（{REVIEW_MIN:.0%} 未満）。不支持・一部支持の多い行のタスクを直して、照合し直す")
 
 
 # ---------- [outputs] ----------
