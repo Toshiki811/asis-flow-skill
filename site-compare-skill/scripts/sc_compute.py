@@ -9,9 +9,11 @@
 決め方（references/compare-rules.md の 3 章）:
   並び      基準あり: 基準の拠点のタスクを、基準の箱の並びで。ほかのタスクは、それを持つ拠点で線をたどって前にある基準のタスクのあと
             （無ければ、あとにある基準のタスクの前）。基準なし: 前後を支持する拠点の数で並べる（輪は、平均の位置で切る）
-  区分      記載のある拠点が 1 つ → 拠点固有／比べる拠点に全部記載があり、差が無い → 共通／ほか → 差異あり
+  区分      記載のある拠点が 1 つ → 拠点固有／比べる拠点（対象外を除く）に全部記載があり、差が無い → 共通／ほか → 差異あり
   記号      ○ 差なし／△ その拠点が差に関わる／— 記載なし／対象外。拠点の組ごとに比べ、基準があれば基準と違う拠点に △（基準が粗くて決まらない組は、
             その両方）。基準が無ければ、いちばん多くの拠点と違う拠点に △
+  対象外    業務ごとに対象外にした拠点（axis の out_of_scope）と、タスクごとに: 箱が全部ほかの拠点の担当（用語の組の site）のレーンにある拠点・
+            記載なしに not_here（この拠点の手順ではない根拠）を書いた拠点。区分・記載なし・依頼・差の割合に数えず、差は自拠点の箱だけで見る
   差の種類  担当（レーンの組）・システム・帳票は「同じ／違う／片方だけ記載」（片方だけ記載は差に数えない）。1 つの箱で書いた拠点（粗い側）の
             担当・システム・帳票が、詳しい拠点のものに含まれていれば同じ。判断は、行き先が別のタスクに分かれる判断の数（粗い側とは比べない）。
             順序は、線でたどれる前後が拠点で逆。内容は LLM が書いたもの。記載なし
@@ -197,11 +199,13 @@ def task_diffs(mdl, rid, t, present, compared, conflicts, edges_of):
     if bad:
         diffs.append({"kind": "判断", "state": "違う", "sites": involved_sites(bad, present, base),
                       "text": "／".join(dict.fromkeys(f"{mdl.names[x]}: 判断 {dec[x]}" for a, b in bad for x in (a, b)))})
-    if conflicts.get(t["id"]):
-        ss = [s for s in mdl.order if s in conflicts[t["id"]]]
+    ss = [s for s in mdl.order if s in (conflicts.get(t["id"]) or ()) and s in present]   # 対象外の拠点（ほかの拠点が行う）の順は見ない
+    if ss:
         diffs.append({"kind": "順序", "state": "違う", "sites": ss, "text": "前後のタスクとの順が、" + "・".join(mdl.names[s] for s in ss) + " で逆"})
     for c in t.get("content") or []:
-        diffs.append({"kind": "内容", "state": c.get("kind", "その他"), "sites": [s for s in c.get("sites") or [] if s in mdl.names], "text": c.get("text", "")})
+        cs = [s for s in c.get("sites") or [] if s in present]
+        if cs:
+            diffs.append({"kind": "内容", "state": c.get("kind", "その他"), "sites": cs, "text": c.get("text", "")})
     absent = [s for s in compared if s not in present]
     if absent and present:
         diffs.append({"kind": "記載なし", "state": "記載なし", "sites": absent, "text": "・".join(mdl.names[s] for s in absent) + " の資料に記載なし"})
@@ -343,25 +347,31 @@ def compute_row(mdl, rid, cfg, nb):
     order, conflicts = order_tasks(mdl, rid, tasks, graphs)
     compared = mdl.participants(rid)
     by = {t["id"]: t for t in tasks}
+    split = {t["id"]: mdl.task_split(t) for t in tasks}             # 自拠点の箱と、対象外（ほかの拠点が行う・この拠点の手順ではない）
     res = []
     for pos, tid in enumerate(order, 1):
         t = by[tid]
         mem = t.get("members") or {}
-        present = [s for s in mdl.order if mem.get(s)]
-        diffs, onesided, ref = task_diffs(mdl, rid, t, present, compared, conflicts, edges_of)
+        own, out = split[tid]
+        present = [s for s in mdl.order if own.get(s)]
+        here = [s for s in compared if s not in out]                 # このタスクで比べる拠点
+        diffs, onesided, ref = task_diffs(mdl, rid, dict(t, members=own), present, here, conflicts, edges_of)
         real = [d for d in diffs if d["kind"] in REAL and d["kind"] != "記載なし"]
         involved = {s for d in real for s in d["sites"]}
+        if out:                                                      # 差の種類ではない（REAL に入れない）。差の内容の欄に、理由を出す
+            diffs.append({"kind": "対象外", "state": "対象外", "sites": [s for s in mdl.order if s in out],
+                          "text": "／".join(f"{mdl.names[s]}: {out[s]}" for s in mdl.order if s in out)})
         marks = {}
         for s in mdl.order:
-            if (mdl.site_part(rid, s) or {}).get("relation") == "out_of_scope":
+            if (mdl.site_part(rid, s) or {}).get("relation") == "out_of_scope" or s in out:
                 marks[s] = MARK_OUT
             elif s not in present:
                 marks[s] = MARK_NONE
             else:
                 marks[s] = MARK_DIFF if s in involved else MARK_SAME
-        # ほかの拠点が対象外の行でも、1 拠点だけの作業は拠点固有（共通と出すと、どの拠点も同じに行うと読める）
-        cls = "拠点固有" if len(present) == 1 else "共通" if set(present) == set(compared) and not real else "差異あり"
-        cnt = {s: len(mem[s]) for s in present}
+        # ほかの拠点が対象外の行・タスクでも、1 拠点だけの作業は拠点固有（共通と出すと、どの拠点も同じに行うと読める）
+        cls = "拠点固有" if len(present) == 1 else "共通" if set(present) == set(here) and not real else "差異あり"
+        cnt = {s: len(own[s]) for s in present}
         mx = max(cnt.values()) if cnt else 0
         key = f"{rid}|{tid}"
         if key not in nb["assigned"]:
@@ -370,11 +380,14 @@ def compute_row(mdl, rid, cfg, nb):
         members = {s: [{"key": k, "label": (mdl.node(s, k) or {}).get("label", ""), "type": (mdl.node(s, k) or {}).get("type", ""),
                         "role": mdl.role_name(s, k), "systems": sorted(mdl.group_name(y) for y in mdl.systems(s, k) if not y.startswith("R")),
                         "files": sorted(mdl.group_name(d) for d in mdl.documents(s, k)), "src": (mdl.node(s, k) or {}).get("src", []),
-                        "inferred": bool((mdl.node(s, k) or {}).get("inferred"))} for k in mem[s]] for s in present}
+                        "inferred": bool((mdl.node(s, k) or {}).get("inferred")),
+                        "other": mdl.done_by(s, [k]) if k not in own.get(s, []) else ""} for k in mem[s]]
+                   for s in mdl.order if mem.get(s) and (s in present or s in out)}
         res.append({"id": tid, "no": nb["assigned"][key], "pos": pos, "name": t.get("name", ""), "class": cls, "marks": marks, "ref": ref,
                     "kinds": [k for k in REAL if any(d["kind"] == k for d in diffs)], "diffs": diffs, "onesided": onesided,
                     "grain": {"counts": cnt, "coarse": [s for s in present if cnt[s] == 1 and mx > 1], "fine": [s for s in present if cnt[s] > 1]},
-                    "joined": t.get("joined", ""), "members": members, "inferred": any(m["inferred"] for ms in members.values() for m in ms)})
+                    "joined": t.get("joined", ""), "members": members, "out": {s: out[s] for s in mdl.order if s in out},
+                    "inferred": any(m["inferred"] for s in present for m in members[s])})
     sites = {}
     for sid in mdl.order:
         sp = mdl.site_part(rid, sid) or {}
@@ -403,14 +416,15 @@ def compute_row(mdl, rid, cfg, nb):
         if not e["complexity"] or s == ref:
             e["spread"] = None
             continue
-        ratio = sum(1 for x in res if x["marks"].get(s) in (MARK_DIFF, MARK_NONE)) / max(1, len(res))
+        mine = [x for x in res if x["marks"].get(s) != MARK_OUT]   # 対象外のタスクは、分母にも数えない
+        ratio = sum(1 for x in mine if x["marks"].get(s) in (MARK_DIFF, MARK_NONE)) / max(1, len(mine))
         e["spread"] = {"diff": scores[s] - scores[ref], "ratio": round(ratio, 2), "level": spread_level(abs(scores[s] - scores[ref]), cfg)}
     lv = [e["spread"]["level"] for e in sites.values() if e.get("spread")]
     grp = next((g for g in mdl.axis.get("groups") or [] if g.get("id") == row.get("group")), None)
     return {"row": rid, "name": row["name"], "group": row.get("group"), "group_name": grp["name"] if grp else "", "parent": row.get("parent"),
             "mode": mdl.axis.get("mode"), "basis": basis, "ref": ref, "sites": sites, "tasks": res,
             "spread": max(lv, key=["小", "中", "大"].index) if lv else None,
-            "requests": requests(mdl, rid, res, tasks, edges_of)}
+            "requests": requests(mdl, rid, res, [dict(t, members=split[t["id"]][0]) for t in tasks], edges_of)}
 
 
 def main():

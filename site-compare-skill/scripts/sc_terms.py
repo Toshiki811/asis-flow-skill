@@ -12,7 +12,7 @@ LLM は、訳・言い換えで同じものを、理由（reason）つきで 1 �
 import argparse
 import sys
 
-from sc_common import load_snap, norm, ordered_sites, save, site_names, sites_of, try_load, work_dir
+from sc_common import load_snap, norm, ordered_sites, save, site_named, site_names, sites_of, try_load, work_dir
 
 PREFIX = {"actor": "R", "system": "Y", "document": "D"}
 
@@ -67,6 +67,9 @@ def draft(cmp, sites):
         for _key, mem in names.items():
             g = {"id": next_id(data["groups"], kind), "kind": kind, "name": mem[0][1], "members": [{"site": s, "term": n} for s, n in mem],
                  "basis": "same_name", "reason": ""}
+            owner = {site_named(n, s, sites) for s, n in mem} if kind == "actor" else {None}
+            if len(owner) == 1 and None not in owner:                # ほかの拠点の担当の名前（「本部拠点」「本部の固定資産管理責任者」）: 案。理由は LLM が書く
+                g["site"] = owner.pop()
             data["groups"].append(g)
             added += 1
     save(cmp / "terms.json", data)
@@ -92,7 +95,8 @@ def main():
         for (sid, k, name), n in sorted(used.items(), key=lambda x: (x[0][1], ordered_sites(sites).index(x[0][0]), x[0][2])):
             if k == kind:
                 g = gof.get((sid, kind, name))
-                print(f"  {names[sid]:<10} {name:<24} 箱 {n:>3}  → {g['id'] + ' ' + g['name'] if g else '（どの組にも無い）'}")
+                own = f"（{names[g['site']]}の担当）" if g and g.get("site") else ""
+                print(f"  {names[sid]:<10} {name:<24} 箱 {n:>3}  → {g['id'] + ' ' + g['name'] + own if g else '（どの組にも無い）'}")
 
 
 if __name__ == "__main__":

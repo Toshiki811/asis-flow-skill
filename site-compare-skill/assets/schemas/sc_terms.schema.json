@@ -22,7 +22,8 @@
     "members": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["site", "term"], "properties": {
      "site": {"$ref": "sc_common#/$defs/site_id"}, "term": {"type": "string", "minLength": 1, "description": "その拠点の用語（asis の用語の正本の名前のまま）"}}}},
     "basis": {"enum": ["same_name", "translation", "equivalent"], "description": "まとめた根拠: `same_name` 名前が同じ（機械が確かめる）／`translation` 訳が同じ／`equivalent` 呼び方は違うが、原典の役割の説明・担う作業が同じ"},
-    "reason": {"type": "string", "description": "まとめた理由（translation・equivalent は必須。原典の説明・担う作業を書く）"}
+    "reason": {"type": "string", "description": "まとめた理由（translation・equivalent は必須。原典の説明・担う作業を書く。site を書いた組は、その担当がその拠点の人・部門である根拠も）"},
+    "site": {"anyOf": [{"$ref": "sc_common#/$defs/site_id"}, {"type": "null"}], "description": "担当（actor）の組だけ: その担当が属する拠点（ほかの拠点の人・部門を、資料の拠点が呼んだ名前のとき。「本部拠点」「本部の固定資産管理責任者」）。members[].site（その言葉を使う資料の拠点）とは別。自拠点の担当と決めたときは null。その拠点の箱のうち、ほかの拠点の担当のレーンの箱は、その拠点の作業として比べない（タスクの記号が対象外）"}
    }
   }
  }

@@ -24,7 +24,8 @@ def node_line(mdl, sid, key, edges):
     if not n:
         return f"    {key}（写しに無い）"
     t = {"process": "作業", "decision": "判断", "system": "システム", "subprocess": "別のフローへ", "start": "開始", "end": "終了"}.get(n["type"], n["type"])
-    parts = [f"    {key} [{t}] {mdl.role_name(sid, key)}｜{n['label']}"]
+    who = mdl.owner(sid, key)                                        # ほかの拠点の担当のレーンの箱（その拠点の作業として比べない。タスクの記号が対象外）
+    parts = [f"    {key} [{t}] {mdl.role_name(sid, key)}{f'〔{mdl.names[who]}の担当〕' if who else ''}｜{n['label']}"]
     if n.get("detail"):
         parts.append(f"（{n['detail']}）")
     if n.get("systems"):
@@ -155,7 +156,11 @@ def main():
                 print(f"{t['id']} {t['name']} — {mdl.names[sid]} に箱が無い。checked に書く候補 {len(cs)}:")
                 for k, sc, text, where in cs:
                     print(f"    {k}  {sc:.2f}  {text}（{where}）")
-                print(f"    checked: {json.dumps([c[0] for c in cs], ensure_ascii=False)}")
+                sure = mdl.derivable(t, sid)
+                print(f"    checked: {json.dumps(list(dict.fromkeys([c[0] for c in cs] + sure)), ensure_ascii=False)}")
+                if sure:                                             # 書き分けで、この拠点に当てはまらない手順（機械で分かる）
+                    print(f"    not_here: {json.dumps(sure, ensure_ascii=False)}（ほかの拠点の箱が引く共通の資料の手順は、書き分けで{mdl.names[sid]}に当てはまらない。"
+                          f"この拠点の手順でなければ、absent に書く。記号が対象外になる）")
         if not n:
             print("記載なしのタスクは無い")
 

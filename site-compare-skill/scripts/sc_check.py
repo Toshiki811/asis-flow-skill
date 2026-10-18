@@ -31,7 +31,7 @@ import re
 import sys
 
 from sc_common import (OTHER_SITE, STEP_TYPES, SWITCH_WORDS, A, Report, ends_with_verb, is_jp, load, match_path, mentions, norm, result_path,
-                       shared_work, site_ids, site_names, site_work, sites_of, snap_path, split_key, try_load, work_dir)
+                       shared_work, site_ids, site_named, site_names, site_work, sites_of, snap_path, split_key, try_load, work_dir)
 from sc_validate import validate
 
 STAGES = ["sites", "applies", "snapshot", "terms", "axis", "rows", "compute", "verify", "outputs"]
@@ -325,6 +325,25 @@ def check_terms(cx, rp):
             rp.fail(f"terms.json {gid}: 名前が違う用語を same_name でまとめている（訳なら translation、言い換えなら equivalent と理由）")
         if g["basis"] in ("translation", "equivalent") and not g["reason"].strip():
             rp.fail(f"terms.json {gid}: {g['basis']} でまとめた理由（reason）が無い（原典の役割の説明・担う作業を書く）")
+        own = g.get("site")                                          # その担当が属する拠点（ほかの拠点の人・部門）
+        if own is not None:
+            if g["kind"] != "actor":
+                rp.fail(f"terms.json {gid}: site は担当（actor）の組だけに書く")
+            elif own not in cx.ids:
+                rp.fail(f"terms.json {gid}: site の拠点 {own} が sites.json に無い")
+            else:
+                if not g["reason"].strip():
+                    rp.fail(f"terms.json {gid}: site を書いた組は、reason に、その担当が{cx.names[own]}の人・部門である根拠を書く")
+                if own in per:
+                    rp.fail(f"terms.json {gid}: site（{cx.names[own]}）の組に、{cx.names[own]}自身の用語「{'・'.join(per[own])}」を入れない"
+                            f"（{cx.names[own]}の担当の組とは分ける。混ぜると、ほかの拠点の同じ役職の箱まで{cx.names[own]}の作業になる）")
+        elif g["kind"] == "actor" and "site" not in g:
+            for m in g["members"]:
+                o = site_named(m["term"], m["site"], cx.sites)
+                if o:
+                    rp.fail(f"terms.json {gid}: {cx.names.get(m['site'], m['site'])}の「{m['term']}」は、ほかの拠点（{cx.names[o]}）の担当の名前に読める。"
+                            f"組に site（その担当の拠点。自拠点の担当なら null）を書く")
+                    break
     used = sc_terms.used_terms(cx.cmp, cx.sites)
     for (s, kind, name) in used:
         if (s, kind, name) not in where:
@@ -539,16 +558,35 @@ def check_row(cx, rp, mdl, rid, sc_match):
             miss = [k for k in want if k not in ab["checked"]]
             if miss:
                 rp.fail(f"{tw}: {cx.names[s]}の記載なしで、機械の候補 {', '.join(miss)} を確かめていない（checked に書き、同じ作業でない理由を note に。同じ作業ならタスクに入れる）")
+            nh = ab.get("not_here") or []
+            for k in nh:                                             # この拠点の手順ではない根拠（書くと、記号が対象外）
+                _why, bad = mdl.not_here_key(s, k)
+                if bad:
+                    rp.fail(f"{tw}: {cx.names[s]}の not_here: {bad}")
+                elif k not in ((cx.snap(s) or {}).get("nodes") or {}) and k not in ab["checked"]:
+                    rp.fail(f"{tw}: {cx.names[s]}の not_here の {k} を、checked にも書く（確かめた候補）")
+            sure = mdl.derivable(t, s)
+            if sure and not nh:
+                rp.fail(f"{tw}: {cx.names[s]}の記載なし: ほかの拠点のこのタスクの箱が引く共通の資料の手順は、書き分けで{cx.names[s]}に当てはまらず、"
+                        f"{cx.names[s]}は「{OTHER_SITE}」として外している。この拠点の手順でないなら、absent.not_here と checked に {', '.join(sure)} を書く（記号が対象外になる）")
         for s in (t["absent"] or {}):
             if s not in parts:
                 rp.fail(f"{tw}: absent の {cx.names.get(s, s)}は、この行にフローを当てていない")
+        _own, out = mdl.task_split(t)
         for i, c in enumerate(t["content"], 1):
             for s in c["sites"]:
-                if s not in present:
+                if s in out:
+                    rp.fail(f"{tw} 内容の差 {i}: {cx.names.get(s, s)}は、このタスクでは対象外（{out[s]}）。内容の差に書かない")
+                elif s not in present:
                     rp.fail(f"{tw} 内容の差 {i}: {cx.names.get(s, s)}は、このタスクに箱が無い（記載なしは、内容の差に書かない）")
             for e in c["evidence"]:
-                if e["node"] not in (mem.get(e["site"]) or []):
-                    rp.fail(f"{tw} 内容の差 {i}: 根拠の箱 {e['node']} が、{cx.names.get(e['site'], e['site'])}のこのタスクの箱でない")
+                who = cx.names.get(e["site"], e["site"])
+                if ("node" in e) == ("item" in e):
+                    rp.fail(f"{tw} 内容の差 {i}: 根拠は 1 つずつ、node（箱）か item（その拠点がフローから外した項目）のどちらか")
+                elif "node" in e and e["node"] not in (mem.get(e["site"]) or []):
+                    rp.fail(f"{tw} 内容の差 {i}: 根拠の箱 {e['node']} が、{who}のこのタスクの箱でない")
+                elif "item" in e and e["item"] not in mdl.excluded(e["site"]):
+                    rp.fail(f"{tw} 内容の差 {i}: 根拠の項目 {e['item']} が、{who}のフローから外した項目に無い（拠点の写し snap の excluded）")
             if not is_jp(c["text"]):
                 rp.fail(f"{tw} 内容の差 {i}: 日本語で書く")
             if not {e["site"] for e in c["evidence"]} - set(c["sites"]):
@@ -766,7 +804,7 @@ def check_outputs(cx, rp):
     for el in ET.fromstring(text).iter():
         v = el.get("value") if el.tag == "mxCell" else el.get("label") if el.tag == "object" else None
         if v:
-            labels.append(re.sub(r"<[^>]+>", "", v))
+            labels.append(re.sub(r"<[^>]+>", "", re.sub(r"<br\s*/?>", " ", v, flags=re.I)))   # 折った所は空白に（つなぐと、英語の語の続きを見逃す）
         if el.tag == "object" and el.get("tooltip"):
             labels.append(el.get("tooltip"))
     names, srcs = proper_names(cx), source_names(cx)

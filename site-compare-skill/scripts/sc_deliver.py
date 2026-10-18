@@ -59,6 +59,7 @@ def numbers(cmp):
     for sid in mdl.order:
         per[sid] = {"name": mdl.names[sid], "tasks": sum(1 for x in tasks if x["marks"].get(sid) in ("○", "△")),
                     "absent": sum(1 for x in tasks if x["marks"].get(sid) == "—"), "diff": sum(1 for x in tasks if x["marks"].get(sid) == "△"),
+                    "out": sum(1 for x in tasks if x["marks"].get(sid) == "対象外"),
                     "coarse": sum(1 for x in tasks if sid in x["grain"]["coarse"]),
                     "levels": {lv["name"]: sum(1 for r in res if (r["sites"].get(sid) or {}).get("complexity") and
                                                r["sites"][sid]["complexity"][r["basis"]]["level"] == lv["name"]) for lv in cfg["levels"]},
@@ -73,9 +74,11 @@ def numbers_md(n):
              f"- 対応の照合の支持率: {n['support']['ok']}/{n['support']['total']}" + (f"（{pct(n['support']['ok'] / n['support']['total'])}）" if n['support']['total'] else ""),
              f"- 複雑性: {'そろえた粒度' if n['basis'] == 'aligned' else '原典の粒度'}で、分岐 × {n['weights']['branch']} ＋ 受け渡し × {n['weights']['handoff']}。境 "
              + "・".join(f"{lv['name']} {lv['max'] if lv['max'] is not None else '超'}" for lv in n["levels"]), "",
-             "| 拠点 | 記載のあるタスク | 差のあるタスク（△） | 記載なし（—） | 粗く書いたタスク | 複雑性（行の数） | 追加の資料の依頼 |", "| --- | --- | --- | --- | --- | --- | --- |"]
+             "| 拠点 | 記載のあるタスク | 差のあるタスク（△） | 記載なし（—） | 対象外 | 粗く書いたタスク | 複雑性（行の数） | 追加の資料の依頼 |",
+             "| --- | --- | --- | --- | --- | --- | --- | --- |"]
     for s in n["sites"].values():
-        lines.append(f"| {s['name']} | {s['tasks']} | {s['diff']} | {s['absent']} | {s['coarse']} | " + "・".join(f"{k} {v}" for k, v in s["levels"].items())
+        lines.append(f"| {s['name']} | {s['tasks']} | {s['diff']} | {s['absent']} | {s.get('out', 0)} | {s['coarse']} | "
+                     + "・".join(f"{k} {v}" for k, v in s["levels"].items())
                      + f" | {s['requests']} |")
     return "\n".join(lines) + "\n"
 

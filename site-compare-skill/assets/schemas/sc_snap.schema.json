@@ -11,7 +11,7 @@
   "flows": {"type": "object", "description": "フロー ID → 名前・開始と終了の条件・レーン・箱の鍵・線"},
   "families": {"type": "object", "description": "フロー ID → 開いた 1 本（下位フローを中身で置き換えた箱と線・開いた子・知らせ）"},
   "nodes": {"type": "object", "description": "箱の鍵 → 種類・レーン・名前・補足・札・帳票・出典の表示・引用・カードの項目・推定・指紋"},
-  "excluded": {"type": "array", "description": "フローから外した項目（記載なしの候補に使う）"},
+  "excluded": {"type": "array", "description": "フローから外した項目（記載なしの候補・not_here・内容の差の根拠に使う）: 鍵・フロー・文・理由・出典・資料の中身のハッシュ・原文の引用（quote）・同じページの、拠点の名前の出る注記の引用（notes）"},
   "terms": {"type": "array", "description": "用語の正本の名前"},
   "questions": {"type": "integer", "description": "拠点のフローの確認事項の数"},
   "stamp": {"$ref": "sc_common#/$defs/mark", "description": "写しの中身の印（拠点の作業フォルダが変われば変わる）"},

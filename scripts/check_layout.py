@@ -20,6 +20,7 @@ import argparse
 import os
 import pathlib
 import shutil
+import signal
 import subprocess
 
 from common import Report, load, work_dir
@@ -32,11 +33,21 @@ def drawio_cli():
     return shutil.which("drawio") or shutil.which("draw.io") or (MAC_CLI if pathlib.Path(MAC_CLI).exists() else None)
 
 
-def export_png(cli, drawio, index, png, scale=1.0):
+def export_png(cli, drawio, index, png, scale=1.0, tries=2, limit=180):
+    """1 ページを PNG に。draw.io（Electron）は、まれに止まったまま返らない: 時間で切り、子のプロセスごと止めて、もう一度回す"""
     png.parent.mkdir(parents=True, exist_ok=True)
-    r = subprocess.run([cli, "-x", "-f", "png", "-p", str(index), "-s", str(scale), "-o", str(png), str(drawio)],
-                       capture_output=True, text=True, timeout=300)
-    return png.exists(), (r.stderr or r.stdout).strip()[-200:]
+    msg = ""
+    for _ in range(tries):
+        p = subprocess.Popen([cli, "-x", "-f", "png", "-p", str(index), "-s", str(scale), "-o", str(png), str(drawio)],
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+        try:
+            out, err = p.communicate(timeout=limit)
+            return png.exists(), (err or out).strip()[-200:]
+        except subprocess.TimeoutExpired:
+            os.killpg(p.pid, signal.SIGKILL)                         # 画面の無い環境の仮の画面（Xvfb）も、同じ組で止まる
+            p.communicate()
+            msg = f"draw.io が {limit} 秒で終わらない（{tries} 回試した）"
+    return False, msg
 
 
 def seg_hits_rect(p, q, r, pad=2):

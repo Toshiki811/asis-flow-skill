@@ -262,8 +262,9 @@ def wording(base):
     say(not [w for w in eng if any(w in v for v in cells) or w in fig], "表記: 英語の原文・英語のフローの名前・英語の担当と帳票の名前が、Excel と draw.io に出ない",
         f"{[w for w in eng if any(w in v for v in cells) or w in fig]}")
     say(any("申請と承認（申請の箱）" in v for v in cells), "表記: 日本語でない拠点のフローは、日本語の名前（title）で出る")
-    say("｜申請者｜経費精算書を領収書と一緒に提出する" in fig and "Expense Claim Procedure (Singapore) p.1" in fig,
-        "表記: 図の説明の担当は比べる用語の名前（日本語）・出典の資料名は固有名のまま")
+    say("｜申請者（Employee）｜経費精算書を領収書と一緒に提出する" in fig and "Expense Claim Procedure (Singapore) p.1" in fig
+        and 'value="申請者（Employee）"' in fig and 'value="申請者"' in fig,
+        "表記: 図のレーン・説明の担当は比べる用語の名前（日本語）に拠点の言葉を添える・出典の資料名は固有名のまま")
     say("T-006" in fig and "内訳" in fig and "記載なし" in fig, "表記: 図にタスクの番号・内訳の枠・記載なしの空き枠がある")
 
 
@@ -405,6 +406,39 @@ def extra_site(d):
     edit(d / "sites.json", lambda s: s["sites"].append({"id": "HK", "name": "香港拠点", "aliases": ["香港"], "language": "en", "inputs": [str(d / "nowhere")]}))
 
 
+def snap_x(sid, key, fn):
+    return J(f"snap/{sid}.json", lambda s: fn(next(x for x in s["excluded"] if x["key"] == key)))
+
+
+def os_excludes_own(d):
+    """大阪支店が、自分に当たる書き分け（大阪支店だけの承認 M01.2.s4）を、ほかの拠点だけの手順として外したことにする"""
+    def go(s):
+        x = next(x for x in s["excluded"] if x["key"] == "M01.2.s3")
+        s["excluded"].append(dict(x, key="M01.2.s4", text="申請を承認する（支店長）"))
+    edit(d / "snap" / "OS.json", go)
+
+
+def split_b02(m):
+    """B02: 東京支店の課長の承認（大阪支店では行わない手順）を、別のタスクに分ける"""
+    task(m, "t1")["members"]["TK"].remove("F02:P-003")
+    m["tasks"].append({"id": "t2", "name": "課長が申請を承認する", "members": {"TK": ["F02:P-003"], "OS": [], "SG": []},
+                       "absent": {"OS": {"checked": [], "note": "大阪支店は支店長が承認する"}, "SG": {"checked": [], "note": "課長の承認だけを分けて書いていない"}},
+                       "joined": "", "content": []})
+
+
+def other_finance(t):
+    """シンガポール拠点の Finance を、東京支店の担当（site）の組に分ける（シンガポール拠点の経理の箱が、ほかの拠点の作業になる）"""
+    g = next(g for g in t["groups"] if g["id"] == "R03")
+    g["members"] = [m for m in g["members"] if m["site"] != "SG"]
+    t["groups"].append({"id": "R09", "kind": "actor", "name": "東京支店の経理部", "members": [{"site": "SG", "term": "Finance"}],
+                        "basis": "same_name", "site": "TK", "reason": "シンガポール拠点の手順書の Finance は、東京支店の経理部"})
+
+
+def BD_units(s):
+    import build_drawio
+    return build_drawio.units(s)
+
+
 def split_task(m):
     t = task(m, "t3")
     t["members"]["TK"].remove("F03-1:P-002")
@@ -467,6 +501,14 @@ CASES = [
     ("訳でまとめた理由が無い", "terms", term("R01", lambda g: g.update(reason="")), "でまとめた理由（reason）が無い"),
     ("比べる箱の用語がどの組にも無い", "terms", drop_term("R05"), "「支店長」がどの組にも無い"),
     ("用語の確認事項の組が無い", "terms", J("terms.json", lambda t: t["questions"].append(new_question(group="R99"))), "組 R99 が無い"),
+    ("ほかの拠点の担当の拠点が sites.json に無い", "terms", term("R05", lambda g: g.update(site="XX", reason="x")), "site の拠点 XX が sites.json に無い"),
+    ("ほかの拠点の担当の名前なのに site が無い", "terms",
+     J("terms.json", lambda t: t["groups"].append({"id": "R09", "kind": "actor", "name": "東京支店の経理部", "members": [{"site": "OS", "term": "東京支店の経理部"}],
+                                                    "basis": "same_name", "reason": ""})),
+     "は、ほかの拠点（東京支店）の担当の名前に読める"),
+    ("site を担当でない組に書く", "terms", term("Y02", lambda g: g.update(site="TK")), "site は担当（actor）の組だけに書く"),
+    ("site を書いた組に根拠が無い", "terms", term("R05", lambda g: g.update(site="TK", reason="")), "その担当が東京支店の人・部門である根拠を書く"),
+    ("site の組に、その拠点自身の用語", "terms", term("R02", lambda g: g.update(site="TK", reason="x")), "東京支店自身の用語「課長」を入れない"),
     # [axis]
     ("比べる行が無い", "axis", rm("axis.json"), "axis.json が無い"),
     ("比べる行が読めない", "axis", garbage("axis.json"), "axis.json が読めない"),
@@ -523,6 +565,24 @@ CASES = [
     ("記載なしで機械の候補を確かめていない", "rows", M("B03", lambda m: task(m, "t1")["absent"]["OS"].update(checked=[])), "を確かめていない"),
     ("記載なしの拠点が行に無い", "rows", M("B01", lambda m: task(m, "t1")["absent"].update(XX={"checked": [], "note": "無い"})), "は、この行にフローを当てていない"),
     ("記載なしの拠点を内容の差に書く", "rows", M("B03", lambda m: task(m, "t4")["content"][0].update(sites=["OS"])), "このタスクに箱が無い（記載なしは、内容の差に書かない）"),
+    ("not_here の鍵が外した項目にも箱にも無い", "rows", M("B03", lambda m: task(m, "t1")["absent"]["OS"].update(not_here=["M01.9.s9"])),
+     "は、この拠点がフローから外した項目にも、この拠点の箱にも無い"),
+    ("not_here の項目を外した理由が書き分けでない", "rows",
+     seq(snap_x("OS", "M01.2.s3", lambda x: x.update(reason="経費申請と同じなので描かない")), M("B03", lambda m: task(m, "t1")["absent"]["OS"].update(not_here=["M01.2.s3"]))),
+     "の外した理由が「ほかの拠点だけの手順」でない"),
+    ("not_here の項目が、書き分けでこの拠点に当たる", "rows",
+     seq(os_excludes_own, M("B03", lambda m: task(m, "t1")["absent"]["OS"].update(not_here=["M01.2.s4"], checked=["F02:P-003", "M01.2.s3", "M01.2.s4"]))),
+     "は、書き分け（applies.json）で大阪支店に当てはまる手順"),
+    ("not_here の項目を checked に書かない", "rows", M("B03", lambda m: task(m, "t1")["absent"]["OS"].update(not_here=["M01.2.s3"], checked=["F02:P-003"])),
+     "の not_here の M01.2.s3 を、checked にも書く"),
+    ("not_here の箱に、ほかの拠点の名前が無い", "rows", M("B03", lambda m: task(m, "t1")["absent"]["OS"].update(not_here=["F01:P-001"])),
+     "の名前・補足に、ほかの拠点の名前が無い"),
+    ("書き分けで分かる記載なしに not_here が無い", "rows", M("B02", split_b02), "absent.not_here と checked に M01.2.s3 を書く"),
+    ("対象外の拠点を内容の差に書く", "rows", J("terms.json", other_finance), "は、このタスクでは対象外"),
+    ("内容の差の根拠に箱と項目の両方", "rows", M("B01", lambda m: task(m, "t2")["content"][0]["evidence"][0].update(item="M01.2.s3")),
+     "根拠は 1 つずつ、node（箱）か item"),
+    ("内容の差の根拠の項目が外した項目に無い", "rows", M("B01", lambda m: task(m, "t2")["content"][0]["evidence"].append({"site": "OS", "item": "M01.9.s9"})),
+     "根拠の項目 M01.9.s9 が、大阪支店のフローから外した項目に無い"),
     ("内容の差の根拠の箱がタスクに無い", "rows", M("B03", lambda m: task(m, "t4")["content"][0]["evidence"][0].update(node="F03:P-001")), "根拠の箱 F03:P-001 が"),
     ("内容の差が日本語でない", "rows", M("B03", lambda m: task(m, "t4")["content"][0].update(text="Manual entry in Oracle")), "日本語で書く"),
     ("作業の箱がどのタスクにも無い", "rows", M("B03", lambda m: task(m, "t3")["members"]["TK"].remove("F03-1:P-002")), "がどのタスクにも入っていない"),
@@ -653,11 +713,12 @@ def parts(base, root):
             for e in f["edges"]:
                 e["from"], e["to"] = ["P-004" if x == "P-003" else x for x in (e["from"], e["to"])]
         edit(P_flow(d, "TK", "F03"), renum)
+        edit(P_match(d, "B03"), lambda m: task(m, "t4")["content"][0]["evidence"].append({"site": "TK", "item": "M01.2.s4"}))   # 外した項目の根拠は、付け直さない
         rc, out = run("sc_collect.py", "-w", d, "--site", "TK", "--no-gate")
-        m = json.dumps(jload(P_match(d, "B03")))
+        m = json.dumps(jload(P_match(d, "B03")), ensure_ascii=False)
         rc2, out2 = check(d, "rows")
-        say(rc == 0 and "F03:P-004" in m and "F03:P-003" not in m and rc2 == 0, "付け直し: 拠点の箱の番号が振り直されても、出典の指紋でタスクの鍵を付け直す",
-            out[-300:] + tail(out2))
+        say(rc == 0 and "F03:P-004" in m and "F03:P-003" not in m and '"item": "M01.2.s4"' in m and rc2 == 0,
+            "付け直し: 拠点の箱の番号が振り直されても、出典の指紋でタスクの鍵を付け直す（外した項目の根拠はそのまま）", out[-300:] + tail(out2))
         shutil.rmtree(d / "asis" / "TK")
         shutil.copytree(base / "asis" / "TK", d / "asis" / "TK")
         for name in ("snap/TK.json", "rows/B03.match.json", "axis.json"):
@@ -700,9 +761,114 @@ def status_and_gate(base, root):
             f"{[(t['name'], t['class']) for t in r['tasks']]}")
         run("sc_drawio.py", "-w", e)
         fig = (e / "out" / "拠点比較フロー.drawio").read_text(encoding="utf-8")
-        say('id="lane-OS.?none-h" value="（対象外）"' in fig and "対象外（この業務を行わない拠点）" in fig,
+        say('id="lane-OS.?none-h" value="（対象外）"' in fig and "対象外（この拠点では行わない業務・作業）" in fig,
             "区分: 対象外の拠点のレーンの見出しは（対象外）で、凡例に対象外の箱がある", re.findall(r'id="lane-OS[^"]*" value="[^"]*"', fig)[:3])
         shutil.rmtree(e)
+    if wanted("対象外"):
+        from sc_rows import Model
+        import sc_match
+        import sc_verify
+        e = d / "x1"                                                 # ほかの拠点の担当のレーンの箱
+        shutil.copytree(d, e, ignore=shutil.ignore_patterns("x1"))
+        before = jload(e / "rows" / "B03.result.json")
+        J("terms.json", other_finance)(e)
+        M("B03", lambda m: task(m, "t4").update(content=[]))(e)
+        recompute(e)
+        r = jload(e / "rows" / "B03.result.json")
+        x = {k["id"]: k for k in r["tasks"]}
+        req = next((q for q in r["requests"] if q["site"] == "SG"), {"coarse": [], "absent": []})
+        score = lambda res: [res["sites"]["SG"]["complexity"][b]["score"] for b in ("aligned", "raw")]
+        say(x["t3"]["marks"]["SG"] == "対象外" and x["t4"]["marks"]["SG"] == "対象外" and "資料では、東京支店の経理部（東京支店）が行う" in x["t3"]["out"].get("SG", "")
+            and x["t3"]["no"] not in req["coarse"] + req["absent"] and x["t4"]["class"] == "拠点固有" and score(r) == score(before),
+            "対象外: ほかの拠点の担当のレーンの箱だけのタスクは対象外（区分・依頼に数えない。複雑性は同じ）",
+            f"{[(k['id'], k['marks'], k['class'], k.get('out')) for k in r['tasks']]} {req}")
+        say(x["t2"]["marks"]["SG"] == "○" and x["t2"]["class"] == "拠点固有", "対象外: どの拠点にも自拠点の箱が無いタスクは、ほかの拠点の箱を記載ありにする",
+            f"{x['t2']['marks']} {x['t2']['class']}")
+        run("sc_drawio.py", "-w", e)
+        run("sc_book.py", "-w", e)
+        fig = (e / "out" / "拠点比較フロー.drawio").read_text(encoding="utf-8")
+        say("対象外（東京支店の経理部（東京支店）が行う）" in fig and "ほかの拠点が行う作業" in fig and "dashPattern=6 3" in fig,
+            "対象外: 図は、ほかの拠点の担当のレーンの箱を灰色にし、凡例に出す")
+        import openpyxl
+        ws = openpyxl.load_workbook(e / "out" / "拠点比較.xlsx")["拠点タスク一覧"]
+        head = [c.value for c in ws[1]]
+        row = next(rr for rr in ws.iter_rows(min_row=2, values_only=True) if rr[0] == x["t3"]["no"])
+        say("対象外" not in str(row[head.index("差の種類")]) and "対象外: シンガポール拠点" in str(row[head.index("差の内容")])
+            and str(row[head.index("シンガポール拠点")]).startswith("対象外"),
+            "対象外: 表は、記号を対象外にし、わけを差の内容に出す（差の種類には出さない）", str(row))
+        shutil.rmtree(e)
+        e = d / "x2"                                                 # 自拠点の箱とほかの拠点の箱が混ざる
+        shutil.copytree(d, e, ignore=shutil.ignore_patterns("x2"))
+        had = [k["kind"] for k in jload(e / "rows" / "B02.result.json")["tasks"][0]["diffs"]]
+        term("R05", lambda g: g.update(site="TK", reason="試験: 支店長を東京支店の人とする"))(e)
+        recompute(e)
+        now = [k["kind"] for k in jload(e / "rows" / "B02.result.json")["tasks"][0]["diffs"]]
+        say("担当" in had and "担当" not in now, "対象外: 自拠点の箱もあるタスクは、差を自拠点の箱だけで見る（ほかの拠点の担当の差を出さない）", f"{had} → {now}")
+        shutil.rmtree(e)
+        e = d / "x3"                                                 # 記載なしに、この拠点の手順ではない根拠（not_here）
+        shutil.copytree(d, e, ignore=shutil.ignore_patterns("x3"))
+        M("B02", split_b02)(e)
+        mdl = Model(e, jload(e / "sites.json"))
+        t2 = next(k for k in mdl.tasks("B02") if k["id"] == "t2")
+        ck = {s: [c[0] for c in sc_match.candidates(mdl, "B02", t2, s)] for s in ("OS", "SG")}
+        def fill(m):
+            a = task(m, "t2")["absent"]
+            a["OS"].update(checked=sorted(set(ck["OS"]) | {"M01.2.s3"}), not_here=["M01.2.s3"], note="共通の資料の書き分けで、大阪支店では課長が承認しない")
+            a["SG"].update(checked=ck["SG"])
+        M("B02", fill)(e)
+        recompute(e)
+        rc, out = check(e, "rows")
+        r = jload(e / "rows" / "B02.result.json")
+        x = next(k for k in r["tasks"] if k["id"] == "t2")
+        req = next((q for q in r["requests"] if q["site"] == "OS"), {"absent": []})
+        say(rc == 0 and x["marks"]["OS"] == "対象外" and x["marks"]["SG"] == "—" and x["class"] == "拠点固有" and x["no"] not in req["absent"]
+            and "共通の資料の書き分けで、東京支店・シンガポール拠点だけの手順" in x["out"]["OS"],
+            "対象外: 記載なしに not_here を書くと対象外（依頼に出ない）", tail(out) + f" {x['marks']} {x.get('out')} {req}")
+        mdl = Model(e, jload(e / "sites.json"))
+        cl = sc_verify.claims(mdl, "B02")
+        sheet = sc_verify.sheet_text(mdl, "B02", "V-9")
+        quote = next(q["quote"] for q in jload(e / "snap" / "OS.json")["excluded"] if q["key"] == "M01.2.s3")
+        say("not_here" in cl["t2/OS:absent"][1] and "not_here" not in cl["t2/SG:absent"][1] and "の作業は、この拠点の手順ではない" in sheet and quote and quote in sheet,
+            "対象外: 照合シートに、この拠点の手順ではない主張と根拠の引用が出る（not_here の無い主張の印は変わらない）", sheet[-600:])
+        shutil.rmtree(e)
+        e = d / "x4"                                                 # 内容の差の根拠に、外した項目
+        shutil.copytree(d, e, ignore=shutil.ignore_patterns("x4"))
+        M("B01", lambda m: task(m, "t2")["content"][0]["evidence"].append({"site": "OS", "item": "M01.2.s3"}))(e)
+        rc, out = check(e, "rows")
+        sheet = sc_verify.sheet_text(Model(e, jload(e / "sites.json")), "B01", "V-9")
+        say(rc == 0 and "大阪支店の根拠（フローに描かなかった、資料の項目）" in sheet and quote in sheet,
+            "対象外: 内容の差の根拠に、拠点がフローから外した項目を書け、照合シートに引用が出る", tail(out))
+        shutil.rmtree(e)
+    if wanted("図の形"):
+        import sc_drawio
+        fig = (d / "out" / "拠点比較フロー.drawio").read_text(encoding="utf-8")
+        lay = {p["id"]: p for p in jload(d / "out" / "拠点比較フロー.layout.json")["pages"]}
+        n = lay["row-B01"]["nodes"]
+        cx = lambda k: n[k][0] + n[k][2] / 2
+        w = re.search(r'id="lane-TASK-h"[^>]*>\s*<mxGeometry x="[^"]*" y="[^"]*" width="([0-9.]+)"', fig)
+        say(abs(cx("TK.F01.start") - cx("TK.F01.P-001")) < 1 and w and float(w.group(1)) == 190,
+            "図の形: 開始・終了の丸は箱の真ん中にそろい、タスクの列はタスクの名前の幅", f"{cx('TK.F01.start')} {cx('TK.F01.P-001')} {w and w.group(1)}")
+        b2 = lay["row-B02"]["nodes"]
+        ends = [k for k in b2 if k.startswith("TK.") and ".end" in k]
+        say(len(ends) == 2 and all(b2[k][1] > max(v[1] for kk, v in b2.items() if kk.startswith("TK.") and ".end" not in kk) for k in ends)
+            and b2["TK.F02.end"][1] < b2["TK.F02.end2"][1],
+            "図の形: 途中の終了も、いちばん下の帯に（ふつうの終了が上）", f"{[(k, b2[k][1]) for k in ends]}")
+        e = d / "f1"
+        shutil.copytree(d, e, ignore=shutil.ignore_patterns("f1"))
+        J("snap/TK.json", lambda s: s["nodes"]["F02:end2"].update(label="終了"))(e)
+        run("sc_drawio.py", "-w", e)
+        b2 = {p["id"]: p for p in jload(e / "out" / "拠点比較フロー.layout.json")["pages"]}["row-B02"]
+        tk = [k for k in b2["nodes"] if k.startswith("TK.") and ".end" in k]
+        into = [x for x in b2["edges"] if x["to"] == "TK.F02.end"]
+        say(tk == ["TK.F02.end"] and len(into) == 2, "図の形: 名前が同じ終了は、拠点の塊で 1 つにまとめる", f"{tk} {[(x['from'], x['to']) for x in into]}")
+        shutil.rmtree(e)
+        rows = sc_drawio.balanced_lines("T-001: 経費申請書を作成する", 138, 11)
+        say(rows is not None and len(rows) == 2 and BD_units(rows[-1]) >= 3 and "".join(rows).replace(" ", "") == "T-001:経費申請書を作成する"
+            and sc_drawio.balanced_lines("T-001: 申請を承認する", 138, 11) is None,
+            "図の形: 最後の行が 1〜2 字になる名前だけ、機械が行に分ける", f"{rows}")
+        mdl = sc_drawio.Model(d, jload(d / "sites.json"))
+        say(mdl.lane_label("SG", "R01") == "申請者（Employee）" and mdl.lane_label("TK", "R01") == "申請者" and mdl.lane_label("OS", "R03") == "経理（経理担当）",
+            "図の形: レーンの名前は、比べる用語の名前に拠点の言葉を添える", f"{mdl.lane_label('SG', 'R01')} {mdl.lane_label('OS', 'R03')}")
     if wanted("出典"):
         e = d / "o1"
         shutil.copytree(d, e, ignore=shutil.ignore_patterns("o1"))
@@ -748,6 +914,17 @@ def status_and_gate(base, root):
         shutil.rmtree(e)
         rc, out = run("sc_layout.py", "-w", d, env=fake_drawio(root, ok=False))
         say(rc == 1 and "PNG に書き出せない" in out, "配置: PNG に書き出せなければ FAIL", tail(out))
+        rc, out = run("sc_layout.py", "-w", d, "--no-png")
+        say(rc == 0 and "0 FAIL / 0 WARN" in out, "配置: 架空の 3 拠点の図は、近すぎて並ぶ線も無い", tail(out))
+        e = d / "e3"
+        shutil.copytree(d, e, ignore=shutil.ignore_patterns("e1", "e2", "e3"))
+        def close(lay):
+            pg = next(p for p in lay["pages"] if p["id"] == "row-B01")
+            pg["edges"] += [{"from": "a1", "to": "b1", "points": [[5000, 100], [5000, 200]]}, {"from": "a2", "to": "b2", "points": [[5006, 120], [5006, 220]]}]
+        edit(e / "out" / "拠点比較フロー.layout.json", close)
+        rc, out = run("sc_layout.py", "-w", e, "--no-png")
+        say(rc == 0 and "6px の近さで 80px 並んで走る" in out, "配置: 近すぎて並ぶ線は WARN", tail(out))
+        shutil.rmtree(e)
     if wanted("納品"):
         env = fake_drawio(root)
         dest = root / "dest"

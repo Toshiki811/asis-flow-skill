@@ -12,6 +12,7 @@
  },
  "placeholder": "rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#A6A6A6;dashed=1;dashPattern=4 4;fontColor=#808080;fontSize=10;",
  "out_of_scope": "rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F2F2;strokeColor=#BFBFBF;fontColor=#808080;fontSize=10;",
+ "other_site": "fillColor=#E7E6E6;strokeColor=#A6A6A6;fontColor=#595959;dashed=1;dashPattern=6 3;",
  "task_label": "text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=4;",
  "task_lane": "rounded=0;whiteSpace=wrap;html=1;fillColor=#F2F2F2;strokeColor=#BFBFBF;fontSize=12;fontStyle=1;",
  "task_lane_body": "rounded=0;whiteSpace=wrap;html=1;fillColor=#FAFAFA;strokeColor=#D9D9D9;",

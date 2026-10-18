@@ -5,7 +5,8 @@
   python3 scripts/sc_layout.py -w <比較の作業フォルダ> --no-png        # 点検だけ
   python3 scripts/sc_layout.py -w <比較の作業フォルダ> --preview       # draw.io の無い環境で、下見の画像を out/下見/ に（納品物にしない）
 
-点検は asis-flow-skill の check_layout.py と同じ（箱の重なり・線が箱を貫く・出どころも行き先も違う線が同じ所を走る は FAIL。交わりの多い線は WARN）。
+点検は asis-flow-skill の check_layout.py と同じ（箱の重なり・線が箱を貫く・出どころも行き先も違う線が同じ所を走る は FAIL。交わりの多い線は WARN）に、
+近すぎて並ぶ線（出どころも行き先も違う 2 本が 8px 未満の近さで 40px 以上並ぶ）の WARN を足したもの。
 PNG は、目で全ページを見るためのもの（帯のそろい・空き枠・内訳の枠・色）。納品の門は、PNG が新しくそろっていなければ止まる。
 """
 import argparse
@@ -16,6 +17,37 @@ import sys
 from sc_common import FIG, Report, load, work_dir
 
 from check_layout import drawio_cli, export_png, page_problems
+
+
+CLOSE, SPAN = 8, 40                                                  # 出どころも行き先も違う 2 本の線が、この近さ（px）未満で、この長さ以上並ぶと WARN
+
+
+def close_runs(pg, near=CLOSE, span=SPAN):
+    """近すぎて並んで走る線の組: [(線, 線, 間の px, 並ぶ長さ)]。asis の点検（同じ所を重なって走る）より広い近さで見る。
+    出どころか行き先が同じ線は、合流・分かれる線なので見ない（asis の点検と同じ）"""
+    segs = []
+    for e in pg["edges"]:
+        pts = e.get("points") or []
+        segs.append((e, [(p, q) for p, q in zip(pts, pts[1:])]))
+    out = []
+    for i, (e1, s1) in enumerate(segs):
+        for e2, s2 in segs[i + 1:]:
+            if e1["from"] == e2["from"] or e1["to"] == e2["to"]:
+                continue
+            best = None
+            for a, b in s1:
+                for c, d in s2:
+                    for ax in (0, 1):                                # ax=0: 縦の線（x が同じ）／1: 横の線
+                        o = 1 - ax
+                        if abs(a[ax] - b[ax]) > 0.5 or abs(c[ax] - d[ax]) > 0.5:
+                            continue
+                        gap = abs(a[ax] - c[ax])
+                        ov = min(max(a[o], b[o]), max(c[o], d[o])) - max(min(a[o], b[o]), min(c[o], d[o]))
+                        if gap < near and ov >= span and (best is None or ov > best[1]):
+                            best = (gap, ov)
+            if best:
+                out.append((e1, e2, *best))
+    return out
 
 
 def preview(cmp, fig, rp):
@@ -66,6 +98,9 @@ def main():
                 rp.fail(f"{FIG}［{pg['name']}］: {text}", at=found.gi_frame.f_lineno)
             else:
                 rp.warn(f"{FIG}［{pg['name']}］: {text}")
+        for e1, e2, gap, ov in close_runs(pg):
+            rp.warn(f"{FIG}［{pg['name']}］: 線 {e1['from']}→{e1['to']} と {e2['from']}→{e2['to']} が、{gap:g}px の近さで {ov:g}px 並んで走る"
+                    f"（別の線と読み分けにくい。sc_drawio の線の通り道の間隔か、帯の中の箱の並びを見直す）")
     if a.preview:
         preview(cmp, fig, rp)
     elif not a.no_png:

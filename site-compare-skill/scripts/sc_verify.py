@@ -39,6 +39,8 @@ def claims(mdl, rid):
                 out[f"{t['id']}/{s}"] = (digest(body), body)
         for s, ab in (t.get("absent") or {}).items():
             body = {"name": t.get("name"), "site": s, "checked": sorted(ab.get("checked") or []), "note": ab.get("note"), "others": others}
+            if ab.get("not_here"):                                   # 書いた所だけ（無い主張の印は、前と同じ）
+                body["not_here"] = sorted(ab["not_here"])
             out[f"{t['id']}/{s}:absent"] = (digest(body), body)
         for i, c in enumerate(t.get("content") or [], 1):
             body = {"name": t.get("name"), "content": c}
@@ -69,7 +71,10 @@ def item_block(mdl, sid, key, indent="    "):
         return node_block(mdl, sid, key, indent)
     x = next((x for x in s.get("excluded") or [] if x["key"] == key), None)
     if x:
-        return [f"{indent}- 「{x['text']}」（フローに描かなかった手順。理由: {x['reason']}）", f"{indent}  出典 {x['src']}"]
+        lines = [f"{indent}- 「{x['text']}」（フローに描かなかった手順。理由: {x['reason']}）",
+                 f"{indent}  出典 {x['src']}" + (f": 「{x['quote']}」" if x.get("quote") else "")]
+        lines += [f"{indent}  同じページの注記: 「{q}」" for q in x.get("notes") or []]
+        return lines
     return [f"{indent}- {key}（写しに無い）"]
 
 
@@ -80,7 +85,8 @@ def sheet_text(mdl, rid, vid, only=None):
            "下の主張が、原典（出典の引用）から見て正しいかを、1 つずつ判定してください。",
            "箱の名前は日本語に直してあります（日本語でない拠点は、引用が原文です）。",
            "箱の担当・札（システム）・帳票・補足は、拠点ごとに原典と照らして確かめてあります（表の資料では、同じ行のほかの列から付けていて、引用に出ないことがあります）。"
-           "この照合で見るのは、箱の組とタスクの対応・記載なし・内容の差です。担当・システム・帳票・順序の違いは、機械が箱から出すので、内容の差に書かなくてかまいません。", ""]
+           "この照合で見るのは、箱の組とタスクの対応・記載なし・内容の差です。担当・システム・帳票・順序の違いは、機械が箱から出すので、内容の差に書かなくてかまいません。"
+           "1 つの箱は、1 つのタスクにだけ入ります。箱がほかの作業の物も名指ししていれば、主な作業のタスクに入れ、もう一方は内容の差（対象）として出ています。", ""]
     out.append("## 拠点ごとの、この業務の箱（並び順）")
     for sid in mdl.order:
         sp = mdl.site_part(rid, sid) or {}
@@ -101,20 +107,34 @@ def sheet_text(mdl, rid, vid, only=None):
             c = body["content"]
             out += [f"### {cid}　タスク「{t['name']}」の内容の差", f"  主張: {c['text']}（種類: {c['kind']}）"]
             for e in c["evidence"]:
-                out.append(f"  {mdl.names.get(e['site'], e['site'])}の根拠の箱:")
-                out += node_block(mdl, e["site"], e["node"])
+                if "item" in e:                                      # 拠点がフローから外した項目（共通の資料の書き分けなど）
+                    out.append(f"  {mdl.names.get(e['site'], e['site'])}の根拠（フローに描かなかった、資料の項目）:")
+                    out += item_block(mdl, e["site"], e["item"])
+                else:
+                    out.append(f"  {mdl.names.get(e['site'], e['site'])}の根拠の箱:")
+                    out += node_block(mdl, e["site"], e["node"])
         elif m.group(3):
             sid = m.group(2)
             ab = t["absent"][sid]
-            out += [f"### {cid}　{mdl.names[sid]}に、タスク「{t['name']}」の作業は書かれていない",
-                    f"  主張の理由: {ab['note']}", "  ほかの拠点の、このタスクの箱:"]
+            if ab.get("not_here"):
+                out += [f"### {cid}　{mdl.names[sid]}では、タスク「{t['name']}」の作業は、この拠点の手順ではない"
+                        f"（資料に、ほかの拠点が行う・ほかの拠点だけの手順とある）",
+                        f"  主張の理由: {ab['note']}", "  この拠点の手順ではないとした根拠:"]
+                for k in ab["not_here"]:
+                    out += item_block(mdl, sid, k)
+                out.append("  見ること: 根拠の文から、この作業をほかの拠点が行う（この拠点の手順ではない）と読めるか。この拠点の箱（上の一覧）が、この作業をしていないか")
+                out.append("  ほかの拠点の、このタスクの箱:")
+            else:
+                out += [f"### {cid}　{mdl.names[sid]}に、タスク「{t['name']}」の作業は書かれていない",
+                        f"  主張の理由: {ab['note']}", "  ほかの拠点の、このタスクの箱:"]
             for s, ks in (t.get("members") or {}).items():
                 for k in ks:
                     out += [f"    {mdl.names[s]}"] + node_block(mdl, s, k, "      ")
             out.append("  確かめた候補（字が似ている箱・描かなかった手順）:" if ab.get("checked") else "  字が似ている候補は無かった")
             for k in ab.get("checked") or []:
                 out += item_block(mdl, sid, k)
-            out.append("  見ること: 候補のほかにも、同じ作業がこの拠点の箱（上の一覧）や、粗く書いた 1 つの箱の中に含まれていないか")
+            if not ab.get("not_here"):
+                out.append("  見ること: 候補のほかにも、同じ作業がこの拠点の箱（上の一覧）や、粗く書いた 1 つの箱の中に含まれていないか")
         else:
             sid = m.group(2)
             out += [f"### {cid}　{mdl.names[sid]}の次の箱は、タスク「{t['name']}」の作業である"]

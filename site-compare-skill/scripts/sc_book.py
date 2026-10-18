@@ -56,9 +56,11 @@ LEGEND = [
                    "直すときは、もとのデータ（用語の対応・比べる行・タスクの対応）を直して書き出し直す（このブックに書き込んだ内容は、確認事項一覧の回答の欄を除いて、書き出し直すと消える）。"),
     ("業務分類・業務種別・タスク", "業務分類 › 業務種別（比べる行。拠点のフロー 1 本か、その一部）› タスク（拠点をまたいで同じ作業とした単位）。"
                                    "タスクは、いちばん粗く書いた拠点に合わせる（ほかの拠点が 1 つの作業で書いた所は、詳しい拠点の作業をまとめて 1 つのタスクにし、内訳として残す）。"),
-    ("区分", "共通＝比べた拠点のすべてに記載があり、差が無い／差異あり＝2 拠点以上に記載があり、担当・システム・帳票・判断・順序・内容のどれかが違う、または記載の無い拠点がある／"
+    ("区分", "共通＝比べた拠点（対象外を除く）のすべてに記載があり、差が無い／差異あり＝2 拠点以上に記載があり、担当・システム・帳票・判断・順序・内容のどれかが違う、または記載の無い拠点がある／"
              "拠点固有＝記載のある拠点が 1 つだけ。"),
-    ("○ △ —", "○＝記載あり・差なし／△＝記載あり・差がある（基準と違う。基準が無ければ、記載のある最初の拠点と違う）／—＝資料に記載なし（業務が無いとは言っていない）／対象外＝その拠点で対象外にした業務。"),
+    ("○ △ —", "○＝記載あり・差なし／△＝記載あり・差がある（基準と違う。基準が無ければ、記載のある最初の拠点と違う）／—＝資料に記載なし（業務が無いとは言っていない）／"
+               "対象外＝その拠点では行わない業務・作業（資料に、ほかの拠点が行う・この拠点の手順ではないとある。業務ごと対象外にした拠点は、その業務の全部のタスク）。"
+               "対象外のわけは「差の内容」の欄に出す。区分・追加の資料の依頼には数えない。"),
     ("差の種類", "担当（レーン）・システム・帳票・判断（行き先が別のタスクに分かれる判断の数）・順序（線でたどれる前後が逆）・内容（やり方・値・対象。根拠つきで書いたもの）・記載なし。"
                  "片方の拠点にしか書いていない担当・システム・帳票は「片方だけ記載」の列に出し、差には数えない。"),
     ("粒度", "「粗」＝その拠点が、ほかの拠点が詳しく書いたタスクを 1 つの作業で書いている（比べるときは粗い側に合わせた）。詳しい拠点の作業は、拠点の列に内訳として残している。"),
@@ -143,6 +145,8 @@ def site_cell(x, sid, mdl):
             runs.append(("\n（推定を含む）", "pale"))
     elif mk == "—":
         runs.append((" 記載なし", "pale"))
+    if mk == "対象外" and x.get("out", {}).get(sid):                  # タスクごとの対象外: わけ（ほかの拠点が行う・この拠点の手順ではない）
+        runs.append(("\n（" + x["out"][sid] + "）", "pale"))
     fill = {"—": "none", "対象外": "none", "△": "mark"}.get(mk)
     return C(runs, fill=fill)
 
@@ -188,7 +192,7 @@ def sheets(cmp, mdl, results, qs):
         rid = res["row"]
         for x in res["tasks"]:
             tid_name[(rid, x["id"])] = (x["no"], x["name"])
-            kinds = [d["kind"] for d in x["diffs"]]
+            kinds = [d["kind"] for d in x["diffs"] if d["kind"] != "対象外"]   # 対象外は差の種類ではない（わけは差の内容に出す）
             row = [C(x["no"]), C(res.get("group_name") or "—"), C(res["name"]), C(x["name"], font="bold"), C(x["class"], fill={"共通": "common", "差異あり": "diff", "拠点固有": "unique"}[x["class"]]),
                    C("・".join(dict.fromkeys(kinds)) or "—", font="diff" if kinds else None),
                    C("\n".join(f"{d['kind']}: {d['text']}" for d in x["diffs"] if d["kind"] != "記載なし") or "—"),
@@ -200,7 +204,8 @@ def sheets(cmp, mdl, results, qs):
                 mem = x["members"].get(s) or []
                 mk = x["marks"].get(s, "—")
                 out[T_DETAIL].append([C(x["no"]), C(res["name"]), C(x["name"]), C(mdl.names[s]), C(mk, font="mark", fill={"—": "none", "対象外": "none", "△": "mark"}.get(mk)),
-                                      C("\n".join(m["label"] for m in mem) or "（記載なし）"), C("\n".join(dict.fromkeys(m["role"] for m in mem)) or "—"),
+                                      C("\n".join(m["label"] for m in mem) or ("（対象外）" if mk == "対象外" else "（記載なし）")),
+                                      C("\n".join(dict.fromkeys(m["role"] for m in mem)) or "—"),
                                       C("・".join(dict.fromkeys(y for m in mem for y in m["systems"])) or "—"), C("・".join(dict.fromkeys(f for m in mem for f in m["files"])) or "—"),
                                       C([("\n".join(dict.fromkeys(z for m in mem for z in m["src"])), "src")] if any(m["src"] for m in mem) else "—"), C("推定" if any(m["inferred"] for m in mem) else ""),
                                       C("粗" if s in x["grain"]["coarse"] else "詳" if s in x["grain"]["fine"] and x["grain"]["coarse"] else ""),

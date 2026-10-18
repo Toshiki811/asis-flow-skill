@@ -6,15 +6,19 @@
 1 ページ目  業務種別 × 拠点の表（複雑性の大中小の色・分岐と受け渡しの数・粒度差の印・差の大きさ）。セルから各ページへ
 各ページ    業務種別（比べる行）ごとに 1 ページ。拠点のレーンの塊を横に並べ（基準が左。上に拠点の見出し）、左の「タスク」の列に T 番号とタスク名。
             タスクごとの帯で、同じタスクの箱を同じ高さにそろえる（帯の高さは、そのタスクの箱がいちばん多い拠点の段の数）。
-            箱の色は区分（共通・差異あり・拠点固有）。記載なしは点線の空き枠。推定は赤い破線（asis と同じ）。ほかの拠点が 1 つの箱で書いた
-            タスクの、詳しい拠点の箱は、点線の枠（内訳）で囲む。箱の中は「T 番号: 作業の名前」と、差のある拠点には「△ 差の種類」。
-            出典・担当・差の内容は、マウスを乗せたときの説明に（図には出さない）。レーンは比べる用語の名前（日本語）で、役割の順にそろえる。
+            箱の色は区分（共通・差異あり・拠点固有）。記載なしは点線の空き枠、対象外は灰色の枠。ほかの拠点の担当のレーンの箱は灰色の破線
+            （その拠点の作業として比べない）。推定は赤い破線（asis と同じ）。ほかの拠点が 1 つの箱で書いたタスクの、詳しい拠点の箱は、
+            点線の枠（内訳）で囲む。箱の中は「T 番号: 作業の名前」と、差のある拠点には「△ 差の種類」。名前は、最後の行が 1〜2 字にならないように折る。
+            出典・担当・差の内容は、マウスを乗せたときの説明に（図には出さない）。レーンは比べる用語の名前（日本語）で、拠点の言葉が違えば
+            「出納職員（事務員）」と添え、役割の順にそろえる。タスクの列は、タスクの名前の幅。拠点の塊の終了は、いちばん下の帯に（名前が同じものは 1 つ）。
             5 拠点以上は、基準（無ければ 1 つ目の拠点）と 3 拠点ずつのページに分ける。タスクが 25 を超える行は、タスクの境でページを分ける。
-線の通し方・戻りの線・配置の点検は、asis-flow-skill の業務フローの図と同じ部品（FlowDrawing・check_layout.page_problems）。
-並べた配置で配置の点検に当たるページは、レーンを広げて描き直し、それでも当たればページの番号を出す（sc_layout.py が FAIL にする）。
+線の通し方・戻りの線・配置の点検は、asis-flow-skill の業務フローの図と同じ部品（FlowDrawing・check_layout.page_problems）。線どうしの間は、
+asis の列を分けた図と同じ広さ（COL_GAP・COL_PITCH）。並べた配置で配置の点検に当たる（か、近すぎて並ぶ線のある）ページは、レーンを広げて
+描き直し、いちばんよい幅を使う。それでも点検に当たれば、ページの番号を出す（sc_layout.py が FAIL にする）。
 """
 import argparse
 import copy
+import math
 import json
 import sys
 
@@ -23,6 +27,7 @@ from sc_rows import Model
 
 import build_drawio as BD                                            # asis の図の部品
 from check_layout import page_problems
+from sc_layout import close_runs
 
 MAX_SITES, MAX_TASKS = 4, 25
 
@@ -41,12 +46,29 @@ def esc(t):
     return BD.esc(t)
 
 
+def balanced_lines(text, inner, font):
+    """箱の名前を、draw.io に任せて折ると最後の行が 1〜2 字になるときだけ、行に分けた並び（それ以外は None で、折るのは draw.io）。
+    行の数は変えずに、少し狭い幅で文節の切れ目に寄せて詰め直す（実際の字の幅で、行が箱からはみ出して折れ直さないように）"""
+    per = max(1.0, inner / font)
+    u = BD.units(text)
+    n = max(1, math.ceil(u / per))
+    if n == 1 or u - (n - 1) * per > 2.2:
+        return None
+    for w in range(int(inner) - 4, int(inner * 0.6), -4):
+        for back in (3, 0):
+            got = BD.fit_lines(text, [w] * n, font, back)
+            if got and BD.units(got[0][-1]) >= 3:
+                return got[0]
+    return None
+
+
 class CompareDrawing(BD.FlowDrawing):
     """比べる行 1 つ（の拠点の組）を 1 ページに。asis の FlowDrawing に、帯でそろえた行を渡し、レーン・箱・凡例の描き方を比較用にする"""
 
     def __init__(self, fl, ctx, rows, meta, page_id, page_name):
         self._rows, self.meta = rows, meta
         super().__init__(fl, ctx)
+        self.gap, self.pitch = BD.COL_GAP, BD.COL_PITCH                # 拠点の塊を横に並べると、帯の下を横に走る線が多い: 線どうしの間を広げる（asis の列を分けた図と同じ）
         self.page = BD.Page(page_id, page_name[:60], self.S["model"])
 
     def split_cols(self):
@@ -66,6 +88,11 @@ class CompareDrawing(BD.FlowDrawing):
             if m["kind"] in ("placeholder", "out"):
                 show["label"] = m["text"]
             w, h, html, _cite = BD.node_box(show, self.S)
+            if n["type"] not in ("start", "end", "decision"):
+                head = f"{show['id']}: {show['label']}"
+                rows = balanced_lines(head, w - 12, 11)
+                if rows:                                             # 最後の行が 1〜2 字にならないように、機械が行に分ける
+                    html = html.replace(esc(head), "<br>".join(esc(r) for r in rows), 1)
             if not m.get("no"):                                      # タスクに入らない箱（別のフローへ進む箱）: 番号の代わりに「⇒」
                 html = html.replace(esc("⇒: "), "⇒ ", 1)
             if m.get("mark"):
@@ -74,6 +101,9 @@ class CompareDrawing(BD.FlowDrawing):
             if m.get("coarse"):
                 html += "<br>" + f'<font style="font-size:9px" color="{X["mark"]["粗"]}">{esc(m["coarse"])}</font>'
                 h += 13
+            if m.get("other"):
+                html += "<br>" + f'<font style="font-size:9px" color="#595959">{esc(m["other"])}</font>'
+                h += 13 * BD.n_lines(m["other"], 138, 9)
             self.geo[n["id"]] = [0, 0, w, h]
             self.label[n["id"]] = html
         self.files_of, self.fgeo = {}, {}
@@ -81,12 +111,25 @@ class CompareDrawing(BD.FlowDrawing):
     def place(self):
         super().place()
         tl = self.meta["task_lane"]
-        if tl is not None:                                           # タスクの列: 名前を、帯の上にそろえて左に寄せる
-            for n in self.main:
+        if tl is not None:
+            v = self.v0[tl]
+            cut = self.meta["X"]["lane"]["task_width"] + 10              # タスクの列は、タスクの名前の幅だけ（拠点のレーンと同じ幅にしない）
+            d = self.vw[v] - cut
+            if d > 0:
+                self.vw[v] = cut
+                for n in self.main:
+                    if self.li[n["lane"]] != tl:
+                        self.geo[n["id"]][0] -= d
+            for n in self.main:                                      # タスクの列: 名前を、帯の上にそろえて左に寄せる
                 if self.meta["node"][n["id"]]["kind"] == "task_label":
                     g = self.geo[n["id"]]
                     g[0] = self.lane_x(tl) + 8
                     g[1] = self.row_y[self._rows[n["id"]]]
+        pw = self.S["size"]["process"][0]
+        for n in self.main:                                          # 開始・終了の丸を、箱の真ん中にそろえる（asis はレーンの真ん中。比較の図はレーンが狭く、ずれる）
+            if n["type"] in ("start", "end"):
+                g = self.geo[n["id"]]
+                g[0] = self.lx(self.vcol(n["id"])) + self.L["node_dx"] + pw / 2 - g[2] / 2
 
     def node_style(self, n):
         X, m = self.meta["X"], self.meta["node"][n["id"]]
@@ -99,6 +142,8 @@ class CompareDrawing(BD.FlowDrawing):
         style = super().node_style(n)
         if m.get("cls") and n["type"] not in ("start", "end"):
             style = BD.add_style(style, X["class"][m["cls"]])
+        if m.get("other"):                                           # ほかの拠点が行う作業: 区分の色の代わりに灰色
+            style = BD.add_style(style, X["other_site"])
         if n.get("inferred"):
             style = BD.add_style(style, self.ext["inferred"])
         return style
@@ -159,7 +204,9 @@ class CompareDrawing(BD.FlowDrawing):
         px = self.lx(len(self.vw)) + self.S["legend_gap"]
         rows = [("共通", X["class"]["共通"]), ("差異あり", X["class"]["差異あり"]), ("拠点固有", X["class"]["拠点固有"]), ("記載なし（資料に無い）", X["placeholder"])]
         if any(m.get("kind") == "out" for m in self.meta["node"].values()):
-            rows.append(("対象外（この業務を行わない拠点）", X["out_of_scope"]))
+            rows.append(("対象外（この拠点では行わない業務・作業）", X["out_of_scope"]))
+        if any(m.get("other") for m in self.meta["node"].values()):
+            rows.append(("ほかの拠点が行う作業（資料の箱。比べない）", X["other_site"]))
         y = self.L["header_y"]
         self.page.vertex("legend-title", "<b>凡例</b>", self.S["text_style"], px, y, 220, 20)
         for k, (name, st) in enumerate(rows):
@@ -217,7 +264,7 @@ def page_data(mdl, rid, res, sids, tasks, X):
             lane_of[(sid, g)] = lid
             kind = "system" if g.startswith("Y") else "role"
             none = "（対象外）" if (mdl.site_part(rid, sid) or {}).get("relation") == "out_of_scope" else "（記載なし）"
-            fl["lanes"].append({"id": lid, "name": mdl.group_name(g) if not g.startswith("?none") else none, "kind": kind})
+            fl["lanes"].append({"id": lid, "name": mdl.lane_label(sid, g) if not g.startswith("?none") else none, "kind": kind})   # 拠点の言葉を添える
         meta["blocks"].append((sid, names[sid], first, len(fl["lanes"]) - 1, sid == mdl.baseline))
     by = {t["id"]: t for t in tasks}
     task_res = {x["id"]: x for x in res["tasks"]}
@@ -232,10 +279,20 @@ def page_data(mdl, rid, res, sids, tasks, X):
                 tof[k] = x["id"]
         starts = [k for k in nodes if (mdl.node(sid, k) or {}).get("type") == "start"]
         ends = [k for k in nodes if (mdl.node(sid, k) or {}).get("type") == "end" and split_key(k)[1] == "end"]
+        last = split_key(ends[-1])[0] if ends else None
+        # いちばん下の帯に置く終了: 最後のフローの終了と、途中の終了（差し戻しなどで終わる所）。名前が同じ終了は 1 つにまとめる
+        # （途中の終了を、その帯に残すと、1 つの塊に終了が 2 つ並び、長い線が並んで走る）
+        low = [k for k in nodes if (mdl.node(sid, k) or {}).get("type") == "end" and not (split_key(k)[1] == "end" and split_key(k)[0] != last)]
+        rep, alias = {}, {}
+        for k in sorted(low, key=lambda k: k != (ends[-1] if ends else None)):
+            lab = (mdl.node(sid, k) or {}).get("label") or "終了"
+            alias[k] = rep.setdefault(lab, k)
         cur = "START"
         for k in nodes:
             n = mdl.node(sid, k) or {}
             t = n.get("type")
+            if alias.get(k, k) != k:
+                continue
             if t == "start":                                         # 行に 2 本以上のフローを当てた拠点は、2 本目からの開始を、続く箱の帯に
                 nxt = next((b2 for a, b2, *_ in edges if a == k), None)  # （開始を全部いちばん上に並べると、開始の線が重なって走る）
                 b = "START" if k == starts[0] else tof.get(nxt, cur)
@@ -243,10 +300,13 @@ def page_data(mdl, rid, res, sids, tasks, X):
                 b = tof[k]
             else:
                 b = cur                                              # 帯の無い箱（別のフローへ進む箱・途中の終了）は、前の箱の帯に
-            if t == "end" and split_key(k)[1] == "end":
-                b = "END" if k == ends[-1] else cur                  # いちばん下の帯には、最後のフローの終了だけ
+            if k in alias:
+                b = "END"
             cur = b if b != "END" else cur
-            local[b].setdefault(sid, []).append(k)
+            if b == "END" and ends and k == ends[-1]:                   # いちばん下の帯では、最後のフローのふつうの終了を上に（まっすぐ下りて入る）
+                local[b].setdefault(sid, []).insert(0, k)
+            else:
+                local[b].setdefault(sid, []).append(k)
             g = mdl.role(sid, k) if t not in ("start", "end") else None
             lane = lane_of.get((sid, g)) if g else None
             if lane is None:                                         # 開始・終了は、つながる箱のレーンに
@@ -260,7 +320,8 @@ def page_data(mdl, rid, res, sids, tasks, X):
                 kinds = [d["kind"] for d in x["diffs"] if sid in d["sites"] and d["kind"] != "記載なし"]
                 mark = "△ " + "・".join(dict.fromkeys(kinds))
             coarse = "粗: ほかの拠点の " + str(max(x["grain"]["counts"].values())) + " 作業に当たる" if x and sid in x["grain"]["coarse"] else ""
-            tip = [f"{names[sid]}｜{mdl.role_name(sid, k)}｜{n.get('label', '')}"]           # 担当・システム・帳票は、比べる用語の名前（日本語）で
+            other = f"対象外（{mdl.done_by(sid, [k])}が行う）" if t not in ("start", "end") and mdl.owner(sid, k) else ""   # ほかの拠点の担当のレーンの箱
+            tip = [f"{names[sid]}｜{mdl.role_label(sid, k)}｜{n.get('label', '')}"]          # 担当・システム・帳票は、比べる用語の名前（日本語）で
             if n.get("detail"):
                 tip.append(f"補足: {n['detail']}")
             ys = [mdl.group_name(y) for y in sorted(mdl.systems(sid, k)) if n.get("lane_kind") != "system"]
@@ -278,8 +339,13 @@ def page_data(mdl, rid, res, sids, tasks, X):
                                 "systems": [mdl.group_name(y) for y in mdl.systems(sid, k) if y.startswith("Y") and n.get("lane_kind") != "system"],
                                 "inferred": n.get("inferred", False)})
             meta["node"][nid] = {"kind": "node", "no": x["no"] if x else "", "cls": x["class"] if x else None, "mark": mark, "coarse": coarse,
-                                 "tip": "\n".join(tip), "band": b}
+                                 "other": other, "tip": "\n".join(tip), "band": b}
+        seen = set()
         for a, b2, lbl, inf in edges:
+            a, b2 = alias.get(a, a), alias.get(b2, b2)
+            if (a, b2, lbl) in seen:                                 # まとめた終了へ、同じ所から同じラベルで入る線は 1 本に
+                continue
+            seen.add((a, b2, lbl))
             fl["edges"].append({"from": node_id(sid, a), "to": node_id(sid, b2), "label": lbl, "inferred": inf})
     rows, r = {}, 0
     for b in bands:
@@ -288,7 +354,7 @@ def page_data(mdl, rid, res, sids, tasks, X):
             ks = local[b].get(sid, [])
             ids = [node_id(sid, k) for k in ks]
             if ids:
-                sub = [n for n in fl["nodes"] if n["id"] in ids]
+                sub = sorted((n for n in fl["nodes"] if n["id"] in ids), key=lambda n: ids.index(n["id"]))   # 帯の中の並び（いちばん下の帯は、ふつうの終了が上）
                 es = [e for e in fl["edges"] if e["from"] in ids and e["to"] in ids]
                 got = BD.assign_rows(sub, es) if len(sub) > 1 else {ids[0]: 0}
                 base = min(got.values())
@@ -313,8 +379,10 @@ def page_data(mdl, rid, res, sids, tasks, X):
                 lane = lane_of.get((sid, want)) or next(l["id"] for l in fl["lanes"] if l["id"].startswith(f"{sid}."))
                 pid = f"{sid}.none.{b}"
                 fl["nodes"].append({"id": pid, "type": "process", "lane": lane, "label": "（記載なし）"})
+                why = (x.get("out") or {}).get(sid)
                 meta["node"][pid] = {"kind": "placeholder" if mk == "—" else "out", "no": x["no"], "text": "（記載なし）" if mk == "—" else "（対象外）",
-                                     "tip": f"{names[sid]}: タスク {x['no']} {x['name']} は、資料に記載なし" if mk == "—" else f"{names[sid]}: 対象外"}
+                                     "tip": f"{names[sid]}: タスク {x['no']} {x['name']} は、資料に記載なし" if mk == "—" else
+                                     f"{names[sid]}: タスク {x['no']} {x['name']} は対象外" + (f"（{why}）" if why else "")}
                 rows[pid] = r
             for sid in sids:                                         # 内訳の枠
                 if sid in x["grain"]["fine"] and x["grain"]["coarse"]:
@@ -339,7 +407,7 @@ def row_pages(mdl, rid, res, X, S, ctx):
             fl, rows, meta = page_data(mdl, rid, sub, ss, tasks, X)
             suffix = ("" if len(groups) == 1 else f"-s{gi + 1}") + ("" if len(chunks) == 1 else f"-t{ci + 1}")
             name = (res.get("label") or res["name"]) + (f"（{gi + 1}/{len(groups)}）" if len(groups) > 1 else "") + (f"［{ci + 1}/{len(chunks)}］" if len(chunks) > 1 else "")
-            page = None
+            best = None
             for width in (X["lane"]["width"], S["lane"]["width"], S["lane"]["width"] + 80):
                 S2 = copy.deepcopy(S)
                 S2["lane"]["width"] = width
@@ -347,8 +415,12 @@ def row_pages(mdl, rid, res, X, S, ctx):
                 page = CompareDrawing(fl, c2, rows, meta, f"row-{rid}{suffix}", name).build()
                 lay = {"nodes": page.nodes, "edges": page.edges, "captions": page.captions}
                 bad = [m for kind, m in page_problems(lay) if kind == "fail"]
-                if not bad:
+                score = (len(bad), len(close_runs(lay)))              # 配置の点検の FAIL が無く、近すぎて並ぶ線のいちばん少ない幅
+                if best is None or score < best[0]:
+                    best = (score, page, bad)
+                if score == (0, 0):
                     break
+            _score, page, bad = best
             if bad:
                 problems.append((name, bad[:3]))
             pages.append(page)

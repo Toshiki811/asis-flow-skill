@@ -159,6 +159,19 @@ def mentions(text, sites):
     return out
 
 
+def site_named(term, sid, sites):
+    """用語が、ほかの拠点の担当の名前に読めるとき、その拠点の ID（その拠点の名前・別名そのもの、か「<名前・別名>の…」）"""
+    t = norm(str(term or ""))
+    for x in sites.get("sites") or []:
+        if x.get("id") == sid:
+            continue
+        for n in [x.get("name", "")] + list(x.get("aliases") or []):
+            n = norm(n)
+            if n and (t == n or t.startswith(n + "の")):
+                return x["id"]
+    return None
+
+
 SWITCH_WORDS = ("拠点ごと", "拠点によって", "支店ごと", "支店によって", "各拠点", "各支店", "拠点により", "支店により", "by site", "by branch", "each branch", "each site")
 
 

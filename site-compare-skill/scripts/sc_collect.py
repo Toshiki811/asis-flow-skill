@@ -7,7 +7,7 @@
 
 拠点の門: その拠点の asis の点検（check_flow.py --stage flow と --stage review。原典照合まで）が FAIL 0 でなければ、写さない。
 写すもの: 分類の木・フロー（箱ごとに、種類・レーン・名前・補足・札・付いた帳票・出典の表示「資料名 p.N」・推定の印・指紋）・
-フローから外した項目（記載なしの候補に使う）・用語。
+フローから外した項目（記載なしの候補・not_here・内容の差の根拠に使う。原文の引用と、同じページの拠点の名前の出る注記つき）・用語。
 開いたフロー（families）: 下位フローへのリンク（その分類の子孫へのものだけ）を、子のフローの中身で置き換えた 1 本。子のふつうの終了だけを
 親の次へつなぐ（ほかの終了は、終わりのまま）。同じ子を 2 回指せば、2 回目はリンクのまま。ほかの業務へ続くリンクは、そのまま。
 箱の鍵は「F03-1:P-004」。拠点を直して番号が振り直されても、出典の指紋（種類と、引いたカードの項目）が 1 つに決まる箱は、
@@ -21,8 +21,8 @@ import re
 import subprocess
 import sys
 
-from sc_common import (ASIS_SCRIPTS, A, digest, load, match_path, node_key, save, site_ids, site_work, sites_of, snap_path, split_key,
-                       try_load, work_dir)
+from sc_common import (ASIS_SCRIPTS, A, digest, load, match_path, mentions, node_key, save, site_ids, site_work, sites_of, snap_path,
+                       split_key, try_load, work_dir)
 
 GATE = (("check_flow.py", "--stage", "flow"), ("check_flow.py", "--stage", "review"))
 
@@ -141,8 +141,11 @@ def collect(cmp, sites, sid):
         for x in fl.get("excluded_items") or []:
             c = A.load_card(w, x["doc_id"], x["page"]) or {}
             it = next((y for y in (c.get("steps") or []) + (c.get("decisions") or []) if y.get("id") == x.get("item")), {})
+            notes = [n.get("quote") or n.get("text") for n in c.get("notes") or []          # 同じページの、拠点の名前の出る注記（書き分けの原文のことが多い）
+                     if mentions(" ".join(str(v or "") for v in (n.get("text"), n.get("quote"))), sites)]
             excluded.append({"key": f"{x['doc_id']}.{x['page']}.{x['item']}", "flow": fid, "text": it.get("action") or it.get("question") or "",
-                             "reason": x.get("reason", ""), "src": lab.src({"doc_id": x["doc_id"], "page": x["page"]}), "doc": sha.get(x["doc_id"], "")})
+                             "reason": x.get("reason", ""), "src": lab.src({"doc_id": x["doc_id"], "page": x["page"]}), "doc": sha.get(x["doc_id"], ""),
+                             "quote": it.get("quote", ""), "notes": [q for q in notes if q]})
     families = {}
     for fid in flows:
         families[fid] = expand(flows, desc, fid)
@@ -198,12 +201,14 @@ def rekey(cmp, sid, old, new):
             if isinstance(t.get("members"), dict) and isinstance(t["members"].get(sid), list):
                 t["members"][sid] = [fix(k) for k in t["members"][sid]]
             ab = (t.get("absent") or {}).get(sid)
-            if isinstance(ab, dict) and isinstance(ab.get("checked"), list):
-                ab["checked"] = [fix(k) for k in ab["checked"]]
+            if isinstance(ab, dict):
+                for f2 in ("checked", "not_here"):
+                    if isinstance(ab.get(f2), list):
+                        ab[f2] = [fix(k) for k in ab[f2]]
             for c in t.get("content") or []:
                 for e in c.get("evidence") or []:
-                    if e.get("site") == sid:
-                        e["node"] = fix(e.get("node"))
+                    if e.get("site") == sid and "node" in e:                 # 外した項目（item）の根拠は、箱の番号と関わらない
+                        e["node"] = fix(e["node"])
         save(f, mt)
     return len(mp), lost
 
