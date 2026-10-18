@@ -684,6 +684,20 @@ def parts(base, root):
 
 def status_and_gate(base, root):
     d = copy(base, root, "gate")
+    if wanted("区分"):
+        e = d / "k1"
+        shutil.copytree(d, e, ignore=shutil.ignore_patterns("k1"))
+        def out_of_scope(a):
+            for x in next(r for r in a["rows"] if r["id"] == "B01")["sites"]:
+                if x["site"] != "TK":
+                    x.update(relation="out_of_scope", reason="この拠点は申請を本部で受ける")
+        J("axis.json", out_of_scope)(e)
+        M("B01", lambda m: [t["members"].update({s: [] for s in t["members"] if s != "TK"}) or t.update(absent={}) for t in m["tasks"]])(e)
+        recompute(e)
+        r = jload(e / "rows" / "B01.result.json")
+        say(all(t["class"] == "拠点固有" for t in r["tasks"]), "区分: ほかの拠点が対象外の行の、1 拠点だけの作業は拠点固有（共通にしない）",
+            f"{[(t['name'], t['class']) for t in r['tasks']]}")
+        shutil.rmtree(e)
     if wanted("出典"):
         e = d / "o1"
         shutil.copytree(d, e, ignore=shutil.ignore_patterns("o1"))

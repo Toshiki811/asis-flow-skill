@@ -359,7 +359,8 @@ def compute_row(mdl, rid, cfg, nb):
                 marks[s] = MARK_NONE
             else:
                 marks[s] = MARK_DIFF if s in involved else MARK_SAME
-        cls = "拠点固有" if len(present) == 1 and len(compared) > 1 else "共通" if set(present) == set(compared) and not real else "差異あり"
+        # ほかの拠点が対象外の行でも、1 拠点だけの作業は拠点固有（共通と出すと、どの拠点も同じに行うと読める）
+        cls = "拠点固有" if len(present) == 1 else "共通" if set(present) == set(compared) and not real else "差異あり"
         cnt = {s: len(mem[s]) for s in present}
         mx = max(cnt.values()) if cnt else 0
         key = f"{rid}|{tid}"
