@@ -596,7 +596,7 @@ def parts(base, root):
             "下書き: 書き分けの候補（拠点の名前の出る項目と、同じ節の項目。未定）", f"{[(i['key'], i['scope'], i['mentions']) for i in ap['items']]}")
         shutil.copy2(base / "applies.json", d / "applies.json")
         rc, out = run("sc_site_ops.py", "-w", d, "--site", "OS")
-        say(rc == 0 and '"op": "exclude", "item": "M01.2.s3"' in out and "ほかの拠点だけの手順（大阪支店では行わない）" in out,
+        say(rc == 0 and '"op": "exclude", "item": "M01.2.s3"' in out and "ほかの拠点だけの手順（大阪支店では行わない" in out,   # 理由の頭（書き分けの根拠の文が続く）
             "下書き: ほかの拠点だけの手順を外す直し（大阪支店は、課長の承認を外す）", out[-300:])
         (d / "axis.json").rename(d / "axis.keep")
         rc, out = run("sc_axis.py", "draft", "-w", d)

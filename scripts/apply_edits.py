@@ -220,7 +220,8 @@ class Builder:
             nm = self.lane_name(i, op, p.get("lane"))
             if not str(p.get("label", "")).strip():
                 self.bad(i, op, "parts の label が空")
-            out.append(dict({"label": str(p.get("label", "")).strip(), "lane": nm, "inferred": bool(p.get("inferred"))},
+            out.append(dict({"label": str(p.get("label", "")).strip(), "lane": nm, "inferred": bool(p.get("inferred")),
+                             "detail": str(p.get("detail") or "").strip()},                  # 部分ごとの補足（書かなければ、手順の補足は最初の部分に付く）
                             **(self.timing(i, dict(op, reason=op.get("reason") or "部分ごとに指定"), p) or {})))
         if any(a["lane"] == b["lane"] for a, b in zip(out, out[1:])):
             return self.bad(i, op, "続く2つが同じレーン。分けるのは、文の途中で担当が変わるときだけ（同じ担当の作業は、1つのノードのままにする）")
@@ -237,6 +238,7 @@ class Builder:
         self.nodes[k]["gate"] = {x: str(op.get(x) or "").strip() for x in ("question", "yes", "no")}
         self.nodes[k]["gate"]["no"] = self.nodes[k]["gate"]["no"] or opposite(self.nodes[k]["gate"]["yes"]) or ELSE   # 行わない側は、反対の語（決まり 3.4）
         self.nodes[k]["gate"]["no_to"] = op.get("no_to", "next")
+        self.nodes[k]["gate"]["lane"] = self.lane_name(i, op, op.get("lane")) if op.get("lane") else ""   # 判断する人（書かなければ、その先の手順のレーン）
 
     def op_branch(self, i, op):
         k = self.need(i, op, "item")
@@ -328,13 +330,14 @@ class Builder:
             base = {"key": k, "doc": n["doc"], "page": n["page"], "origin": n["origin"], "mark": n["mark"], "group": n["group"], "actor": n["actor"],
                     "sources": [self.source(*s) for s in n["sources"]] + ([self.plain(n["added"])] if n.get("added") else []), "fork": n.get("fork")}
             if n.get("gate"):
-                out.append(dict(base, id=k + "?", type="decision", label=n["gate"]["question"], lane="", gate=n["gate"], follows=k))
+                out.append(dict(base, id=k + "?", type="decision", label=n["gate"]["question"], lane=n["gate"].get("lane", ""), gate=n["gate"], follows=k))
             label, aside = short_label(n["label"]) if not n.get("relabeled") else (n["label"], "")
             detail = n.get("detail", "・".join(x for x in (n["condition"] if not n.get("gate") and not n.get("target") else "", aside) if x))   # 使うシステムは、札（systems）に出る
             if n.get("parts"):
                 for j, p in enumerate(n["parts"], 1):
                     out.append(dict(base, id=f"{k}#{j}", type="process", label=p["label"], lane=p["lane"], lane_set=True, part=j, soft=p["inferred"],
-                                    detail=detail if j == 1 else "", reference=n.get("reference", "") if j == 1 else "", files=j == 1,
+                                    detail=p.get("detail") or (detail if j == 1 and not any(q.get("detail") for q in n["parts"]) else ""),
+                                    reference=n.get("reference", "") if j == 1 else "", files=j == 1,
                                     **{f: p.get(f) or n.get(f) for f in TIME_FIELDS}))
             else:
                 out.append(dict(base, id=k, type="decision" if n["kind"] == "decision" else "process", label=label, lane=n["lane"],

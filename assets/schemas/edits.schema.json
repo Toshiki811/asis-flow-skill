@@ -67,7 +67,7 @@
     },
     "reason": {"type": "string", "description": "exclude: フローに入れない理由（same_as・flow で決まった形にできるときは、書かなくてよい。書けば、決まった形のあとに続ける）。time・add: 量（volume）を、機械の決め方と変える理由"},
     "same_as": {"type": "string", "description": "exclude: 同じ作業として、ほかの項目（キー）をフローに入れたとき。理由は、機械が決まった形で書く"},
-    "lane": {"type": "string", "description": "lane・add: 置くレーン（用語の正本の名前）"},
+    "lane": {"type": "string", "description": "lane・add: 置くレーン（用語の正本の名前）。decide: 判断する人のレーン（書かなければ、その先の手順のレーン）。link: 進む箱のレーン（書かなければ、前の箱と同じ）"},
     "label": {
      "type": "string",
      "description": "label: 短くした・動詞で終わるように直したラベル（原典の語で。判断は「〜か」）。branch: 書かれていない側の線のラベル（書かなければ、書かれた側の反対の語。表に無ければ「その他」）。add: 足すノードのラベル。link: リンクのラベル"
@@ -98,10 +98,11 @@
        "lane": {"type": "string", "minLength": 1},
        "inferred": {"type": "boolean"},
        "action": {"$ref": "common#/$defs/actions"},
-       "volume": {"enum": ["小", "中", "大", "特大"]}
+       "volume": {"enum": ["小", "中", "大", "特大"]},
+       "detail": {"type": "string"}
       }
      },
-     "description": "split: 分けたあとの作業（順に）。`label`・`lane`、動作の種類を部分ごとに変えるなら `action`、前の作業との順が原典に無ければ `inferred: true`。続く2つは別のレーン"
+     "description": "split: 分けたあとの作業（順に）。`label`・`lane`、動作の種類を部分ごとに変えるなら `action`、前の作業との順が原典に無ければ `inferred: true`、その部分だけの補足は `detail`（書かなければ、手順の補足は最初の部分に付く）。続く2つは別のレーン"
     },
     "question": {"type": "string", "description": "decide: 何で分かれるか（判断ノードのラベル）"},
     "yes": {"type": "string", "description": "decide: その手順を行う側の線のラベル。add: before の項目へ進む側のラベル"},

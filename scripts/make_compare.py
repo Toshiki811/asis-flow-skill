@@ -234,8 +234,11 @@ class Sheets:
             put(page, MARGIN, y, "なし（割り当てたページはすべて、どれかのノードの出典になっている）", size=10)
         for k in unused:
             others = [f for f in self.cited.get(k, []) if f != self.F]       # 点検（check_flow.py）と同じ見方で書く
+            mine = [x for x in fl.get("excluded_items") or [] if (x.get("doc_id"), x.get("page")) == k]
             why = (f"ほかのフロー（{'・'.join(others)}）の出典になっている" if others
                    else why_unused(k, self.reasons, self.item_why) or "理由の記録なし（check_flow.py が FAIL にする）")
+            if mine:                                                 # このフローの手順もあるページ: 入れなかった理由は、下の一覧（同じ作業として入れた・ほかのフローで描く など）
+                why = f"このフローに当たる手順 {len(mine)} 件は、下の「フローに入れなかった手順」に理由つきで載せた" + (f"。ほかに {why}" if others else "")
             y = put(page, MARGIN, y, f"{self.src({'doc_id': k[0], 'page': k[1]})}　{self.dmap.get(k[0], {}).get('rel_path', '')}　— {why}",
                     size=10, width=wide, max_lines=2) + 4
         y += 20
