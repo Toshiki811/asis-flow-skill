@@ -26,7 +26,7 @@ import sys
 import unicodedata
 import xml.etree.ElementTree as ET
 
-from common import (ASSETS, HIERARCHY_LABEL, STEP_TYPES, collect_questions, docs_by_id, labels, load, load_flows, manifest,
+from common import (ASSETS, HIERARCHY_LABEL, OUTPUT_FONT, STEP_TYPES, collect_questions, docs_by_id, labels, load, load_flows, manifest,
                     question_ids, save, src_label, tree_nodes, work_dir)
 from validate import blocking
 from common import REL_LABEL as REL, ROLE_LABEL as ROLE, SEV_LABEL as SEV
@@ -1230,11 +1230,23 @@ def overview_page(ctx, flows, here):
     return OverviewDrawing(ctx, flows, here).build()
 
 
+def with_font(style, font=OUTPUT_FONT):
+    """セルの style に書体を足す（テンプレート・様式が書体を決めていれば、そのまま）"""
+    if "fontFamily=" in style:
+        return style
+    return add_style(style, f"fontFamily={font};") if style else f"fontFamily={font};"
+
+
 def render(name, pages):
-    """ページの並び → (draw.io の文字, 配置)。書き出し（write）と、点検の作り直し（check_flow.py）が使う"""
+    """ページの並び → (draw.io の文字, 配置)。書き出し（write）と、点検の作り直し（check_flow.py）が使う。
+    どのセル（箱・線・凡例・注記）にも、書体（OUTPUT_FONT）を足す"""
     mx = ET.Element("mxfile", {"host": "app.diagrams.net", "agent": "asis-flow-skill", "version": "24.0.0"})
     for p in pages:
-        mx.append(copy.deepcopy(p.diagram))
+        d = copy.deepcopy(p.diagram)
+        for c in d.iter("mxCell"):
+            if c.get("vertex") == "1" or c.get("edge") == "1":
+                c.set("style", with_font(c.get("style") or ""))
+        mx.append(d)
     ET.indent(mx, space=" ")
     return ET.tostring(mx, encoding="unicode") + "\n", {"file": name, "pages": [
         dict({"index": i + 1, "id": p.id, "name": p.name, "bounds": [round(v, 1) for v in p.b], "nodes": p.nodes, "edges": p.edges, "captions": p.captions},

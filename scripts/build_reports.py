@@ -24,7 +24,7 @@ import pathlib
 from common import (NODE_LABEL, HIERARCHY_LABEL, NON_CONTENT_TYPES, Answers, BadJson, CardItems, all_pages, answer_gaps, collect_questions, item_reasons, labels,
                     load, load_card, load_flows, manifest, node_details, q_targets, src_label, tree_nodes, try_load, unused_reasons,
                     why_unused, work_dir)
-from common import ASSETS, REL_LABEL as REL, ROLE_LABEL as ROLE, SEV_LABEL as SEV
+from common import ASSETS, OUTPUT_FONT, REL_LABEL as REL, ROLE_LABEL as ROLE, SEV_LABEL as SEV
 from validate import blocking, validate
 
 SEV_ORDER = {"high": 0, "mid": 1, "low": 2}
@@ -41,7 +41,7 @@ Q_HEAD = ["番号", "重要度", "種別", "答えで変わる所", "対象", "�
 Q_BOOK, Q_SHEET, Q_TEMPLATE = "確認事項一覧.xlsx", "確認事項", "確認事項一覧_テンプレート.xlsx"
 # 欄の決まり（テンプレートの印）と、既定のテンプレートの体裁（回答・回答者・回答日は、人が埋める欄）
 Q_SPEC = {"sheets": {Q_SHEET: Q_HEAD}, "required": {Q_SHEET: ["番号", "質問"]}, "keys": {Q_SHEET: ["番号"]}}   # 人が埋める欄は、番号の行に戻す
-Q_LOOK = {"font": None, "border": False, "head_align": False, "head_fill": "DAE8FC", "order": [Q_SHEET], "manual": {Q_SHEET: ["回答", "回答者", "回答日"]},
+Q_LOOK = {"font": OUTPUT_FONT, "size": 11, "head_font": dict(b=True), "border": False, "head_align": False, "head_fill": "DAE8FC", "order": [Q_SHEET], "manual": {Q_SHEET: ["回答", "回答者", "回答日"]},
           "widths": {Q_SHEET: [9, 8, 14, 16, 20, 16, 60, 40, 22, 14, 50, 12, 12]}}
 
 

@@ -19,6 +19,8 @@ import subprocess
 import sys
 import tempfile
 
+from common import font_env
+
 SKILL = pathlib.Path(__file__).resolve().parent.parent
 CAP = 16000                                                          # Chromium が 1 枚で撮れる長辺のおおよその上限（px）
 
@@ -30,7 +32,7 @@ const [, , drawio, outDir, scaleArg, capArg] = process.argv;
 const want = parseFloat(scaleArg || '2'), cap = parseInt(capArg || '16000', 10);
 const xml = fs.readFileSync(drawio, 'utf8');
 const stem = path.basename(drawio, '.drawio');
-const font = process.env.ASIS_MX_FONT || 'Helvetica,IPAPGothic,sans-serif';
+const font = process.env.ASIS_MX_FONT || 'Yu Gothic UI,IPAPGothic,sans-serif';
 
 function renderOne({ xml, i, scale, font, cap }) {
   const container = document.getElementById('g');
@@ -217,7 +219,7 @@ def render(drawio, out_dir, scale=2.0, timeout=600):
     with tempfile.TemporaryDirectory(prefix="asis_mx_") as td:
         js = pathlib.Path(td) / "harness.js"
         js.write_text(HARNESS, encoding="utf-8")
-        env = dict(os.environ, ASIS_PW_MODULE=pr["playwright"], ASIS_MXCLIENT=pr["mxclient"])
+        env = dict(font_env(), ASIS_PW_MODULE=pr["playwright"], ASIS_MXCLIENT=pr["mxclient"])   # 書体が無い機械は、代わりの和文の書体で
         try:
             r = subprocess.run([pr["node"], str(js), str(drawio), str(out_dir), str(scale), str(CAP)], capture_output=True, text=True, timeout=timeout, env=env)
         except subprocess.TimeoutExpired:

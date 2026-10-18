@@ -439,6 +439,11 @@ def other_finance(t):
                         "basis": "same_name", "site": "TK", "reason": "シンガポール拠点の手順書の Finance は、東京支店の経理部"})
 
 
+def to_sg(s):
+    """東京支店・大阪支店の「経費申請書を作成する」を、シンガポール拠点へ行う作業にする（シンガポール拠点は受け取る側）"""
+    s["nodes"]["F01:P-001"]["label"] = "経費申請書を作成してシンガポール拠点へ送付する"
+
+
 def BD_units(s):
     import build_drawio
     return build_drawio.units(s)
@@ -583,6 +588,14 @@ CASES = [
     ("not_here の箱に、ほかの拠点の名前が無い", "rows", M("B03", lambda m: task(m, "t1")["absent"]["OS"].update(not_here=["F01:P-001"])),
      "の名前・補足に、ほかの拠点の名前が無い"),
     ("書き分けで分かる記載なしに not_here が無い", "rows", M("B02", split_b02), "absent.not_here と checked に M01.2.s3 を書く"),
+    ("not_here の受け取る側の箱が、この拠点へ行うと書いていない", "rows", M("B01", lambda m: task(m, "t1")["absent"]["SG"].update(not_here=["TK/F01:P-001"])),
+     "の名前・補足に、シンガポール拠点へ行う作業とない"),
+    ("not_here の受け取る側の箱が、このタスクの箱でない", "rows", M("B01", lambda m: task(m, "t1")["absent"]["SG"].update(not_here=["TK/F02:P-003"])),
+     "は、このタスクの東京支店の箱でない"),
+    ("not_here の受け取る側の拠点が、この拠点", "rows", M("B01", lambda m: task(m, "t1")["absent"]["SG"].update(not_here=["SG/F01:P-001"])),
+     "の拠点 SG が、ほかの拠点でない"),
+    ("受け取る側が機械で分かるのに not_here が無い", "rows", seq(J("snap/TK.json", to_sg), J("snap/OS.json", to_sg)),
+     "どれもシンガポール拠点へ行う作業と書いている（シンガポール拠点は受け取る側）。absent.not_here に TK/F01:P-001, OS/F01:P-001 を書く"),
     ("対象外の拠点を内容の差に書く", "rows", J("terms.json", other_finance), "は、このタスクでは対象外"),
     ("内容の差の根拠に箱と項目の両方", "rows", M("B01", lambda m: task(m, "t2")["content"][0]["evidence"][0].update(item="M01.2.s3")),
      "根拠は 1 つずつ、node（箱）か item"),
@@ -719,10 +732,14 @@ def parts(base, root):
                 e["from"], e["to"] = ["P-004" if x == "P-003" else x for x in (e["from"], e["to"])]
         edit(P_flow(d, "TK", "F03"), renum)
         edit(P_match(d, "B03"), lambda m: task(m, "t4")["content"][0]["evidence"].append({"site": "TK", "item": "M01.2.s4"}))   # 外した項目の根拠は、付け直さない
+        edit(P_match(d, "B03"), lambda m: task(m, "t4")["absent"]["OS"].update(not_here=["TK/F03:P-003"]))                  # ほかの拠点の記載なしの、受け取る側の根拠
         rc, out = run("sc_collect.py", "-w", d, "--site", "TK", "--no-gate")
-        m = json.dumps(jload(P_match(d, "B03")), ensure_ascii=False)
+        moved = jload(P_match(d, "B03"))
+        recv = task(moved, "t4")["absent"]["OS"].pop("not_here")
+        edit(P_match(d, "B03"), lambda m: task(m, "t4")["absent"]["OS"].pop("not_here"))
+        m = json.dumps(moved, ensure_ascii=False)
         rc2, out2 = check(d, "rows")
-        say(rc == 0 and "F03:P-004" in m and "F03:P-003" not in m and '"item": "M01.2.s4"' in m and rc2 == 0,
+        say(rc == 0 and "F03:P-004" in m and "F03:P-003" not in m and '"item": "M01.2.s4"' in m and recv == ["TK/F03:P-004"] and rc2 == 0,
             "付け直し: 拠点の箱の番号が振り直されても、出典の指紋でタスクの鍵を付け直す（外した項目の根拠はそのまま）", out[-300:] + tail(out2))
         shutil.rmtree(d / "asis" / "TK")
         shutil.copytree(base / "asis" / "TK", d / "asis" / "TK")
@@ -771,11 +788,13 @@ def status_and_gate(base, root):
         shutil.rmtree(e)
     if wanted("対象外"):
         from sc_rows import Model
+        import sc_common
         import sc_match
         import sc_verify
         e = d / "x1"                                                 # ほかの拠点の担当のレーンの箱
         shutil.copytree(d, e, ignore=shutil.ignore_patterns("x1"))
         before = jload(e / "rows" / "B03.result.json")
+        cl0 = sc_verify.claims(Model(e, jload(e / "sites.json")), "B03")
         J("terms.json", other_finance)(e)
         M("B03", lambda m: task(m, "t4").update(content=[]))(e)
         recompute(e)
@@ -789,6 +808,12 @@ def status_and_gate(base, root):
             f"{[(k['id'], k['marks'], k['class'], k.get('out')) for k in r['tasks']]} {req}")
         say(x["t2"]["marks"]["SG"] == "○" and x["t2"]["class"] == "拠点固有", "対象外: どの拠点にも自拠点の箱が無いタスクは、ほかの拠点の箱を記載ありにする",
             f"{x['t2']['marks']} {x['t2']['class']}")
+        mdl = Model(e, jload(e / "sites.json"))
+        cl = sc_verify.claims(mdl, "B03")
+        sheet = sc_verify.sheet_text(mdl, "B03", "V-9")
+        say(cl["t3/SG"][1].get("owner") and cl["t3/SG"][0] != cl0["t3/SG"][0] and "owner" not in cl["t3/TK"][1] and cl["t3/TK"][0] == cl0["t3/TK"][0]
+            and "どの箱も、東京支店の担当が行う" in sheet and "シンガポール拠点の手順書の Finance は、東京支店の経理部" in sheet,
+            "対象外: ほかの拠点の担当の箱を含む主張は、担当をその拠点の人とした理由つきで照合に回す（ほかの主張の印は変わらない）", sheet[-700:])
         run("sc_drawio.py", "-w", e)
         run("sc_book.py", "-w", e)
         fig = (e / "out" / "拠点比較フロー.drawio").read_text(encoding="utf-8")
@@ -801,6 +826,10 @@ def status_and_gate(base, root):
         say("対象外" not in str(row[head.index("差の種類")]) and "対象外: シンガポール拠点" in str(row[head.index("差の内容")])
             and str(row[head.index("シンガポール拠点")]).startswith("対象外"),
             "対象外: 表は、記号を対象外にし、わけを差の内容に出す（差の種類には出さない）", str(row))
+        tt = openpyxl.load_workbook(e / "out" / "拠点比較.xlsx")["拠点間の用語対応"]
+        why = next((rr for rr in tt.iter_rows(min_row=2, values_only=True) if "東京支店の経理部" in rr), ())
+        say(any(str(v).startswith("東京支店の担当（ほかの拠点）。シンガポール拠点の手順書") for v in why),
+            "対象外: 用語対応のシートの根拠の欄に、ほかの拠点の担当と出す", str(why))
         shutil.rmtree(e)
         e = d / "x2"                                                 # 自拠点の箱とほかの拠点の箱が混ざる
         shutil.copytree(d, e, ignore=shutil.ignore_patterns("x2"))
@@ -844,6 +873,28 @@ def status_and_gate(base, root):
         say(rc == 0 and "大阪支店の根拠（フローに描かなかった、資料の項目）" in sheet and quote in sheet,
             "対象外: 内容の差の根拠に、拠点がフローから外した項目を書け、照合シートに引用が出る", tail(out))
         shutil.rmtree(e)
+        e = d / "x5"                                                 # 受け取る側（ほかの拠点の箱が「シンガポール拠点へ送付する」）
+        shutil.copytree(d, e, ignore=shutil.ignore_patterns("x5"))
+        J("snap/TK.json", to_sg)(e)
+        J("snap/OS.json", to_sg)(e)
+        mdl = Model(e, jload(e / "sites.json"))
+        rec = mdl.receiver(next(k for k in mdl.tasks("B01") if k["id"] == "t1"), "SG")
+        M("B01", lambda m: task(m, "t1")["absent"]["SG"].update(not_here=rec))(e)
+        recompute(e)
+        rc, out = check(e, "rows")
+        r = jload(e / "rows" / "B01.result.json")
+        x = next(k for k in r["tasks"] if k["id"] == "t1")
+        req = next((q for q in r["requests"] if q["site"] == "SG"), {"absent": []})
+        sheet = sc_verify.sheet_text(Model(e, jload(e / "sites.json")), "B01", "V-9")
+        say(rc == 0 and rec == ["TK/F01:P-001", "OS/F01:P-001"] and x["marks"]["SG"] == "対象外" and "（シンガポール拠点は受け取る側）" in x["out"]["SG"]
+            and x["no"] not in req["absent"] and x["class"] == "共通" and "この拠点は受け取る側" in sheet and "東京支店の箱:" in sheet,
+            "対象外: ほかの拠点の箱がこの拠点へ行う作業と書けば、受け取る側として対象外（区分は残りの拠点で決まり、照合シートに根拠の箱が出る）",
+            tail(out) + f" {rec} {x['marks']} {x['class']} {x.get('out')}")
+        sites = jload(e / "sites.json")
+        say(sc_common.addressed("申請書を東京の経理部へ報告する", "TK", sites) and sc_common.addressed("申請書を東京支店に提出する", "TK", sites)
+            and not sc_common.addressed("申請書を東京支店に保管する", "TK", sites) and not sc_common.addressed("東京支店の口座から支払う", "TK", sites),
+            "対象外: 受け取る側は「へ」か「に＋受け渡しの動詞」で見る（「東京支店に保管する」は拾わない）")
+        shutil.rmtree(e)
     if wanted("図の形"):
         import sc_drawio
         fig = (d / "out" / "拠点比較フロー.drawio").read_text(encoding="utf-8")
@@ -874,6 +925,19 @@ def status_and_gate(base, root):
         mdl = sc_drawio.Model(d, jload(d / "sites.json"))
         say(mdl.lane_label("SG", "R01") == "申請者（Employee）" and mdl.lane_label("TK", "R01") == "申請者" and mdl.lane_label("OS", "R03") == "経理（経理担当）",
             "図の形: レーンの名前は、比べる用語の名前に拠点の言葉を添える", f"{mdl.lane_label('SG', 'R01')} {mdl.lane_label('OS', 'R03')}")
+    if wanted("書体"):
+        import zipfile
+        fig = (d / "out" / "拠点比較フロー.drawio").read_text(encoding="utf-8")
+        cells = [c for c in re.findall(r"<mxCell [^>]*>", fig) if 'vertex="1"' in c or 'edge="1"' in c]
+        bad = [c for c in cells if "fontFamily=Yu Gothic UI;" not in c]
+
+        def faces(path):
+            xml = zipfile.ZipFile(path).read("xl/styles.xml").decode("utf-8")
+            fonts = re.findall(r"<font>(.*?)</font>|<font/>", re.search(r"<fonts[^>]*>(.*?)</fonts>", xml, re.S).group(1), re.S)
+            return [(re.search(r'<name val="([^"]*)"', f) or [None, None])[1] for f in fonts]
+        book, tpl = faces(d / "out" / "拠点比較.xlsx"), faces(SKILL / "assets" / "拠点比較_テンプレート.xlsx")
+        say(cells and not bad and set(book) == {"Yu Gothic UI"} and set(tpl) == {"Yu Gothic UI"},
+            "書体: 図のどのセルも、表のブックとテンプレートの書体も Yu Gothic UI", f"{len(cells)} {bad[:2]} {set(book)} {set(tpl)}")
     if wanted("出典"):
         e = d / "o1"
         shutil.copytree(d, e, ignore=shutil.ignore_patterns("o1"))

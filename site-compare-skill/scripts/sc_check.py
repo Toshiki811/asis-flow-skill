@@ -560,15 +560,19 @@ def check_row(cx, rp, mdl, rid, sc_match):
                 rp.fail(f"{tw}: {cx.names[s]}の記載なしで、機械の候補 {', '.join(miss)} を確かめていない（checked に書き、同じ作業でない理由を note に。同じ作業ならタスクに入れる）")
             nh = ab.get("not_here") or []
             for k in nh:                                             # この拠点の手順ではない根拠（書くと、記号が対象外）
-                _why, bad = mdl.not_here_key(s, k)
+                _why, bad = mdl.not_here_key(s, k, t)
                 if bad:
                     rp.fail(f"{tw}: {cx.names[s]}の not_here: {bad}")
-                elif k not in ((cx.snap(s) or {}).get("nodes") or {}) and k not in ab["checked"]:
+                elif "/" not in k and k not in ((cx.snap(s) or {}).get("nodes") or {}) and k not in ab["checked"]:
                     rp.fail(f"{tw}: {cx.names[s]}の not_here の {k} を、checked にも書く（確かめた候補）")
             sure = mdl.derivable(t, s)
             if sure and not nh:
                 rp.fail(f"{tw}: {cx.names[s]}の記載なし: ほかの拠点のこのタスクの箱が引く共通の資料の手順は、書き分けで{cx.names[s]}に当てはまらず、"
                         f"{cx.names[s]}は「{OTHER_SITE}」として外している。この拠点の手順でないなら、absent.not_here と checked に {', '.join(sure)} を書く（記号が対象外になる）")
+            rec = mdl.receiver(t, s)
+            if rec and not sure and not nh:
+                rp.fail(f"{tw}: {cx.names[s]}の記載なし: ほかの拠点のこのタスクの箱が、どれも{cx.names[s]}へ行う作業と書いている（{cx.names[s]}は受け取る側）。"
+                        f"absent.not_here に {', '.join(rec)} を書く（記号が対象外になる）")
         for s in (t["absent"] or {}):
             if s not in parts:
                 rp.fail(f"{tw}: absent の {cx.names.get(s, s)}は、この行にフローを当てていない")

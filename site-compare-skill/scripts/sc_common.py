@@ -159,6 +159,19 @@ def mentions(text, sites):
     return out
 
 
+HANDOFF = "送|提出|申請|報告|連絡|依頼|回|届|渡|伝|照会|相談"           # 「本部に〜する」を、本部へ行う作業と読む動詞（「本部に保管する」は拾わない）
+
+
+def addressed(text, sid, sites):
+    """文が、その拠点へ行う作業と書いているか（「本部へ申請する」「本部の会計責任者へ報告する」「本部に送付する」）"""
+    x = next((x for x in sites.get("sites") or [] if x.get("id") == sid), None)
+    names = sorted({norm(n) for n in [(x or {}).get("name", "")] + list((x or {}).get("aliases") or []) if n}, key=len, reverse=True)
+    if not names:
+        return False
+    pat = f"(?:{'|'.join(map(re.escape, names))})(?:の[^、。へに]{{1,12}}?)?(?:へ|に(?:{HANDOFF}))"
+    return re.search(pat, norm(str(text or ""))) is not None
+
+
 def site_named(term, sid, sites):
     """用語が、ほかの拠点の担当の名前に読めるとき、その拠点の ID（その拠点の名前・別名そのもの、か「<名前・別名>の…」）"""
     t = norm(str(term or ""))

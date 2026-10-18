@@ -105,6 +105,7 @@ DELIVERABLES = (f"{FLOW_FIG}*.drawio", ACT_FIG, MATRIX_BOOK) + REPORTS
 NUMBERS_FILE = "納品の数"                                              # 納品の門が書く数（out/納品の数.md・.json）
 BASELINE_FILE = "現状の処理時間.json"                                    # 納品の門が書く、現状の処理時間の写し（BPR の比較の基準。表の版つき）
 RECORDS = ("チェック_*.txt", "照合シート_*.pdf", "差分照合シート_*.pdf", "原典照合レビュー_採否表.md", f"{NUMBERS_FILE}.md", f"{NUMBERS_FILE}.json", BASELINE_FILE)
+OUTPUT_FONT = "Yu Gothic UI"                                         # 納品物の字の書体（図のセル・表のブック・下見）。テンプレートが書体を決めていれば、そちらを残す
 REVIEW_MIN = 0.95                                                    # 原典照合の支持率の下限（業務フロー・アクティビティ図それぞれ）。下回れば、図を直して照合し直す
 MAX_STEPS, MAX_LANES = 25, 8                                         # 1 ページの図の目安（作業の箱の数・レーンの数）。超えたら分ける
 
@@ -1713,3 +1714,36 @@ def node_details(fl, m, questions, items_of):
                     "note": any(items_of(s.get("doc_id"), s.get("page")).get(s.get("item"), {}).get("origin") == "note" for s in ss),
                     "questions": q_node.get(n["id"], [])})
     return out
+
+
+JP_FALLBACK = ("Noto Sans CJK JP", "IPAPGothic", "IPAGothic", "TakaoPGothic", "VL PGothic")   # 書体が無い機械で、代わりに使う和文の書体（先にあるもの）
+_FONT_ENV = {}
+
+
+def font_env(font=OUTPUT_FONT):
+    """図を画像にする draw.io・Chromium に渡す環境変数。書体（OUTPUT_FONT）が無い機械（コンテナの Linux）では、fontconfig で
+    その書体の名前を、ある和文の書体に置き換える（置き換えないと、和文が中国語の字形の書体で描かれる）。書体がある機械・fontconfig の無い機械は、そのまま"""
+    import shutil
+    import subprocess
+    import tempfile
+    if font not in _FONT_ENV:
+        _FONT_ENV[font] = {}
+        if shutil.which("fc-match") and shutil.which("fc-list"):
+            try:
+                got = subprocess.run(["fc-match", "-f", "%{family}", font], capture_output=True, text=True, timeout=30).stdout
+                have = subprocess.run(["fc-list", ":", "family"], capture_output=True, text=True, timeout=30).stdout
+            except (OSError, subprocess.TimeoutExpired):
+                got, have = font, ""
+            fams = {f.strip() for line in have.splitlines() for f in line.split(",")}
+            alt = next((f for f in JP_FALLBACK if f in fams), None)
+            if font not in got.split(",") and alt:
+                base = os.environ.get("FONTCONFIG_FILE") or "/etc/fonts/fonts.conf"
+                conf = pathlib.Path(tempfile.gettempdir()) / "asis_fonts" / "fonts.conf"
+                conf.parent.mkdir(parents=True, exist_ok=True)
+                conf.write_text('<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n<fontconfig>\n'
+                                f'  <include ignore_missing="yes">{base}</include>\n'
+                                f'  <match target="pattern"><test name="family"><string>{font}</string></test>'
+                                f'<edit name="family" mode="assign" binding="strong"><string>{alt}</string></edit></match>\n'
+                                '</fontconfig>\n', encoding="utf-8")
+                _FONT_ENV[font] = {"FONTCONFIG_FILE": str(conf)}
+    return dict(os.environ, **_FONT_ENV[font])

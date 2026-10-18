@@ -205,6 +205,9 @@ def rekey(cmp, sid, old, new):
                 for f2 in ("checked", "not_here"):
                     if isinstance(ab.get(f2), list):
                         ab[f2] = [fix(k) for k in ab[f2]]
+            for o, ab2 in (t.get("absent") or {}).items():           # ほかの拠点の記載なしの、受け取る側の根拠（「<拠点>/<箱の鍵>」）
+                if o != sid and isinstance(ab2, dict) and isinstance(ab2.get("not_here"), list):
+                    ab2["not_here"] = [f"{sid}/{fix(k.split('/', 1)[1])}" if isinstance(k, str) and k.startswith(f"{sid}/") else k for k in ab2["not_here"]]
             for c in t.get("content") or []:
                 for e in c.get("evidence") or []:
                     if e.get("site") == sid and "node" in e:                 # 外した項目（item）の根拠は、箱の番号と関わらない

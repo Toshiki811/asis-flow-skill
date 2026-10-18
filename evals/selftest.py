@@ -4878,6 +4878,21 @@ def template_tests(tmp, good):
     r = subprocess.run([sys.executable, str(S / "table_template.py"), "check"], capture_output=True, text=True)
     out.append(("テンプレート（xlsx）: assets/ の 2 つが、既定の作り方（table_template.py default）と同じ。確かめ（check）が FAIL 0" + ("" if r.returncode == 0 else r.stdout[-400:]),
                 same and r.returncode == 0 and "0 FAIL" in r.stdout))
+    import zipfile
+    import build_drawio as BD
+
+    def faces(path):                                                  # ブックの書体（名前の無い書体は None）
+        xml = zipfile.ZipFile(path).read("xl/styles.xml").decode("utf-8")
+        fonts = re.findall(r"<font>(.*?)</font>|<font/>", re.search(r"<fonts[^>]*>(.*?)</fonts>", xml, re.S).group(1), re.S)
+        return {(re.search(r'<name val="([^"]*)"', f) or [None, None])[1] for f in fonts}
+    books = [assets / n for _k, (_s, _l, n) in TT.books().items()] + [good / "out" / "業務マトリクス一覧.xlsx", good / "out" / "確認事項一覧.xlsx"]
+    figs = sorted((good / "out").glob("*.drawio"))
+    cells = [c for f in figs for c in re.findall(r"<mxCell [^>]*>", f.read_text(encoding="utf-8")) if 'vertex="1"' in c or 'edge="1"' in c]
+    bad = [c for c in cells if "fontFamily=Yu Gothic UI;" not in c]
+    out.append((f"書体: テンプレート・書き出した表（{', '.join(sorted(str(faces(b)) for b in books))}）と図のどのセル（{len(cells)}・外れ {bad[:1]}）も Yu Gothic UI。"
+                "テンプレートが書体を決めていれば、それを残す",
+                all(faces(b) == {"Yu Gothic UI"} for b in books) and figs and cells and not bad
+                and BD.with_font("text;fontFamily=Meiryo;") == "text;fontFamily=Meiryo;" and BD.with_font("") == "fontFamily=Yu Gothic UI;"))
     tok = lambda ws, t: next(x for row in ws.iter_rows() for x in row if x.value == t)
 
     def swap_cols(ws, a, b, rows):

@@ -36,6 +36,9 @@ def claims(mdl, rid):
             if ks:
                 body = {"name": t.get("name"), "site": s, "nodes": [[k, (mdl.node(s, k) or {}).get("fp"), (mdl.node(s, k) or {}).get("label")] for k in ks],
                         "others": {o: v for o, v in others.items() if o != s}}
+                own = {k: mdl.owner(s, k) for k in ks if mdl.owner(s, k)}
+                if own:                                              # ほかの拠点の担当の箱（用語の site）。ある主張だけ印が変わる
+                    body["owner"] = own
                 out[f"{t['id']}/{s}"] = (digest(body), body)
         for s, ab in (t.get("absent") or {}).items():
             body = {"name": t.get("name"), "site": s, "checked": sorted(ab.get("checked") or []), "note": ab.get("note"), "others": others}
@@ -66,6 +69,9 @@ def node_block(mdl, sid, k, indent="    "):
 
 
 def item_block(mdl, sid, key, indent="    "):
+    if "/" in key:                                                   # ほかの拠点の箱（受け取る側の根拠）
+        o, k = key.split("/", 1)
+        return [f"{indent}{mdl.names.get(o, o)}の箱:"] + node_block(mdl, o, k, indent + "  ")
     s = mdl.snaps.get(sid) or {}
     if key in (s.get("nodes") or {}):
         return node_block(mdl, sid, key, indent)
@@ -117,12 +123,14 @@ def sheet_text(mdl, rid, vid, only=None):
             sid = m.group(2)
             ab = t["absent"][sid]
             if ab.get("not_here"):
+                recv = all("/" in k for k in ab["not_here"])        # 受け取る側（ほかの拠点の箱が、この拠点へ行う作業と書く）
                 out += [f"### {cid}　{mdl.names[sid]}では、タスク「{t['name']}」の作業は、この拠点の手順ではない"
-                        f"（資料に、ほかの拠点が行う・ほかの拠点だけの手順とある）",
+                        + ("（ほかの拠点が、この拠点へ行う作業。この拠点は受け取る側）" if recv else "（資料に、ほかの拠点が行う・ほかの拠点だけの手順とある）"),
                         f"  主張の理由: {ab['note']}", "  この拠点の手順ではないとした根拠:"]
                 for k in ab["not_here"]:
                     out += item_block(mdl, sid, k)
-                out.append("  見ること: 根拠の文から、この作業をほかの拠点が行う（この拠点の手順ではない）と読めるか。この拠点の箱（上の一覧）が、この作業をしていないか")
+                out.append("  見ること: 根拠の箱の名前・補足から、この作業はほかの拠点がこの拠点へ行う作業で、この拠点は受け取る側と読めるか。この拠点の箱（上の一覧）が、同じ作業をしていないか"
+                           if recv else "  見ること: 根拠の文から、この作業をほかの拠点が行う（この拠点の手順ではない）と読めるか。この拠点の箱（上の一覧）が、この作業をしていないか")
                 out.append("  ほかの拠点の、このタスクの箱:")
             else:
                 out += [f"### {cid}　{mdl.names[sid]}に、タスク「{t['name']}」の作業は書かれていない",
@@ -137,9 +145,17 @@ def sheet_text(mdl, rid, vid, only=None):
                 out.append("  見ること: 候補のほかにも、同じ作業がこの拠点の箱（上の一覧）や、粗く書いた 1 つの箱の中に含まれていないか")
         else:
             sid = m.group(2)
-            out += [f"### {cid}　{mdl.names[sid]}の次の箱は、タスク「{t['name']}」の作業である"]
+            own = body.get("owner") or {}
+            by_site = "・".join(dict.fromkeys(mdl.names[o] for o in own.values()))
+            out += [f"### {cid}　{mdl.names[sid]}の次の箱は、タスク「{t['name']}」の作業である"
+                    + (f"。{'どの箱も' if len(own) == len(body['nodes']) else '印の箱は'}、{by_site}の担当が行う（この拠点の資料の中の、ほかの拠点の作業）" if own else "")]
             for k in (t.get("members") or {}).get(sid) or []:
                 out += node_block(mdl, sid, k)
+                if k in own:                                         # 担当（レーン）を、ほかの拠点の人・部門とした理由（用語の対応）
+                    g = mdl.term(sid, "actor", (mdl.node(sid, k) or {}).get("lane", "")) or {}
+                    out.append(f"      ↑ 担当「{(mdl.node(sid, k) or {}).get('lane', '')}」は、{mdl.names[own[k]]}の人・部門とした。理由: {g.get('reason') or '—'}")
+            if own:
+                out.append(f"  見ること: 上の作業に加えて、箱の担当（レーン）と引用から、この作業を{mdl.names[sid]}の人・部門でなく、{by_site}の人・部門が行うと読めるか")
             oth = [(s, ks) for s, ks in (t.get("members") or {}).items() if s != sid and ks]
             if oth:
                 out.append("  同じタスクにした、ほかの拠点の箱:")

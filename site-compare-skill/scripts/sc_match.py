@@ -161,6 +161,10 @@ def main():
                 if sure:                                             # 書き分けで、この拠点に当てはまらない手順（機械で分かる）
                     print(f"    not_here: {json.dumps(sure, ensure_ascii=False)}（ほかの拠点の箱が引く共通の資料の手順は、書き分けで{mdl.names[sid]}に当てはまらない。"
                           f"この拠点の手順でなければ、absent に書く。記号が対象外になる）")
+                rec = mdl.receiver(t, sid)
+                if rec and not sure:                                 # 受け取る側（ほかの拠点の箱が「本部へ申請する」と書く。checked には書かない）
+                    print(f"    not_here: {json.dumps(rec, ensure_ascii=False)}（ほかの拠点の箱が、どれも{mdl.names[sid]}へ行う作業と書いている。"
+                          f"{mdl.names[sid]}が受け取る側なら、absent に書く。記号が対象外になる）")
         if not n:
             print("記載なしのタスクは無い")
 

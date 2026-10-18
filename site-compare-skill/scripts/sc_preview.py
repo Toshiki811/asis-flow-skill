@@ -15,9 +15,29 @@ import xml.etree.ElementTree as ET
 
 from PIL import Image, ImageDraw, ImageFont
 
-FONTS = ["/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf", "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-         "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc", "C:/Windows/Fonts/meiryo.ttc"]
-FONT = next((f for f in FONTS if pathlib.Path(f).exists()), None)
+from sc_common import A
+
+FONTS = ["C:/Windows/Fonts/YuGothR.ttc", "/usr/share/fonts/opentype/ipafont-gothic/ipagp.ttf", "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf",
+         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc", "C:/Windows/Fonts/meiryo.ttc"]
+
+
+def pick_font():
+    """(書体ファイル, 中の番号): 納品物の書体（Windows の YuGothR.ttc の中の UI の書体）を先に。無ければ、ある和文の書体"""
+    for f in FONTS:
+        if not pathlib.Path(f).exists():
+            continue
+        if "YuGoth" not in f:
+            return f, 0
+        for i in range(8):
+            try:
+                if ImageFont.truetype(f, 10, index=i).getname()[0] == A.OUTPUT_FONT:
+                    return f, i
+            except OSError:
+                break
+    return None, 0
+
+
+FONT, FACE = pick_font()
 
 
 def style_of(s):
@@ -62,7 +82,7 @@ def render(path, out_dir, scale=0.8):
         H = int(max(y + h for _, _, _, _, y, _, h in geos) + 60 + oy)
         img = Image.new("RGB", (int(W * scale), int(H * scale)), "white")
         d = ImageDraw.Draw(img)
-        f = ImageFont.truetype(FONT, max(9, int(10 * scale))) if FONT else ImageFont.load_default()
+        f = ImageFont.truetype(FONT, max(9, int(10 * scale)), index=FACE) if FONT else ImageFont.load_default()
         S = lambda v: v * scale
         geos = [(cid, val, st, x + ox, y + oy, w, h) for cid, val, st, x, y, w, h in geos]
         for cid, val, st, x, y, w, h in geos:

@@ -37,8 +37,9 @@ CROP_MARGIN = 170          # 赤枠のノードのまわりに残す余白（図
 BIG_MB = 10                # 照合シート1本が、これを超えたら知らせる（レビュー担当が Read で開ける大きさ）
 RED = (0.8, 0.1, 0.1)
 KIND = NODE_LABEL
-JP_FONTS = ["/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc", "/System/Library/Fonts/Hiragino Sans GB.ttc",
-            "/Library/Fonts/Arial Unicode.ttf", "C:/Windows/Fonts/meiryo.ttc", "C:/Windows/Fonts/YuGothR.ttc",
+JP_FONTS = ["C:/Windows/Fonts/YuGothR.ttc",                          # 納品物の書体の家族を先に（PDF の部品は TTC の中の書体を選べないので、先頭の書体）
+            "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc", "/System/Library/Fonts/Hiragino Sans GB.ttc",
+            "/Library/Fonts/Arial Unicode.ttf", "C:/Windows/Fonts/meiryo.ttc",
             "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"]
 FONT = {"fontname": "japan"}                                         # 和文の書体ファイルが見つかれば差し替える（半角の字間が詰まる）
 

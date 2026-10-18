@@ -3,7 +3,7 @@
 
 対応（sc_axis・sc_match）・計算（sc_compute）・点検（sc_check）・書き出し（sc_book・sc_drawio）が、同じ引き方を使う。
 """
-from sc_common import (OTHER_SITE, STEP_TYPES, load, load_snap, match_path, mentions, norm, ordered_sites, site_ids, site_names, split_key,
+from sc_common import (OTHER_SITE, STEP_TYPES, addressed, load, load_snap, match_path, mentions, norm, ordered_sites, site_ids, site_names, split_key,
                        try_load)
 
 
@@ -168,9 +168,22 @@ class Model:
         parts = str(key).split(".")
         return self.applies.get((doc, parts[1], parts[2])) if len(parts) == 3 else None
 
-    def not_here_key(self, sid, key):
-        """not_here の鍵 1 つ: (理由の文, 誤りの文)。どちらか一方だけが入る"""
+    def not_here_key(self, sid, key, t=None):
+        """not_here の鍵 1 つ: (理由の文, 誤りの文)。どちらか一方だけが入る。
+        鍵は、この拠点の箱・この拠点がフローから外した項目か、「<拠点>/<箱の鍵>」（ほかの拠点の、このタスク t の箱で、この拠点へ行う作業と書いたもの）"""
         from sc_applies import applies_to
+        if "/" in str(key):                                          # 受け取る側: ほかの拠点の箱が「本部へ申請する」と書く
+            o, k = str(key).split("/", 1)
+            if o == sid or o not in self.names:
+                return None, f"{key} の拠点 {o} が、ほかの拠点でない"
+            if t is not None and k not in ((t.get("members") or {}).get(o) or []):
+                return None, f"{key} は、このタスクの{self.names[o]}の箱でない"
+            if self.owner(o, k):
+                return None, f"{key} は、{self.names[o]}の資料の中の、ほかの拠点の担当の箱（{self.names[o]}の作業でない）"
+            n = self.node(o, k) or {}
+            if not addressed(f"{n.get('label', '')} {n.get('detail', '')}", sid, self.sites):
+                return None, f"{key} の名前・補足に、{self.names[sid]}へ行う作業とない（「{self.names[sid]}へ申請する」のように書いた箱だけを書く）"
+            return f"{self.names[o]}が{self.names[sid]}へ行う作業（{self.names[sid]}は受け取る側）", None
         n = (self.snaps.get(sid) or {}).get("nodes", {}).get(key)
         if n is not None:
             who = [o for o in mentions(f"{n.get('label', '')} {n.get('detail', '')}", self.sites) if o != sid]
@@ -214,9 +227,27 @@ class Model:
         return sorted(k for k, x in self.excluded(sid).items()
                       if str(x.get("reason", "")).startswith(OTHER_SITE) and (x.get("doc"), *str(k).split(".")[1:]) in want)
 
+    def receiver(self, t, sid):
+        """機械で分かる、受け取る側の not_here の鍵（「<拠点>/<箱の鍵>」）: この拠点に箱が無く、箱のあるほかの拠点のどれもが、
+        自拠点の箱のどれかで、この拠点へ行う作業と書いているとき（「本部へ申請する」）"""
+        if (t.get("members") or {}).get(sid):
+            return []
+        out, every = [], False
+        for o in self.order:
+            ks = [k for k in (t.get("members") or {}).get(o) or [] if o != sid and not self.owner(o, k)]
+            if not ks:
+                continue
+            hit = [f"{o}/{k}" for k in ks
+                   if addressed(f"{(self.node(o, k) or {}).get('label', '')} {(self.node(o, k) or {}).get('detail', '')}", sid, self.sites)]
+            if not hit:
+                return []
+            out += hit
+            every = True
+        return out if every else []
+
     def task_split(self, t):
         """(自拠点の箱 {拠点: [鍵]}, このタスクを、その拠点の作業として比べない拠点 {拠点: 理由の文})。
-        箱が全部ほかの拠点の担当のレーンにある拠点と、記載なしに not_here（この拠点の手順ではない根拠）を書いた拠点が、対象外。
+        箱が全部ほかの拠点の担当のレーンにある拠点と、記載なしに not_here（この拠点の手順ではない根拠。受け取る側も）を書いた拠点が、対象外。
         どの拠点にも自拠点の箱が無いタスクは、ほかの拠点の箱を、そのまま記載ありにする（比べる物が無くなる）"""
         mem = {s: list(ks or []) for s, ks in (t.get("members") or {}).items()}
         own = {s: [k for k in ks if not self.owner(s, k)] for s, ks in mem.items()}
@@ -228,7 +259,10 @@ class Model:
                 out[s] = f"資料では、{self.done_by(s, mem[s])}が行う"
             ab = (t.get("absent") or {}).get(s)
             if not mem.get(s) and isinstance(ab, dict) and ab.get("not_here"):
-                why = [self.not_here_key(s, k)[0] for k in ab["not_here"]]
+                why = [self.not_here_key(s, k, t)[0] for k in ab["not_here"] if "/" not in k]
+                by = [k.split("/", 1)[0] for k in ab["not_here"] if "/" in k and self.not_here_key(s, k, t)[0]]
+                if by:                                               # 受け取る側は、行う拠点をまとめて 1 つの文に
+                    why.append(f"{'・'.join(self.names[o] for o in dict.fromkeys(by))}が{self.names[s]}へ行う作業（{self.names[s]}は受け取る側）")
                 out[s] = "／".join(dict.fromkeys(w for w in why if w)) or "資料に、この拠点の手順ではないとある"
         return own, out
 

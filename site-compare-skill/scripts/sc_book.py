@@ -80,7 +80,7 @@ SPEC = {"sheets": HEADS, "repeat": REPEAT, "values": ["拠点", "基準", "行�
                                                      "差の境", "拠点の状態", "確認事項の数", "日付"],
         "required": {T_TASK: ["No", "タスク", "区分", "拠点"], T_Q: ["番号", "質問"]}, "keys": {T_Q: ["番号"], T_TASK: ["No"]},
         "fills": {label: key for label, key, _c, _w in FILLS}, "fonts": {label: key for label, key, _f, _w in FONTS}}
-LOOK = {"font": "游ゴシック", "size": 9, "border": True, "head_fill": "D9E1F2", "head_font": dict(sz=10, b=True), "step_width": 34,
+LOOK = {"font": A.OUTPUT_FONT, "size": 9, "border": True, "head_fill": "D9E1F2", "head_font": dict(sz=10, b=True), "step_width": 34,
         "order": ["概要", T_TASK, T_HEAT, T_REQ, T_DETAIL, T_FLOW, T_HEATD, T_TERMS, T_Q, "読み方"],
         "manual": {T_Q: ["回答", "回答者", "回答日"]},
         "widths": {T_TASK: [8, 14, 16, 30, 9, 16, 40, 18, 30, 10], T_DETAIL: [8, 16, 28, 14, 6, 40, 16, 18, 16, 30, 6, 14, 40],
@@ -243,7 +243,8 @@ def sheets(cmp, mdl, results, qs):
     for g in mdl.terms.get("groups") or []:
         per = {s: [m["term"] for m in g["members"] if m["site"] == s] for s in mdl.order}
         out[T_TERMS].append([C(dict(actor="担当", system="システム", document="帳票")[g["kind"]]), C(g["name"], font="bold"),
-                             C(dict(same_name="名前が同じ", translation="訳", equivalent="言い換え")[g["basis"]]), C(g.get("reason") or "—")]
+                             C(dict(same_name="名前が同じ", translation="訳", equivalent="言い換え")[g["basis"]]),
+                             C((f"{mdl.names[g['site']]}の担当（ほかの拠点）。" if g.get("site") in mdl.names else "") + (g.get("reason") or "—"))]
                             + [C("・".join(per[s]) or "—", fill=None if per[s] else "none") for s in mdl.order])
     for no, origin, q in qs:
         task = tid_name.get((origin[5:], q.get("task"))) if origin.startswith("rows/") else None

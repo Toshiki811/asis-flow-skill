@@ -23,7 +23,7 @@ import shutil
 import signal
 import subprocess
 
-from common import Report, load, work_dir
+from common import Report, font_env, load, work_dir
 from validate import validate
 
 MAC_CLI = "/Applications/draw.io.app/Contents/MacOS/draw.io"
@@ -34,12 +34,13 @@ def drawio_cli():
 
 
 def export_png(cli, drawio, index, png, scale=1.0, tries=2, limit=180):
-    """1 ページを PNG に。draw.io（Electron）は、まれに止まったまま返らない: 時間で切り、子のプロセスごと止めて、もう一度回す"""
+    """1 ページを PNG に。書体が無い機械では、代わりの和文の書体で描く（common.font_env）。
+    draw.io（Electron）は、まれに止まったまま返らない: 時間で切り、子のプロセスごと止めて、もう一度回す"""
     png.parent.mkdir(parents=True, exist_ok=True)
     msg = ""
     for _ in range(tries):
         p = subprocess.Popen([cli, "-x", "-f", "png", "-p", str(index), "-s", str(scale), "-o", str(png), str(drawio)],
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True, env=font_env())
         try:
             out, err = p.communicate(timeout=limit)
             return png.exists(), (err or out).strip()[-200:]
