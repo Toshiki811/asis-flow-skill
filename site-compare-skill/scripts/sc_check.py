@@ -702,6 +702,24 @@ def proper_names(cx):
     return [norm(x) for x in out if x]
 
 
+def source_names(cx):
+    """出典の表示（資料名＋ページ・シートとセル）。セル番地（B10・M12）は行の ID・資料 ID と同じ形なので、漏れを探す前に除く"""
+    out = set()
+    for s in cx.ids:
+        sp = cx.snap(s) or {}
+        for n in (sp.get("nodes") or {}).values():
+            out.update(n.get("src") or [])
+        out.update(x.get("src") or "" for x in sp.get("excluded") or [])
+    return sorted((x for x in out if x), key=len, reverse=True)
+
+
+def leak(v, srcs):
+    for x in srcs:
+        if x in v:
+            v = v.replace(x, "")
+    return next((what for pat, what in LEAK if pat.search(v)), None)
+
+
 def english(v, names):
     """納品物の文字の中の、固有名でない英語（3 語以上続く所）。無ければ None"""
     for m in LATIN_RUN.finditer(v):
@@ -751,12 +769,11 @@ def check_outputs(cx, rp):
             labels.append(re.sub(r"<[^>]+>", "", v))
         if el.tag == "object" and el.get("tooltip"):
             labels.append(el.get("tooltip"))
-    names = proper_names(cx)
+    names, srcs = proper_names(cx), source_names(cx)
     for v in labels:
-        for pat, what in LEAK:
-            if pat.search(v):
-                rp.fail(f"{FIG}: 図の文字に{what}が出ている（「{v[:30]}」）")
-                break
+        what = leak(v, srcs)
+        if what:
+            rp.fail(f"{FIG}: 図の文字に{what}が出ている（「{v[:30]}」）")
         w = english(v, names)
         if w:
             rp.fail(f"{FIG}: 図の文字に英語が出ている（「{w[:30]}」。納品物は日本語。英語の名前・原文の引用を書いた所を日本語にする）")
@@ -768,7 +785,7 @@ def scan_book(cx, rp, book):
     except ImportError:
         return
     wb = openpyxl.load_workbook(book)
-    names = proper_names(cx)
+    names, srcs = proper_names(cx), source_names(cx)
     for ws in wb.worksheets:
         for row in ws.iter_rows():
             for c in row:
@@ -776,10 +793,9 @@ def scan_book(cx, rp, book):
                 if v is None:
                     continue
                 v = str(v)
-                for pat, what in LEAK:
-                    if pat.search(v):
-                        rp.fail(f"{BOOK_NAME}「{ws.title}」{c.coordinate}: {what}が出ている（「{v[:30]}」）")
-                        break
+                what = leak(v, srcs)
+                if what:
+                    rp.fail(f"{BOOK_NAME}「{ws.title}」{c.coordinate}: {what}が出ている（「{v[:30]}」）")
                 w = english(v, names)
                 if w:
                     rp.fail(f"{BOOK_NAME}「{ws.title}」{c.coordinate}: 英語が出ている（「{w[:30]}」。納品物は日本語。英語の名前・原文の引用を書いた所を日本語にする）")

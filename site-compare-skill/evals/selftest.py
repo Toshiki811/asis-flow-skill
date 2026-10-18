@@ -684,6 +684,15 @@ def parts(base, root):
 
 def status_and_gate(base, root):
     d = copy(base, root, "gate")
+    if wanted("出典"):
+        e = d / "o1"
+        shutil.copytree(d, e, ignore=shutil.ignore_patterns("o1"))
+        J("snap/SG.json", lambda sp: next(iter(sp["nodes"].values()))["src"].append("SG_明細表「支払」シート B12"))(e)
+        run("sc_book.py", "-w", e)
+        run("sc_drawio.py", "-w", e)
+        rc, out = check(e, "outputs")
+        say("行の ID" not in out and "資料 ID" not in out, "出典: 表の資料の出典のセル番地（シート B12）は、行の ID・資料 ID として止めない", tail(out))
+        shutil.rmtree(e)
     if wanted("照合"):
         e = d / "v1"
         shutil.copytree(d, e, ignore=shutil.ignore_patterns("v1"))
