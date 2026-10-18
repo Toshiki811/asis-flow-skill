@@ -25,7 +25,7 @@ import json
 import pathlib
 import sys
 
-from sc_common import ASSETS, BOOK, A, digest, load, result_path, save, sites_of, try_load, work_dir
+from sc_common import ASSETS, BOOK, A, digest, load, pct, result_path, save, sites_of, try_load, work_dir
 from sc_rows import Model
 
 import table_template as TT                                          # asis の表の部品
@@ -276,7 +276,7 @@ def values(cmp, mdl, results, qs):
                 tot += 1
                 v = got.get(c)
                 ok += bool(v and v["verdict"] == "支持" and shown.get(v["sheet"], {}).get("claims", {}).get(c) == mark)
-        rate = f"{ok / tot:.0%}（支持 {ok} ÷ 主張 {tot}）" if tot else "—"
+        rate = f"{pct(ok / tot)}（支持 {ok} ÷ 主張 {tot}）" if tot else "—"
     except Exception:                                                # 照合の記録が崩れていても、表は出す（点検が止める）
         pass
     w = cfg["weights"]

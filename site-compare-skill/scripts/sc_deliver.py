@@ -18,7 +18,7 @@ import shutil
 import subprocess
 import sys
 
-from sc_common import BOOK, FIG, load, result_path, save, sites_of, try_load, work_dir
+from sc_common import BOOK, FIG, load, pct, result_path, save, sites_of, try_load, work_dir
 
 S = pathlib.Path(__file__).resolve().parent
 ROUNDS = 2
@@ -70,7 +70,7 @@ def numbers(cmp):
 def numbers_md(n):
     lines = [f"# 比較の数（{n['date']}）", "", f"- 基準の拠点: {n['baseline'] or 'なし'}", f"- 比べる行（業務種別）: {n['rows']}",
              f"- タスク: {n['tasks']}（共通 {n['class']['共通']}・差異あり {n['class']['差異あり']}・拠点固有 {n['class']['拠点固有']}）",
-             f"- 対応の照合の支持率: {n['support']['ok']}/{n['support']['total']}" + (f"（{n['support']['ok'] / n['support']['total']:.0%}）" if n['support']['total'] else ""),
+             f"- 対応の照合の支持率: {n['support']['ok']}/{n['support']['total']}" + (f"（{pct(n['support']['ok'] / n['support']['total'])}）" if n['support']['total'] else ""),
              f"- 複雑性: {'そろえた粒度' if n['basis'] == 'aligned' else '原典の粒度'}で、分岐 × {n['weights']['branch']} ＋ 受け渡し × {n['weights']['handoff']}。境 "
              + "・".join(f"{lv['name']} {lv['max'] if lv['max'] is not None else '超'}" for lv in n["levels"]), "",
              "| 拠点 | 記載のあるタスク | 差のあるタスク（△） | 記載なし（—） | 粗く書いたタスク | 複雑性（行の数） | 追加の資料の依頼 |", "| --- | --- | --- | --- | --- | --- | --- |"]

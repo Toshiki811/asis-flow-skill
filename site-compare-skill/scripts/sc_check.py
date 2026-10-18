@@ -610,7 +610,7 @@ def check_compute(cx, rp):
 
 def check_verify(cx, rp):
     import sc_verify
-    from sc_common import REVIEW_MIN
+    from sc_common import REVIEW_MIN, pct
     mdl = model(cx)
     vs = sc_verify.versions(cx.cmp)
     shown = {v["id"]: v for v in vs["versions"]}
@@ -674,10 +674,9 @@ def check_verify(cx, rp):
                 rp.fail(f"review/{rid}.review.json {f['id']}: 対応・理由（action）が無い")
     if total:
         rate = ok / total
-        shown_rate = f"{int(rate * 1000) / 10:g}%"    # 切り捨て（94.7% を 95% と出して「95% 未満」と並べない）
-        rp.info(f"対応の照合の支持率 {shown_rate}（支持 {ok} ÷ いまの主張 {total}）")
+        rp.info(f"対応の照合の支持率 {pct(rate)}（支持 {ok} ÷ いまの主張 {total}）")
         if rate < REVIEW_MIN:
-            rp.fail(f"対応の照合の支持率が {shown_rate}（{REVIEW_MIN:.0%} 未満）。不支持・一部支持の多い行のタスクを直して、照合し直す")
+            rp.fail(f"対応の照合の支持率が {pct(rate)}（{REVIEW_MIN:.0%} 未満）。不支持・一部支持の多い行のタスクを直して、照合し直す")
 
 
 # ---------- [outputs] ----------

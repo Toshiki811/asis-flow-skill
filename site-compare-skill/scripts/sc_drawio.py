@@ -114,7 +114,10 @@ class CompareDrawing(BD.FlowDrawing):
             page.vertex(f"lane-{l['id']}-c", "", self.pal[i]["container_style"], self.lane_x(i), L["content_y"], self.lane_w(i), self.bottom - L["content_y"])
         for sid, name, first, last, base in self.meta["blocks"]:   # 拠点の見出し（レーンの塊の上）
             x0, x1 = self.lane_x(first), self.lane_x(last) + self.lane_w(last)
-            page.vertex(f"site-{sid}", esc(name), X["site_header_base"] if base else X["site_header"], x0, L["header_y"] - 30, x1 - x0, 26)
+            page.vertex(f"site-{sid}", esc(name), X["site_header_base"] if base else X["site_header"], x0 + 2, L["header_y"] - 30, x1 - x0 - 4, 26)
+            if first > self.meta["task_lane"] + 1:                     # 拠点の塊の境（同じ拠点の中のレーンの境より太く）
+                page.vertex(f"site-sep-{sid}", "", "line;html=1;direction=south;strokeWidth=2;strokeColor=#404040;", x0 - 1, L["header_y"] - 30, 2,
+                            self.bottom - L["header_y"] + 30)
         page.vertex("title", esc(self.meta["title"]), BD.add_style(S["text_style"], self.ext["title"]), L["x0"], L["header_y"] - 92, max(sum(self.vw), 600), 30)
         page.vertex("to-overview", "◀ 一覧へ", BD.add_style(S["text_style"], self.ext["link_text"]), L["x0"], L["header_y"] - 58, 120, 18,
                     attrs={"link": "data:page/id,overview"})
@@ -155,6 +158,8 @@ class CompareDrawing(BD.FlowDrawing):
         X = self.meta["X"]
         px = self.lx(len(self.vw)) + self.S["legend_gap"]
         rows = [("共通", X["class"]["共通"]), ("差異あり", X["class"]["差異あり"]), ("拠点固有", X["class"]["拠点固有"]), ("記載なし（資料に無い）", X["placeholder"])]
+        if any(m.get("kind") == "out" for m in self.meta["node"].values()):
+            rows.append(("対象外（この業務を行わない拠点）", X["out_of_scope"]))
         y = self.L["header_y"]
         self.page.vertex("legend-title", "<b>凡例</b>", self.S["text_style"], px, y, 220, 20)
         for k, (name, st) in enumerate(rows):
@@ -211,7 +216,8 @@ def page_data(mdl, rid, res, sids, tasks, X):
             lid = f"{sid}.{g}"
             lane_of[(sid, g)] = lid
             kind = "system" if g.startswith("Y") else "role"
-            fl["lanes"].append({"id": lid, "name": mdl.group_name(g) if not g.startswith("?none") else "（記載なし）", "kind": kind})
+            none = "（対象外）" if (mdl.site_part(rid, sid) or {}).get("relation") == "out_of_scope" else "（記載なし）"
+            fl["lanes"].append({"id": lid, "name": mdl.group_name(g) if not g.startswith("?none") else none, "kind": kind})
         meta["blocks"].append((sid, names[sid], first, len(fl["lanes"]) - 1, sid == mdl.baseline))
     by = {t["id"]: t for t in tasks}
     task_res = {x["id"]: x for x in res["tasks"]}
@@ -313,7 +319,7 @@ def page_data(mdl, rid, res, sids, tasks, X):
             for sid in sids:                                         # 内訳の枠
                 if sid in x["grain"]["fine"] and x["grain"]["coarse"]:
                     ids = [node_id(sid, k) for k in (by[b].get("members") or {}).get(sid) or []]
-                    meta["frames"].append((f"{x['no']} の内訳（{len(ids)} 作業）", ids))
+                    meta["frames"].append((f"内訳（{len(ids)} 作業）", ids))    # 短く: 上から入る矢印（箱の真ん中）に重ならないように
         r += h
     return fl, rows, meta
 

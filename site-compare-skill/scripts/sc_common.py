@@ -62,6 +62,11 @@ MATERIAL_CAP = A.MATERIAL_CAP                                         # 1 体に
 REVIEW_MIN = A.REVIEW_MIN                                             # 照合の支持率の下限
 
 
+def pct(rate):
+    """支持率の表示。切り捨てて小数 1 桁（94.7% を 95% と丸めて「95% 未満」と並べない）"""
+    return f"{int(rate * 1000) / 10:g}%"
+
+
 def work_dir(arg):
     w = pathlib.Path(arg).expanduser().resolve()
     if not w.exists():

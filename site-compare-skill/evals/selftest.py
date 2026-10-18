@@ -18,6 +18,7 @@
 """
 import argparse
 import json
+import re
 import os
 import pathlib
 import shutil
@@ -690,13 +691,17 @@ def status_and_gate(base, root):
         def out_of_scope(a):
             for x in next(r for r in a["rows"] if r["id"] == "B01")["sites"]:
                 if x["site"] != "TK":
-                    x.update(relation="out_of_scope", reason="この拠点は申請を本部で受ける")
+                    x.update(relation="out_of_scope", parts=[], reason="この拠点は申請を本部で受ける")
         J("axis.json", out_of_scope)(e)
         M("B01", lambda m: [t["members"].update({s: [] for s in t["members"] if s != "TK"}) or t.update(absent={}) for t in m["tasks"]])(e)
         recompute(e)
         r = jload(e / "rows" / "B01.result.json")
         say(all(t["class"] == "拠点固有" for t in r["tasks"]), "区分: ほかの拠点が対象外の行の、1 拠点だけの作業は拠点固有（共通にしない）",
             f"{[(t['name'], t['class']) for t in r['tasks']]}")
+        run("sc_drawio.py", "-w", e)
+        fig = (e / "out" / "拠点比較フロー.drawio").read_text(encoding="utf-8")
+        say('id="lane-OS.?none-h" value="（対象外）"' in fig and "対象外（この業務を行わない拠点）" in fig,
+            "区分: 対象外の拠点のレーンの見出しは（対象外）で、凡例に対象外の箱がある", re.findall(r'id="lane-OS[^"]*" value="[^"]*"', fig)[:3])
         shutil.rmtree(e)
     if wanted("出典"):
         e = d / "o1"
