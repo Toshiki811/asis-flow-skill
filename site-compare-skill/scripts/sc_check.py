@@ -622,7 +622,11 @@ def check_verify(cx, rp):
         cur = sc_verify.claims(mdl, rid)
         rv, err = try_load(cx.cmp / "review" / f"{rid}.review.json")
         if err or rv is None:
-            rp.fail(f"{rid}: 対応の照合をしていない（python3 scripts/sc_verify.py sheet → 作り方を知らない別のエージェントに照合させる → sc_verify.py draft。references/verify-prompt.md）")
+            sent = [v["id"] for v in vs["versions"] if v.get("row") == rid]
+            how = ("python3 scripts/sc_verify.py sheet → 作り方を知らない別のエージェントに照合させる → sc_verify.py draft" if not sent
+                   else f"照合シートは出した（{sent[-1]}）。報告が届いたら python3 scripts/sc_verify.py draft" if not sc_verify.reports_of(cx.cmp, rid)
+                   else "報告は届いている。python3 scripts/sc_verify.py draft で採否表を作る")
+            rp.fail(f"{rid}: 対応の照合をしていない（{how}。references/verify-prompt.md）")
             total += len(cur)
             continue
         if not shape(rp, rv, "review", f"review/{rid}.review.json"):

@@ -205,7 +205,9 @@ class Status:
         has = (self.cmp / "review" / "versions.json").exists()
         self.row("7", "照合", "未" if not has else "要直し" if n else "済み", first[:120] if n else "支持率 95% 以上")
         if n:
-            if "対応の照合をしていない" in first:
+            if "照合シートは出した" in first or "報告は届いている" in first:
+                self.add(f"# 照合の担当の報告（reports/verify_<行>.json）を待つ → 届いたら python3 scripts/sc_verify.py draft -w {W} → 採否と対応を書く")
+            elif "対応の照合をしていない" in first:
                 self.add(f"python3 scripts/sc_verify.py sheet -w {W}    # 対応の照合シート（行ごと）",
                          "# 照合シートを、作り方を知らない別のエージェントに渡して照合させる（references/verify-prompt.md）→ python3 scripts/sc_verify.py draft → 採否と対応を書く")
             else:
