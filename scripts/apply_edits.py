@@ -700,7 +700,11 @@ class Builder:
             if None in ids or None in edge or (edge and len(edge) != 2):
                 self.err.append(site(f"questions[{i}]（{qid}）: items・edge が指す項目が、下書きに無い"))
                 continue
-            ids = list(dict.fromkeys(first[k] for k in ids))
+            parts = {}                                               # 分けた手順を指す問いは、分けた部分の全部を指す（担当を仮に決めたのは、どの部分も同じ）
+            for n in order:
+                if n.get("part"):
+                    parts.setdefault(n["key"], []).append(n["id"])
+            ids = list(dict.fromkeys(j for k in ids for j in (parts.get(k) or [first[k]])))
             if edge:
                 y["edge"] = [first[edge[0]], first[edge[1]]]
             elif len(ids) == 1:
