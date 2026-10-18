@@ -5582,9 +5582,9 @@ def volume_tests():
 
 
 def skill_dir_tests():
-    """リポジトリの .claude/skills（Claude Code がスキルを探す場所）: 2 つのスキルが、本物の SKILL.md へのリンクで入っている"""
+    """リポジトリの .claude/skills（Claude Code がスキルを探す場所）: asis-flow-skill が、本物の SKILL.md へのリンクで入っている"""
     base = SKILL / ".claude" / "skills"
-    want = {"asis-flow-skill": SKILL / "SKILL.md", "site-compare-skill": SKILL / "site-compare-skill" / "SKILL.md"}
+    want = {"asis-flow-skill": SKILL / "SKILL.md"}                  # site-compare-skill は別のリポジトリ
     names = lambda p: re.search(r"^name:\s*(\S+)", p.read_text(encoding="utf-8")[:300], re.M)
     found = sorted(p.name for p in base.iterdir()) if base.is_dir() else []
     linked = found == sorted(want) and all((base / n / "SKILL.md").resolve() == t.resolve() and (m := names(base / n / "SKILL.md")) and m.group(1) == n
@@ -5593,7 +5593,7 @@ def skill_dir_tests():
     links = [p for p in asis.iterdir() if p.is_symlink()] if asis.is_dir() else []
     no_loop = bool(links) and not asis.is_symlink() and all(p.exists() and not SKILL.resolve().is_relative_to(p.resolve()) for p in links)
     named = {d for d in re.findall(r"`(?:python3 )?([A-Za-z_]+)/", (SKILL / "SKILL.md").read_text(encoding="utf-8")) if (SKILL / d).is_dir()}
-    return [("スキルの置き場所: .claude/skills に asis-flow-skill・site-compare-skill の 2 つがあり、SKILL.md が本物（直下・site-compare-skill/）に解け、name がフォルダの名前と同じ", linked),
+    return [("スキルの置き場所: .claude/skills に asis-flow-skill だけがあり、SKILL.md が本物（直下）に解け、name がフォルダの名前と同じ", linked),
             ("スキルの置き場所: asis-flow-skill は本物のフォルダで、中身のリンクはどれも先があり、直下（.claude を含む）を指さない（輪にしない）。SKILL.md が名指しするフォルダが全部ある",
              no_loop and bool(named) and all((asis / d).exists() for d in named))]
 
