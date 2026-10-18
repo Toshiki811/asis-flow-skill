@@ -54,7 +54,7 @@ def versions(cmp):
 def node_block(mdl, sid, k, indent="    "):
     n = mdl.node(sid, k) or {}
     lines = [f"{indent}- 「{n.get('label', '')}」（担当: {n.get('lane', '')}" + (f"・札: {'・'.join(n['systems'])}" if n.get("systems") else "")
-             + (f"・帳票: {'・'.join(f['name'] for f in n['files'])}" if n.get("files") else "") + (" ・推定" if n.get("inferred") else "") + "）"
+             + (f"・帳票: {'・'.join(dict.fromkeys(f['name'] for f in n['files']))}" if n.get("files") else "") + (" ・推定" if n.get("inferred") else "") + "）"
              + (f" 補足: {n['detail']}" if n.get("detail") else "")]
     for src, q in zip(n.get("src") or [], n.get("quotes") or []):
         lines.append(f"{indent}  出典 {src}: 「{q}」")
@@ -78,7 +78,9 @@ def sheet_text(mdl, rid, vid, only=None):
     out = [f"# ［{vid}］対応の照合シート — {r['name']}", "",
            "業務マニュアルから描いた、拠点ごとの業務フローの箱を、拠点をまたいで「同じ作業」のタスクにまとめました。"
            "下の主張が、原典（出典の引用）から見て正しいかを、1 つずつ判定してください。",
-           "箱の名前は日本語に直してあります（日本語でない拠点は、引用が原文です）。", ""]
+           "箱の名前は日本語に直してあります（日本語でない拠点は、引用が原文です）。",
+           "箱の担当・札（システム）・帳票・補足は、拠点ごとに原典と照らして確かめてあります（表の資料では、同じ行のほかの列から付けていて、引用に出ないことがあります）。"
+           "この照合で見るのは、箱の組とタスクの対応・記載なし・内容の差です。担当・システム・帳票・順序の違いは、機械が箱から出すので、内容の差に書かなくてかまいません。", ""]
     out.append("## 拠点ごとの、この業務の箱（並び順）")
     for sid in mdl.order:
         sp = mdl.site_part(rid, sid) or {}

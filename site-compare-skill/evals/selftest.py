@@ -621,6 +621,17 @@ def parts(base, root):
     if wanted("候補"):
         rc, out = run("sc_match.py", "candidates", "-w", d, "--row", "B03")
         say(rc == 0 and "F02:P-003" in out and "M01.2.s3" in out, "候補: 記載なしの候補（ほかの行の似た作業・フローから外した手順）", out[-400:])
+        snap = d / "snap" / "OS.json"
+        keep = snap.read_text(encoding="utf-8")
+        sp = jload(snap)
+        x = next(x for x in sp["excluded"] if x["key"] == "M01.2.s3")
+        sp["excluded"] += [dict(x, flow="F99"), dict(x, key="M01.2.s9", reason="「支払処理」（F03）のフローで描く")]
+        jsave(snap, sp)
+        rc, out = run("sc_match.py", "candidates", "-w", d, "--row", "B03")
+        lines = [ln for ln in out.splitlines() if "checked:" in ln]
+        say(rc == 0 and lines and all(ln.count('"M01.2.s3"') <= 1 for ln in lines) and any("M01.2.s3" in ln for ln in lines) and "M01.2.s9" not in out,
+            "候補: 共通の資料の手順は 1 回だけ出し、ほかのフローで描いた項目は出さない（描いた箱が候補になる）", out[-400:])
+        snap.write_text(keep, encoding="utf-8")
         rc, out = run("sc_match.py", "material", "-w", d, "--row", "B03")
         say(rc == 0 and "F03-1:D-001" in out and "振込エラーがあるか" in out, "材料: 開いた下位フローの箱が、行の材料に入る", out[:300])
         rc, out = run("sc_axis.py", "plan", "-w", d)
@@ -673,6 +684,18 @@ def parts(base, root):
 
 def status_and_gate(base, root):
     d = copy(base, root, "gate")
+    if wanted("照合"):
+        e = d / "v1"
+        shutil.copytree(d, e, ignore=shutil.ignore_patterns("v1"))
+        verify_report("B03", lambda r: r["findings"].append({"kind": "内容", "target": "t4/SG", "text": "記帳の時機の差も内容の差に足す"}))(e)
+        J("review/B03.review.json", lambda r: r["findings"][0].update(decision="採用", action="内容の差を足した"))(e)
+        M("B03", lambda m: task(m, "t4")["content"].append({"sites": ["SG"], "kind": "値", "text": "シンガポール拠点は月末にまとめて記帳する",
+                                                            "evidence": [{"site": "TK", "node": "F03:S-001"}, {"site": "SG", "node": "F02:P-003"}]}))(e)
+        recompute(e)
+        rc, out = check(e, "verify")
+        say("まだ反映していない" not in out and "判定・指摘が、照合の報告と違う" not in out,
+            "照合: 採用した指摘を、同じタスクに内容の差を足して直せば、反映したとみなす", tail(out))
+        shutil.rmtree(e)
     if wanted("進み具合"):
         rc, out = run("sc_status.py", "-w", d, "--fast")
         say(rc == 0 and "sc_deliver.py" in out and "未" in out.split("9  納品の門")[-1][:20], "進み具合: 書き出しまで済み、次は納品の門", out[-400:])

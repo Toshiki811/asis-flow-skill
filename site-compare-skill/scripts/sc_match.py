@@ -10,6 +10,7 @@
 """
 import argparse
 import json
+import re
 import sys
 
 from sc_common import STEP_TYPES, likeness, match_path, save, sites_of, work_dir
@@ -91,6 +92,9 @@ def task_text(mdl, rid, t, sid):
     return words
 
 
+DRAWN_ELSEWHERE = re.compile(r"（F[0-9]+(?:-[0-9]+)*）のフローで描")
+
+
 def candidates(mdl, rid, t, sid):
     """記載なしの候補: [(鍵, 似ている度合い, 文, どこ)]"""
     words = task_text(mdl, rid, t, sid)
@@ -100,7 +104,13 @@ def candidates(mdl, rid, t, sid):
     for k, n in (s.get("nodes") or {}).items():
         if n["type"] in STEP_TYPES and k not in mine:
             pool.append((k, n["label"], f"{n['flow']} {s['flows'].get(n['flow'], {}).get('name', '')}"))
+    seen = set()
     for x in s.get("excluded") or []:
+        # 共通の資料の手順は、拠点のフロー何本かで外した項目に載る。候補には 1 回だけ出す。
+        # ほかのフローで描いた項目は、その箱が候補になるので出さない（同じ手順が 2 回並ばないように）
+        if x["key"] in seen or DRAWN_ELSEWHERE.search(x.get("reason") or ""):
+            continue
+        seen.add(x["key"])
         pool.append((x["key"], x["text"], f"フローから外した項目（{x['reason'][:20]}）"))
     out = []
     for k, text, where in pool:

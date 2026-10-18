@@ -663,7 +663,12 @@ def check_verify(cx, rp):
             elif f["decision"] == "採用":
                 targets = [c for c in cur if c == f["target"] or c.split("/")[0] == f["target"]]
                 then = shown.get(f["sheet"], {}).get("claims", {})
-                if targets and all(then.get(c) == cur[c][0] for c in targets):
+                # 内容の差を足して直したときは、指摘の当たった主張は変わらない。同じタスクに、それまでの版に無い内容の差があれば直したとみなす
+                task = f["target"].split("/")[0]
+                upto = list(shown)[:list(shown).index(f["sheet"]) + 1] if f["sheet"] in shown else []
+                before = {m for v in upto if shown[v].get("row") == rid for m in shown[v]["claims"].values()}
+                added = any(c.split("/")[0] == task and "/content:" in c and cur[c][0] not in before for c in cur)
+                if targets and not added and all(then.get(c) == cur[c][0] for c in targets):
                     rp.fail(f"review/{rid}.review.json {f['id']}: 採用した指摘「{f['text'][:24]}」を、まだ反映していない（主張の中身が、指摘を受けたシートのときのまま）")
             if f["decision"] and not f["action"].strip():
                 rp.fail(f"review/{rid}.review.json {f['id']}: 対応・理由（action）が無い")
