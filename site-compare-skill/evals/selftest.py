@@ -234,6 +234,11 @@ def unit():
     edges = [("F:start", "F:P-001"), ("F:P-001", "F:D-001"), ("F:D-001", "F:P-002"), ("F:D-001", "F:P-003"), ("F:P-002", "F:P-001"), ("F:P-003", "F:end")]
     say(linear_order(nodes, edges) == ["F:start", "F:P-001", "F:D-001", "F:P-002", "F:P-003", "F:end"], "部品: 箱の並び（戻りの線は数えない・枝は線の順）",
         f"{linear_order(nodes, edges)}")
+    import openpyxl
+    import sc_book
+    cells = {v for ws in openpyxl.load_workbook(C.ASSETS / sc_book.TEMPLATE).worksheets for row in ws.iter_rows(values_only=True) for v in row if isinstance(v, str)}
+    miss = [k for k, text in sc_book.LEGEND if text not in cells]
+    say(not miss, "部品: 既定のテンプレートの読み方が、いまの説明（sc_book.LEGEND）と同じ（違えば python3 scripts/sc_book.py default）", f"{miss}")
 
 
 # ---------- (3)(4) 揺れ・表記 ----------
