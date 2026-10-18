@@ -105,6 +105,7 @@ DELIVERABLES = (f"{FLOW_FIG}*.drawio", ACT_FIG, MATRIX_BOOK) + REPORTS
 NUMBERS_FILE = "納品の数"                                              # 納品の門が書く数（out/納品の数.md・.json）
 BASELINE_FILE = "現状の処理時間.json"                                    # 納品の門が書く、現状の処理時間の写し（BPR の比較の基準。表の版つき）
 RECORDS = ("チェック_*.txt", "照合シート_*.pdf", "差分照合シート_*.pdf", "原典照合レビュー_採否表.md", f"{NUMBERS_FILE}.md", f"{NUMBERS_FILE}.json", BASELINE_FILE)
+API = 1                                                              # ほかのスキル（site-compare-skill）が使う部品の版。部品の名前・引数・戻り値を変えたら上げる
 OUTPUT_FONT = "Yu Gothic UI"                                         # 納品物の字の書体（図のセル・表のブック・下見）。テンプレートが書体を決めていれば、そちらを残す
 REVIEW_MIN = 0.95                                                    # 原典照合の支持率の下限（業務フロー・アクティビティ図それぞれ）。下回れば、図を直して照合し直す
 MAX_STEPS, MAX_LANES = 25, 8                                         # 1 ページの図の目安（作業の箱の数・レーンの数）。業務フローは、ステップ・レーンの数だけでは分けない（決まり 2.10）
