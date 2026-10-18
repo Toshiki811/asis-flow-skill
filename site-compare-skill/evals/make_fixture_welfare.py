@@ -549,7 +549,7 @@ def make_pptx(path):
         shape = {"start": MSO_SHAPE.FLOWCHART_TERMINATOR, "end": MSO_SHAPE.FLOWCHART_TERMINATOR, "proc": MSO_SHAPE.ROUNDED_RECTANGLE,
                  "dec": MSO_SHAPE.DIAMOND}[kind]
         if kind == "dec":
-            w, h = 3.0, 1.4
+            w, h = 3.0, h * 1.4
         sh = slide.shapes.add_shape(shape, Inches(x), Inches(y), Inches(w), Inches(h))
         sh.fill.solid()
         sh.fill.fore_color.rgb = RGBColor(0xDD, 0xEB, 0xF7) if kind == "proc" else RGBColor(0xFF, 0xF2, 0xCC) if kind == "dec" else RGBColor(0xE2, 0xF0, 0xD9)
@@ -587,14 +587,18 @@ def make_pptx(path):
             if nodes[a][0] == "dec" and nodes[b][0] == "proc" and lab:
                 side[b] = True
         shapes = {}
+        # 本流が長いと終端がスライドの下にはみ出すので、縦の間隔と箱の高さを縮めて収める
+        mains = [kind for i, (kind, _, _) in enumerate(nodes) if not side.get(i)]
+        span = sum(1.25 if k != "dec" else 1.65 for k in mains[:-1]) + (1.4 if mains[-1] == "dec" else 1.0)
+        f = min(1.0, (7.5 - 0.3 - 1.3) / span)
         y = 1.3
         col_main, col_side = 1.2, 5.4
         for i, (kind, text, actor) in enumerate(nodes):
             if side.get(i):
-                shapes[i] = box(s, kind, text, actor, col_side, y - 1.25)
+                shapes[i] = box(s, kind, text, actor, col_side, y - 1.25 * f, h=f)
                 continue
-            shapes[i] = box(s, kind, text, actor, col_main, y)
-            y += 1.25 if kind != "dec" else 1.65
+            shapes[i] = box(s, kind, text, actor, col_main, y, h=f)
+            y += (1.25 if kind != "dec" else 1.65) * f
         for a, b, lab in edges:
             pa, pb = shapes[a], shapes[b]
             if side.get(b):
