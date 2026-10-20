@@ -20,7 +20,7 @@
 import argparse
 import re
 
-from common import CardItems, Times, flow_heads, infer_nodes, order_lanes, order_of, save, settle_flow, system_names, tag_systems, try_load, work_dir
+from common import CardItems, Times, flow_heads, infer_nodes, lower_flows, order_lanes, order_of, save, settle_flow, system_names, tag_systems, try_load, work_dir
 from validate import blocking, validate
 
 PREFIX = {"process": "P", "decision": "D", "system": "S", "file": "F", "subprocess": "SUB"}
@@ -144,7 +144,7 @@ def main():
         if ren:
             show = "、".join(f"{a_}→{b_}" for a_, b_ in sorted(ren.items(), key=lambda x: (re.sub(r"\d", "", x[0]), x[0]))[:8])
             print(f"{f.name}: {len(ren)} 個の番号を振り直{'す' if a.dry_run else 'した'}（{show}{' …' if len(ren) > 8 else ''}）")
-        rules = settle_flow(fl)                                      # 決まりで決まる所（判断の名前・分岐のラベル・終了条件・確認事項の重要度）。採否表があっても当てる（番号は変わらない）
+        rules = settle_flow(fl, lower=lower_flows(cats, fl.get("flow_id")))   # 決まりで決まる所（判断の名前・分岐のラベル・終了条件・確認事項の重要度）。採否表があっても当てる（番号は変わらない）
         for x in rules:
             print(f"{f.name}: {x}")
         if ren or marks or tags or boxes or heads or rules or lanes:                # 振り直しが止まっても、ほかの当てはめは保存する（renumber は番号を書き換える前に止まる）

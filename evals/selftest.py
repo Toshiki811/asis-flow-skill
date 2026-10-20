@@ -5845,6 +5845,142 @@ def link_chain_tests(tmp, good):
              and [x["name"] for x in ln3].index("部長") < sys3[0])]
 
 
+def link_place_tests(tmp, good):
+    """リンクの置き方（3.20）: after の無いリンクは終了の手前（終了へ入る線を全部通す）／リンク → リンクは推定で、並びごとに確認事項 1 件／
+    終了条件はリンクの手前の作業から（3.6）／同じ after・終了への線が無いときも、書いた順に続ける／使わないページの理由に項目名を出さない"""
+    tax = json.loads((good / "taxonomy.json").read_text(encoding="utf-8"))
+    hid = {c["id"]: c.get("hierarchy_id") for c in tax["categories"]}
+    ev = "経理部は、承認済みの申請を下の画面で確認し、支払データを登録する。"            # 原典（全体マニュアル スライド 6）にある文
+    src = {"doc_id": "M01", "page": 6, "quote": ev}
+    base = json.loads((SKILL / "evals/fixture_edits/F03.edits.json").read_text(encoding="utf-8"))
+
+    def make(name, flow, seq_to=(), ops=None, alone=False, child=False):   # alone: この分類から出る「続く」を外す（リンクの無いフロー）／child: F03 の下位の分類 F03-1 を足す
+        w = tmp / name
+        shutil.copytree(good, w)
+        if child:
+            edit(w / "taxonomy.json", lambda t: t["categories"].append({"id": "F03-1", "number": "3.1", "name": "振込エラー対応", "parent": "F03", "hierarchy_id": "H1.3.1",
+                                                                        "level": 3, "basis": "toc", "pages": [], "make_flow": True}))
+        edit(w / "structure/hierarchy.json", lambda h: h.update(sequence=[x for x in h["sequence"] if not (alone and x.get("from") == hid[flow])] + [
+            {"from": hid[flow], "to": hid[t], "evidence": ev, "sources": [{"doc_id": "M01", "page": 6}]} for t in seq_to]))
+        if flow == "F03":
+            e = json.loads(json.dumps(base))
+            e["ops"] += list(ops or [])
+        else:
+            e = {"flow_id": flow, "start_condition": "", "end_condition": "", "questions": [], "ops": list(ops or [])}
+        (w / f"flows/{flow}.edits.json").write_text(json.dumps(e, ensure_ascii=False), encoding="utf-8")
+        c, _o = run("apply_edits.py", w, "--flow", flow)
+        f = json.loads((w / f"flows/{flow}.flow.json").read_text(encoding="utf-8")) if c == 0 else {"nodes": [], "edges": [], "lanes": [], "questions": [], "end_condition": "", "unused_pages": []}
+        c2, o2 = run("check_flow.py", w, "--stage", "flow", "--only", flow) if c == 0 else (1, "")
+        return w, c == 0 and c2 == 0 and "0 FAIL" in o2, f
+
+    def chain(f):                                                    # 開始からたどった、リンクの並び（link_flow）と、リンクどうしの線
+        subs = {x["id"]: x for x in f["nodes"] if x["type"] == "subprocess"}
+        heads = [x for x in subs if not any(e["to"] == x and e["from"] in subs for e in f["edges"])]
+        run_, at = [], heads[0] if len(heads) == 1 else None
+        while at in subs and at not in run_:
+            run_.append(at)
+            at = next((e["to"] for e in f["edges"] if e["from"] == at), None)
+        links = [e for e in f["edges"] if e["from"] in subs and e["to"] in subs]
+        return run_, at, links
+
+    def asks(f, ids):                                                # ids を指す確認事項の id
+        return [q["id"] for q in f["questions"] if set(ids) <= set(q.get("nodes") or ([q["node"]] if q.get("node") else []) + (q.get("edge") or []))]
+
+    out = []
+    gone = [{"op": "exclude", "item": "M04.2.s2", "reason": "試験: 判断の書かれていない側を、終了へ入れる"}]   # 「5万円以上か」の書かれている側の行き先を外す
+    for n_links, seq in ((1, ()), (2, ("F03",))):
+        _w, ok, f = make(f"link_dec{n_links}", "F01", seq, gone)
+        run_, last, links = chain(f)
+        dec = next((x["id"] for x in f["nodes"] if x["type"] == "decision"), None)
+        into = [e for e in f["edges"] if run_ and e["to"] == run_[0]]
+        out.append((f"判断の書かれていない側が終了へ入るフロー（リンク {n_links} つ）: 判断の分岐（ラベル・推定の印つき）も最後の作業も、1 つ目のリンクを通って終了へ進む"
+                    + ("。リンク → リンクは推定で、その並びを聞く確認事項が 1 件付く" if n_links > 1 else "") + "。図の点検が通る",
+                    ok and len(run_) == n_links and last == "end" and not [e for e in f["edges"] if e["to"] == "end" and e["from"] != run_[-1]]
+                    and sorted((e["from"] == dec, bool(e.get("label")), bool(e.get("inferred"))) for e in into) == [(False, False, False), (True, True, True)]
+                    and any(q["id"].startswith("m-else") and q.get("edge") == [dec, run_[0]] and "ほかの業務「承認」に進みますか" in q["question"] for q in f["questions"])
+                    and f["end_condition"] == "経費を申請したとき"
+                    and all(e.get("inferred") for e in links) and len(links) == n_links - 1
+                    and [q for q in asks(f, run_) if q.startswith("m-link")] == (["m-link-1"] if n_links > 1 else [])))
+    _w, ok, f = make("link_three", "F03", ("F01", "F02"), [{"op": "link", "flow": "F01", "source": src},
+                                                             {"op": "link", "flow": "F01", "label": "経費申請（再申請）に進む", "source": src}])
+    run_, last, links = chain(f)
+    flows = {x["id"]: x["link_flow"] for x in f["nodes"] if x["type"] == "subprocess"}
+    q1 = [q for q in f["questions"] if q["id"].startswith("m-link")]
+    out.append(("続き先が 3 つ: 1 列につなぎ、リンク → リンクの 2 本は推定。順を聞く確認事項は、並びごとに 1 件（3 つのリンクを指す。線ごとの問いは出さない）。図の点検が通る",
+                ok and [flows[x] for x in run_] == ["F01", "F01", "F02"] and last == "end" and len(links) == 2 and all(e.get("inferred") for e in links)
+                and len(q1) == 1 and q1[0].get("nodes") == run_ and q1[0]["effect"] == "順序"
+                and not [q for q in f["questions"] if q.get("edge") and q["edge"][0] in flows and q["edge"][1] in flows]))
+    _w, ok2, f2 = make("link_end_cond", "F03", ("F01", "F02"))
+    _w, ok3, f3 = make("link_end_cond1", "F01")
+    out.append(("終了条件は、終了の手前のリンクを飛ばし、その手前の作業から作る（「〜に進んだとき」にしない）",
+                ok2 and ok3 and f2["end_condition"] == "振込結果が会計システムに自動で連携されたとき" and f3["end_condition"] == "部長の承認を得たとき"))
+    _w, ok, f = make("link_same_after", "F03", ("F01", "F02"), [{"op": "link", "flow": "F01", "after": "M02.2.s1", "source": src},
+                                                                  {"op": "link", "flow": "F02", "after": "M02.2.s1", "source": src}])
+    run_, last, links = chain(f)
+    flows = {x["id"]: x["link_flow"] for x in f["nodes"] if x["type"] == "subprocess"}
+    before = [e["from"] for e in f["edges"] if run_ and e["to"] == run_[0]]
+    out.append(("2 つのリンクに同じ after を書くと、書いた順（1 つ目のあとに 2 つ目）に続き、その項目の次の作業へ戻る。図の点検が通る",
+                ok and [flows[x] for x in run_] == ["F01", "F02"] and last in {x["id"] for x in f["nodes"] if x["type"] == "process"}
+                and len(before) == 1 and all(e.get("inferred") for e in links)))
+    _w, _ok, f = make("link_no_end", "F03", ("F01", "F02"), [{"op": "disconnect", "from": "M02.1.s4", "to": "end"}])
+    run_, _last, links = chain(f)
+    flows = {x["id"]: x["link_flow"] for x in f["nodes"] if x["type"] == "subprocess"}
+    last_item = next((x["id"] for x in f["nodes"] if x["label"] == "振込結果が会計システムに自動で連携される"), None)
+    out.append(("終了へ入る線が無いフローでも、続き先は最後の項目のあとに、書いた順（sequence の順）に続く。行き止まりの問いは「終わりですか」のまま",
+                [flows[x] for x in run_] == ["F01", "F02"] and all(e.get("inferred") for e in links) and len(links) == 1 and run_
+                and [e["from"] for e in f["edges"] if e["to"] == run_[0]] == [last_item]
+                and any(q["id"].startswith("m-dead") and q.get("edge") == [run_[-1], "end2"] for q in f["questions"])))
+    _w, ok, f = make("link_wired_end", "F03", ("F01", "F02"), [{"op": "connect", "from": "M03.1.s3", "to": "end"}])
+    run_, last, _links = chain(f)
+    wired = [e for e in f["edges"] if e["to"] == "end" and e["from"] not in run_]
+    out.append(("直しの一覧の connect で終了へつないだ線（差し戻しのあと など）は、続き先のリンクを通さず、終了のまま（並びの順の線だけがリンクを通る）",
+                ok and len(run_) == 2 and last == "end" and len(wired) == 1 and wired[0].get("inferred")
+                and next((x["type"] for x in f["nodes"] if x["id"] == wired[0]["from"]), "") == "process"
+                and [e["from"] for e in f["edges"] if e["to"] == run_[0]] == [last_item]))
+    _w, _ok, f = make("link_only_wired", "F03", ("F01",), [{"op": "disconnect", "from": "M02.1.s4", "to": "end"}, {"op": "connect", "from": "M03.1.s3", "to": "end"}])
+    run_, last, _links = chain(f)
+    into = [e for e in f["edges"] if run_ and e["to"] == run_[0]]
+    out.append(("終了へ入る線が connect の線だけなら、それをリンクへ向ける（推定の印と、それを聞く確認事項は、リンクへ入る線に残る）",
+                len(run_) == 1 and last == "end" and len(into) == 1 and into[0].get("inferred")
+                and any(q.get("edge") == [into[0]["from"], run_[0]] for q in f["questions"])))
+    _w, ok4, f4 = make("link_not_seq", "F03", (), [{"op": "link", "flow": "F01", "label": "経費を申請する", "source": src}])
+    w5, _ok5, f5 = make("link_lower", "F03", (), [{"op": "link", "flow": "F03-1", "label": "振込エラーに対応する", "source": src}], child=True)
+    out.append(("終了条件で、ほかの業務へ進むリンクは、続く（sequence）に無くても飛ばす。下位の分類へのリンク（3.18）だけは、作業として終了条件を作る",
+                ok4 and f4["end_condition"] == "振込結果が会計システムに自動で連携されたとき" and f5["end_condition"] == "振込エラーに対応したとき"))
+    w = tmp / "link_end_cond"
+    edit(w / "flows/F03.flow.json", lambda fl: fl.update(end_condition=""))
+    run("renumber.py", w)
+    r1 = json.loads((w / "flows/F03.flow.json").read_text(encoding="utf-8"))["end_condition"]
+    edit(w5 / "flows/F03.flow.json", lambda fl: fl.update(end_condition=""))
+    run("renumber.py", w5)
+    r2 = json.loads((w5 / "flows/F03.flow.json").read_text(encoding="utf-8"))["end_condition"]
+    out.append(("番号の振り直し（renumber.py）でも、空の終了条件は、ほかの業務へ進むリンクを飛ばして作る（下位の分類へのリンクは、作業として扱う）",
+                r1 == "振込結果が会計システムに自動で連携されたとき" and r2 == "振込エラーに対応したとき"))
+    c, o = run("apply_edits.py", make("link_after_dec", "F03", ("F01",), [{"op": "link", "flow": "F01", "after": "x2", "source": src}])[0], "--flow", "F03")
+    out.append(("link の after に分岐を書くと、直しの適用が止まり、分岐のあとには置けないと知らせる（行き止まりのリンクを作らない）",
+                c != 0 and "分岐のあとには置けない" in o))
+    _w, _ok, f0 = make("q_no_link", "F03")
+    node_q = lambda fl: [(q["id"], q.get("node")) for q in fl["questions"] if q["id"].startswith("m-node")]
+    _w, _ok, k0 = make("k_no_link", "F01", (), gone + [{"op": "connect", "from": "M01.3.s3", "to": "M01.4.d1"}], alone=True)
+    _w, _ok, k1 = make("k_one_link", "F01", ("F02",), gone + [{"op": "connect", "from": "M01.3.s3", "to": "M01.4.d1"}], alone=True)
+    allinf = gone + [{"op": "connect", "from": "M01.3.s3", "to": "M01.4.d1"}, {"op": "connect", "from": "M04.2.s1", "to": "end"}]   # 終了へ入る線が、推定の線と connect の線だけ
+    _w, _ok, j0 = make("k_inf_no_link", "F01", (), allinf, alone=True)
+    _w, _ok, j1 = make("k_inf_one_link", "F01", ("F02",), allinf, alone=True)
+    soft_q = lambda fl: sorted((q["id"], q.get("edge", [""])[0]) for q in fl["questions"] if q["id"][:6] in ("m-seq-", "m-else"))
+    out.append(("続き先が増えても、機械の問いの id（m-node-N・m-seq-N・m-else-N）がずれない（確認事項の番号と、お客様の回答の引き継ぎが崩れない。終了へ入る線が推定の線だけでも）",
+                node_q(f0) and node_q(f0) == node_q(f2) and len(soft_q(k0)) == 2 and soft_q(k0) == soft_q(k1) and len(soft_q(j0)) == 3 and soft_q(j0) == soft_q(j1)))
+    w, _ok, f = make("unused_reason", "F03")
+    run("build_drawio.py", w)
+    run("build_reports.py", w)
+    _c, o = run("check_flow.py", w, "--stage", "deliverables")
+    srcmap = next((w / "out").glob("出典対応表*.md"), None)
+    out.append(("ページの手順を全部入れなかったとき、使わないページの理由に項目名（excluded_items）を書かず、出典対応表の点検（納品物）で FAIL にならない",
+                bool(f["unused_pages"]) and any("フローに入れなかった手順・分岐" in x["reason"] for x in f["unused_pages"])
+                and not any("excluded_items" in x["reason"] for x in f["unused_pages"]) and srcmap is not None
+                and "excluded_items" not in srcmap.read_text(encoding="utf-8") and "項目名 excluded_items" not in o))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("-w", "--work", required=True, help="fixture を描画済みの作業フォルダ")
@@ -5890,7 +6026,7 @@ def main():
             ("階層と業務分類に、結び付きと根拠が載る", "詳しくしている" in (good / "out" / "階層と業務分類.md").read_text(encoding="utf-8")),
             ("まとめた確認事項は、対象のノードを並べて載る", "| P-001・P-002 |" in (good / "out" / "確認事項一覧.md").read_text(encoding="utf-8")),
         ]
-        for name, passed in looks + matrix_looks(good) + title_tests(tmp, good) + axis_tests(tmp) + heading_tests(tmp) + pointer_tests(tmp, good) + draft_tests(tmp) + form_tests(tmp, good) + unit_tests() + code_tests() + vba_stmt_tests() + io_fix_tests() + lang_tests() + code_pipeline_tests(tmp) + call_run_tests(tmp) + narrow_tests(tmp) + template_tests(tmp, good) + time_tests(tmp, good) + two_actions_tests(tmp, good) + shown_tests(tmp, good) + supply_tests(tmp, good) + review_tests(tmp, good) + big_tests(tmp, good) + volume_tests() + skill_dir_tests() + access_tests(tmp) + direct_tests(tmp) + sample_fix_tests(tmp) + tree_tests(tmp) + tree_rule_tests(tmp) + review_fix_tests(tmp) + schema_tests(tmp, good) + review_gate_tests(tmp, good) + output_check_tests(tmp, good) + answer_tests(tmp, good) + gate_tests(tmp, good) + mech_tests(tmp, good) + size_tests(tmp, good) + link_chain_tests(tmp, good):
+        for name, passed in looks + matrix_looks(good) + title_tests(tmp, good) + axis_tests(tmp) + heading_tests(tmp) + pointer_tests(tmp, good) + draft_tests(tmp) + form_tests(tmp, good) + unit_tests() + code_tests() + vba_stmt_tests() + io_fix_tests() + lang_tests() + code_pipeline_tests(tmp) + call_run_tests(tmp) + narrow_tests(tmp) + template_tests(tmp, good) + time_tests(tmp, good) + two_actions_tests(tmp, good) + shown_tests(tmp, good) + supply_tests(tmp, good) + review_tests(tmp, good) + big_tests(tmp, good) + volume_tests() + skill_dir_tests() + access_tests(tmp) + direct_tests(tmp) + sample_fix_tests(tmp) + tree_tests(tmp) + tree_rule_tests(tmp) + review_fix_tests(tmp) + schema_tests(tmp, good) + review_gate_tests(tmp, good) + output_check_tests(tmp, good) + answer_tests(tmp, good) + gate_tests(tmp, good) + mech_tests(tmp, good) + size_tests(tmp, good) + link_chain_tests(tmp, good) + link_place_tests(tmp, good):
             print(f"{'OK  ' if passed else 'SKIP' if passed is None else 'NG  '} {name}")   # None は、道具が無くて飛ばした（合格に数えない）
             ok = ok and passed is not False
             skipped += passed is None

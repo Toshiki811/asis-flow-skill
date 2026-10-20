@@ -1404,9 +1404,24 @@ ENDS_ASKED = {"start": ("m-start", "start_condition", "この業務の開始条�
               "end": ("m-end", "end_condition", "この業務の終了条件（何ができたら終わるか）は何ですか。", "終了条件は空のままにした")}
 
 
-def settle_flow(fl, ask=True):
+def lower_flows(cats, flow_id):
+    """この業務分類の下位の分類（taxonomy の parent をたどって flow_id に着く分類）の id。下位フローへのリンク（3.18）は、終了条件で作業として扱う"""
+    out = set()
+    for i in cats:
+        seen, at = set(), (cats.get(i) or {}).get("parent")
+        while at and at not in seen:
+            if at == flow_id:
+                out.add(i)
+                break
+            seen.add(at)
+            at = (cats.get(at) or {}).get("parent")
+    return out
+
+
+def settle_flow(fl, ask=True, lower=()):
     """機械が決まりで決める所を、flow.json に当てる（apply_edits.py・renumber.py が呼ぶ。何度当てても同じ）。変えた所の説明の並びを返す:
-    判断の名前の「？」→「か」（3.4）／書かれていない側のラベル「その他」→ 書かれた側の反対の語（3.4）／空の終了条件 → 終了に入る最後の作業の「〜したとき」（3.6）／
+    判断の名前の「？」→「か」（3.4）／書かれていない側のラベル「その他」→ 書かれた側の反対の語（3.4）／空の終了条件 → 終了に入る最後の作業の「〜したとき」（3.6。
+    終了の手前の、ほかの業務へ進むリンクは飛ばし、その手前の作業から。下位の分類〈lower: lower_flows〉へのリンク〈3.18〉は、作業として扱う）／
     それでも空の開始条件・終了条件に、開始・終了を指す確認事項が無ければ、機械の問い m-start・m-end（3.6。ask=False なら足さない — 直しの一覧の道は、問いを自分で作る）／
     確認事項の重要度（5.4）"""
     notes, nodes = [], [n for n in fl.get("nodes") or [] if isinstance(n, dict)]
@@ -1424,9 +1439,15 @@ def settle_flow(fl, ask=True):
     if not str(fl.get("end_condition") or "").strip():
         last = {e.get("from") for e in edges if e.get("to") == "end" and not e.get("inferred")}
         tail = next((n for n in nodes if n.get("id") in last), None) if len(last) == 1 else None
+        seen = set()
+        while tail and tail.get("type") == "subprocess" and tail.get("link_flow") not in lower and tail.get("id") not in seen:   # 終了の手前の、ほかの業務へ進むリンクは飛ばし、その手前の作業から（リンク → リンクの推定の線もたどる）
+            seen.add(tail.get("id"))
+            last = {e.get("from") for e in edges if e.get("to") == tail.get("id") and (not e.get("inferred") or any(
+                n.get("id") == e.get("from") and n.get("type") == "subprocess" for n in nodes))}
+            tail = next((n for n in nodes if n.get("id") in last), None) if len(last) == 1 else None
         if tail and tail.get("type") in ("process", "system", "subprocess"):
             fl["end_condition"] = when_done(tail.get("label"))
-            notes.append(f"終了条件が空なので、終了に入る最後の作業「{str(tail.get('label'))[:30]}」から「{fl['end_condition']}」にした（原典に成果が書かれていれば、それを書く）")
+            notes.append(f"終了条件が空なので、終了に入る最後の作業（ほかの業務へ進むリンクは飛ばす）「{str(tail.get('label'))[:30]}」から「{fl['end_condition']}」にした（原典に成果が書かれていれば、それを書く）")
     qs = fl.setdefault("questions", []) if isinstance(fl.get("questions", []), list) else []
     for end, (qid, key, text, assume) in ENDS_ASKED.items() if ask else ():
         if str(fl.get(key) or "").strip() or any(isinstance(q, dict) and end in q_targets(q) for q in qs) or not any(n.get("id") == end for n in nodes):

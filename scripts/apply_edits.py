@@ -20,7 +20,7 @@ import pathlib
 import re
 import sys
 
-from common import (ACTIONS, EFFECTS, ELSE, ENDS_ASKED, LABEL_LONG, SEV_LABEL, VOLUMES, CardItems, ask_form, flow_heads, infer_nodes, load, load_page, norm, opposite, order_lanes, page_json, page_units, same_text, site,
+from common import (ACTIONS, EFFECTS, ELSE, ENDS_ASKED, LABEL_LONG, SEV_LABEL, VOLUMES, CardItems, ask_form, flow_heads, infer_nodes, load, load_page, lower_flows, norm, opposite, order_lanes, page_json, page_units, same_text, site,
                     save, settle_flow, severity_of, span_text, system_names, tag_systems, try_load, work_dir)
 from draft_flow import PAGE_TYPE_JA, Draft
 from renumber import PREFIX, apply_ids, renumber
@@ -481,17 +481,45 @@ class Builder:
         hid = {c.get("hierarchy_id"): c["id"] for c in d.cats.values() if c.get("make_flow")}
         auto = [{"flow": hid[x["to"]], "after": None, "label": "", "source": dict((x.get("sources") or [{}])[0], quote=str(x.get("evidence", "")))}
                 for x in seqs if x.get("from") == d.cat.get("hierarchy_id") and x.get("to") in hid and (x.get("sources") or [{}])[0].get("doc_id")]
-        subs = []
+        subs, tail = [], {}                                          # tail: 置いた場所 → そこに最後に置いたリンク（同じ場所の 2 つ目は、前のリンクのあと）
         for k, ln in enumerate(self.links + [x for x in auto if x["flow"] not in {y["flow"] for y in self.links}], 1):
             sid = f"link{k}"
-            at = last[ln["after"]] if ln["after"] else next((x["from"] for x in edges if x["to"] == "end" and x["from"] != "start"), order[-1]["id"])
-            src = ln["source"]
-            here = by.get(at) or next(s_ for s_ in subs if s_["id"] == at)   # 2 つ目のリンクは、1 つ目のリンクのあとに置く（by には無い）
+            if ln["after"] and by[last[ln["after"]]]["type"] == "decision":
+                self.err.append(site(f"link（{ln['flow']}）: after「{ln['after']}」は分岐。分岐のあとには置けない（分岐の行き先の項目を after に書く）"))
+                continue
+            to_end = [] if ln["after"] else [x for x in edges if x["to"] == "end" and x["from"] != "start"]
+            ins = [x for x in to_end if not any(x is y for y in self.wired)] or to_end   # 直しの一覧の connect で終了へつないだ線（対象外・差し戻しのあと など）は、終了のまま
+            keep = next((x for x in ins if not x.get("inferred")), None)   # リンクの担当は、線の並びで最初の、推定でない線（無ければ最初の線）の元から
+            here_id = (keep or ins[0])["from"] if ins else tail.get(last[ln["after"]] if ln["after"] else order[-1]["id"], last[ln["after"]] if ln["after"] else order[-1]["id"])
+            here = by.get(here_id) or next(s_ for s_ in subs if s_["id"] == here_id)   # 前のリンク（by には無い）のこともある
             subs.append({"id": sid, "type": "subprocess", "lane": ln.get("lane") or here["lane"], "label": ln["label"] or f"{d.cats[ln['flow']].get('name')}に進む", "link_flow": ln["flow"],
-                         "sources": [self.plain(src)]})
-            for x in [x for x in edges if x["from"] == at and here["type"] != "decision"]:      # at → 次 を、at → リンク → 次 にする
-                x["from"] = sid
-            edges.append({"from": at, "to": sid})
+                         "sources": [self.plain(ln["source"])]})
+            if ins:                                                  # 終了の手前（3.20）: 終了へ入る線を全部リンクへ向け、リンク → 終了（判断の分岐のラベル・推定の印は、そのまま）
+                for x in ins:
+                    if (x["from"], "end") in soft_why:
+                        soft_why[(x["from"], sid)] = soft_why.pop((x["from"], "end"))
+                for x in ins:
+                    if x is not keep:
+                        x["to"] = sid
+                if keep:                                             # 推定でない線は、元の線の場所に リンク → 終了 を置き、元の線を後ろに足す（線の並びを前と同じに。推定の線は動かさないので、その番号もずれない）
+                    edges.append(dict(keep, to=sid))
+                    keep.clear()
+                    keep.update({"from": sid, "to": "end"})
+                else:
+                    edges.append({"from": sid, "to": "end"})
+            else:                                                    # after のあと（終了への線が無ければ、最後の項目のあと）: at → 次 を、at → リンク → 次 にする
+                at = here_id
+                tail[last[ln["after"]] if ln["after"] else order[-1]["id"]] = sid
+                for x in [x for x in edges if x["from"] == at and here["type"] != "decision"]:
+                    if (at, x["to"]) in soft_why:
+                        soft_why[(sid, x["to"])] = soft_why.pop((at, x["to"]))
+                    x["from"] = sid
+                edges.append({"from": at, "to": sid})
+        link_ids = {s_["id"] for s_ in subs}
+        for x in edges:                                              # リンク → リンクの順は、原典に無い（sequence・link の並びから）。推定にして確認事項で聞く（3.15・3.20）
+            if x["from"] in link_ids and x["to"] in link_ids:
+                x["inferred"] = True
+                soft_why[(x["from"], x["to"])] = "link"
         # レーン・ノード・帳票
         names = []
         for n in order + subs:                                       # リンクの担当（lane）が、ほかの箱に無いレーンのこともある
@@ -544,7 +572,7 @@ class Builder:
               "questions": []}
         infer_nodes(fl)
         tag_systems(fl, CardItems(d.work), system_names(d.work))
-        d.notes.extend(settle_flow(fl, ask=False))                              # 決まりで決まる所（終了条件・分岐のラベル・判断の名前）。確認事項より先に（終了条件が入れば、問いにしない）
+        d.notes.extend(settle_flow(fl, ask=False, lower=lower_flows(d.cats, d.cid)))                              # 決まりで決まる所（終了条件・分岐のラベル・判断の名前）。確認事項より先に（終了条件が入れば、問いにしない）
         fl["questions"] = self.questions(fl, order, by, first, soft_why)
         return fl
 
@@ -562,6 +590,7 @@ class Builder:
         return first[k]
 
     def edge_ops(self, edges, soft_why, by, first, last):
+        self.wired = []                                              # connect で作った線（終了へ入るものは、リンクを通さない: 3.20）
         for i, op in enumerate(x for x in self.e.get("ops") or [] if isinstance(x, dict)):
             if op.get("op") not in ("connect", "disconnect"):
                 continue
@@ -590,6 +619,7 @@ class Builder:
             elif not isinstance(op.get("evidence"), dict):
                 self.bad(i, op, "推定でない線（inferred: false）には、順が書かれた場所（evidence: doc_id・page・lines）を書く")
             edges.append(x)
+            self.wired.append(x)
 
     def unused(self, order):
         cited = {(s["doc_id"], s["page"]) for n in order for s in n["sources"]}
@@ -601,7 +631,7 @@ class Builder:
             c = self.d.cards.get((doc, page)) or {}
             has = bool((c.get("steps") or []) + (c.get("decisions") or []))
             out.append({"doc_id": doc, "page": page, "reason": given.get((doc, page)) or (
-                "このページの手順・分岐は、どれもフローに入れなかった（理由は excluded_items）" if has
+                "このページの手順・分岐は、どれもフローに入れなかった（理由は「フローに入れなかった手順・分岐」に）" if has
                 else f"手順・分岐の記載が無いページ（{PAGE_TYPE_JA.get(c.get('page_type'), '種別なし')}）")})
         return out
 
@@ -614,6 +644,8 @@ class Builder:
         node = {n["id"]: n for n in fl["nodes"]}
         twice = {n["label"] for n in fl["nodes"] if sum(1 for x in fl["nodes"] if x["label"] == n["label"] and x["type"] == n["type"]) > 1 and n["type"] != "end"}
         name = lambda i: f"「{node[i]['label'][:40]}」" + (f"（{lane[node[i]['lane']]}）" if node[i]["label"] in twice else "")   # 同じラベルが2つあれば、担当を添える
+        dest = lambda i: ("終了" if i not in node or node[i]["type"] == "end" else f"ほかの業務「{d.cats.get(node[i]['link_flow'], {}).get('name') or node[i]['label']}」"
+                          if node[i].get("link_flow") else name(i))  # 線の行き先（リンクは業務の名前で。「「〜に進む」に進みますか」にしない）
         pages = lambda ids: [dict(t) for t in dict.fromkeys(tuple(sorted({"doc_id": s["doc_id"], "page": s["page"]}.items()))
                                                            for i in ids for s in node[i].get("sources") or [])]
 
@@ -643,18 +675,27 @@ class Builder:
             q(f"m-actor-{j}", "資料間の矛盾", f"{name(first[key])}は、資料によって担当が違います（{mine}・{other}）。どちらが行いますか。",
               f"{lane[node[first[key]]['lane']]}のレーンに置いた", [first[key]])
         # 推定の線
-        runs, k = [], 0
+        runs, chains, k = [], [], 0
         soft = [(a, b, soft_why.get((a, b))) for x in fl["edges"] if x.get("inferred") for a, b in [(x["from"], x["to"])]]
         for a, b, why in soft:
             k += 1
-            if why == "list":
+            if why == "link":                                        # 続くリンクの並び（1 列につないだもの）は、1 件にまとめる
+                head, tail = next((r for r in chains if r[-1] == a), None), next((r for r in chains if r[0] == b), None)
+                if head and tail:
+                    head.extend(tail)
+                    chains.remove(tail)
+                elif head or tail:
+                    head.append(b) if head else tail.insert(0, a)
+                else:
+                    chains.append([a, b])
+            elif why == "list":
                 run = next((r for r in runs if r[-1] == a), None)
                 if run is None:
                     runs.append([a, b])
                 else:
                     run.append(b)
             elif why == "else":
-                to = "終了" if b in ("end", "end2") else name(b)
+                to = dest(b)
                 lab = next((x.get("label", "") for x in fl["edges"] if x["from"] == a and x["to"] == b), "")
                 q(f"m-else-{k}", "記載なし", f"{name(a)}で、原典に書かれた場合に当たらないとき（「{lab}」）は、{to}に進みますか。",
                   f"書かれていない側は、{to}に進むと仮に置いた", edge=(a, b))
@@ -673,13 +714,16 @@ class Builder:
             elif why == "dead":
                 q(f"m-dead-{k}", "記載なし", f"{name(a)}のあとは、この業務は終わりですか、続く作業がありますか。", "続きが書かれていないので、終了を仮に置いた", edge=(a, b))
             else:                                                    # 並べ替え・足した線・分けた作業の順
-                q(f"m-seq-{k}", "記載なし", f"{name(a)}のあとは、{'終了' if b not in node or node[b]['type'] == 'end' else name(b)}に進みますか。", "原典に順が書かれていないので、この順に仮に置いた", edge=(a, b))
+                q(f"m-seq-{k}", "記載なし", f"{name(a)}のあとは、{dest(b)}に進みますか。", "原典に順が書かれていないので、この順に仮に置いた", edge=(a, b))
         for j, run in enumerate(runs, 1):
             q(f"m-list-{j}", "記載なし", "次の作業は、原典では箇条書きで、順が書かれていません。書かれた順に行いますか、順は決まっていませんか: " + "、".join(name(i) for i in run),
               "原典に書かれた順に並べた", run)
         for n in fl["nodes"]:                                        # 原典に無いノード（機械が推定の印を付けたもの）
             if n.get("inferred"):
                 q(f"m-node-{len(out) + 1}", "記載なし", f"{name(n['id'])}は、原典に手順として書かれていません。実際に行っていますか。", "流れをつなぐために仮に置いた", [n["id"]])
+        for j, run in enumerate(chains, 1):                          # m-node のあと（m-node の番号は、それまでの問いの数から。続き先が増えても、ずらさない）
+            q(f"m-link-{j}", "記載なし", "ほかの業務へ進む順は、原典に書かれていません。この順にすべて進みますか、順は決まっていませんか、場合によってどれか 1 つに進みますか: "
+              + "、".join(name(i) for i in run), "進む先の業務を、仮にこの順で 1 列に置いた", run)
         for end, (qid, key, text, assume) in ENDS_ASKED.items():
             if not fl[key]:
                 q(qid, "記載なし", text, assume, [end])
@@ -723,7 +767,7 @@ class Builder:
 
 
 # 機械が作る確認事項の、答えで変わる所（id の頭 → effect）
-M_EFFECT = {"m-lane": "担当", "m-actor": "担当", "m-else": "分岐", "m-note": "順序", "m-doc": "順序", "m-seq": "順序", "m-list": "順序", "m-dead": "箱", "m-node": "箱",
+M_EFFECT = {"m-lane": "担当", "m-actor": "担当", "m-else": "分岐", "m-note": "順序", "m-doc": "順序", "m-seq": "順序", "m-list": "順序", "m-link": "順序", "m-dead": "箱", "m-node": "箱",
             "m-start": "フローの範囲", "m-end": "フローの範囲"}
 
 

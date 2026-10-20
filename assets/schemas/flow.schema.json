@@ -29,7 +29,7 @@
   "basis": {"enum": ["toc", "llm"], "description": "分類の根拠"},
   "summary": {"type": "string", "description": "フローの要約（1〜2文）"},
   "start_condition": {"type": "string", "description": "開始条件（何を受けて始まるか）。原典に無ければ空にして確認事項"},
-  "end_condition": {"type": "string", "description": "終了条件（何ができたら終わるか）。原典に無ければ、終了に入る最後の作業から機械が「〜したとき」を入れる。それも決まらなければ空にして確認事項"},
+  "end_condition": {"type": "string", "description": "終了条件（何ができたら終わるか）。原典に無ければ、終了に入る最後の作業（ほかの業務へ進むリンクは飛ばす）から機械が「〜したとき」を入れる。それも決まらなければ空にして確認事項"},
   "lanes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/lane"}, "description": "担当。並び順がそのまま列の順になる"},
   "nodes": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/node"}, "description": "ノード"},
   "edges": {"type": "array", "items": {"$ref": "#/$defs/edge"}, "description": "線"},
