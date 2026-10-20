@@ -5805,6 +5805,46 @@ def size_tests(tmp, good):
              c2 == 0 and [pg["id"] for pg in lay["pages"] if "F02" in pg["id"]] == ["flow-F02"] and c3 == 0 and "0 FAIL" in o3 and c4 == 0 and "0 FAIL" in o4)]
 
 
+def link_chain_tests(tmp, good):
+    """終了の手前に置くリンク（after を書かないもの。sequence の続き先と、直しの一覧の link）が 2 つあるフロー: 直しの適用が落ちず、
+    2 つ目のリンクは 1 つ目のリンクのあとに置かれ、担当は前のリンクと同じ。リンクの担当に、ほかの箱に無いレーンを書いても落ちない"""
+    tax = json.loads((good / "taxonomy.json").read_text(encoding="utf-8"))
+    hid = {c["id"]: c.get("hierarchy_id") for c in tax["categories"]}
+    ev = "経理部は、承認済みの申請を下の画面で確認し、支払データを登録する。"            # 原典（全体マニュアル スライド 6）にある文
+    base = json.loads((SKILL / "evals/fixture_edits/F03.edits.json").read_text(encoding="utf-8"))
+
+    def build(name, seq_to, links):
+        w = tmp / name
+        shutil.copytree(good, w)
+        edit(w / "structure/hierarchy.json", lambda h: h["sequence"].extend(
+            [{"from": hid["F03"], "to": hid[t], "evidence": ev, "sources": [{"doc_id": "M01", "page": 6}]} for t in seq_to + [t for t, _ in links]]))   # link の行き先も sequence に書く（無いと WARN）
+        e = json.loads(json.dumps(base))
+        e["ops"] += [dict({"op": "link", "flow": t, "source": {"doc_id": "M01", "page": 6, "quote": ev}}, **({"lane": ln} if ln else {})) for t, ln in links]
+        (w / "flows/F03.edits.json").write_text(json.dumps(e, ensure_ascii=False), encoding="utf-8")
+        c, _o = run("apply_edits.py", w, "--flow", "F03")
+        f = json.loads((w / "flows/F03.flow.json").read_text(encoding="utf-8")) if c == 0 else {"nodes": [], "edges": [], "lanes": []}
+        out = lambda nid: [e_["to"] for e_ in f["edges"] if e_["from"] == nid]
+        c2, o2 = run("check_flow.py", w, "--stage", "flow", "--only", "F03") if c == 0 else (1, "")
+        subs = [x for x in f["nodes"] if x["type"] == "subprocess"]
+        lane = {x["id"]: x["name"] for x in f["lanes"]}
+        into = lambda nid: [e_["from"] for e_ in f["edges"] if e_["to"] == nid]
+        chain = c == 0 and len(subs) == 2 and into(subs[1]["id"]) == [subs[0]["id"]] and out(subs[0]["id"]) == [subs[1]["id"]] and out(subs[1]["id"]) == ["end"] \
+            and all(x not in {s_["id"] for s_ in subs} for x in into(subs[0]["id"]))
+        return c == 0 and c2 == 0 and "0 FAIL / 0 WARN" in o2, subs, lane, chain, f["lanes"]
+
+    ok1, s1, l1, ch1, _ln1 = build("link_two", ["F01", "F02"], [])
+    ok2, s2, l2, ch2, _ln2 = build("link_lane", ["F02"], [("F01", "経理課長")])
+    ok3, s3, l3, _ch3, ln3 = build("link_new_lane", [], [("F01", "部長")])
+    sys3 = [i for i, x in enumerate(ln3) if x.get("kind") == "system"]
+    return [("続き先が 2 つあるフロー: 直しの適用が落ちず、2 つ目のリンクは 1 つ目のリンクのあと・同じ担当に置かれて終了へ続き、図の点検が通る",
+             ok1 and ch1 and s1[0]["lane"] == s1[1]["lane"] and {x["link_flow"] for x in s1} == {"F01", "F02"}),
+            ("1 つ目のリンクに担当（lane）を書くと、2 つ目（続き先から足すリンク）は、その担当で 1 つ目のあとに置かれる",
+             ok2 and ch2 and [l2.get(x["lane"]) for x in s2] == ["経理課長", "経理課長"] and [x["link_flow"] for x in s2] == ["F01", "F02"]),
+            ("リンクの担当に、ほかの箱が使っていないレーンを書いても、直しの適用が落ちず、そのレーンがシステムのレーンより左に足されて図の点検が通る",
+             ok3 and len(s3) == 1 and l3.get(s3[0]["lane"]) == "部長" and sys3 and sys3 == list(range(len(ln3) - len(sys3), len(ln3)))   # システムのレーンは右端のまま（4.2）
+             and [x["name"] for x in ln3].index("部長") < sys3[0])]
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("-w", "--work", required=True, help="fixture を描画済みの作業フォルダ")
@@ -5850,7 +5890,7 @@ def main():
             ("階層と業務分類に、結び付きと根拠が載る", "詳しくしている" in (good / "out" / "階層と業務分類.md").read_text(encoding="utf-8")),
             ("まとめた確認事項は、対象のノードを並べて載る", "| P-001・P-002 |" in (good / "out" / "確認事項一覧.md").read_text(encoding="utf-8")),
         ]
-        for name, passed in looks + matrix_looks(good) + title_tests(tmp, good) + axis_tests(tmp) + heading_tests(tmp) + pointer_tests(tmp, good) + draft_tests(tmp) + form_tests(tmp, good) + unit_tests() + code_tests() + vba_stmt_tests() + io_fix_tests() + lang_tests() + code_pipeline_tests(tmp) + call_run_tests(tmp) + narrow_tests(tmp) + template_tests(tmp, good) + time_tests(tmp, good) + two_actions_tests(tmp, good) + shown_tests(tmp, good) + supply_tests(tmp, good) + review_tests(tmp, good) + big_tests(tmp, good) + volume_tests() + skill_dir_tests() + access_tests(tmp) + direct_tests(tmp) + sample_fix_tests(tmp) + tree_tests(tmp) + tree_rule_tests(tmp) + review_fix_tests(tmp) + schema_tests(tmp, good) + review_gate_tests(tmp, good) + output_check_tests(tmp, good) + answer_tests(tmp, good) + gate_tests(tmp, good) + mech_tests(tmp, good) + size_tests(tmp, good):
+        for name, passed in looks + matrix_looks(good) + title_tests(tmp, good) + axis_tests(tmp) + heading_tests(tmp) + pointer_tests(tmp, good) + draft_tests(tmp) + form_tests(tmp, good) + unit_tests() + code_tests() + vba_stmt_tests() + io_fix_tests() + lang_tests() + code_pipeline_tests(tmp) + call_run_tests(tmp) + narrow_tests(tmp) + template_tests(tmp, good) + time_tests(tmp, good) + two_actions_tests(tmp, good) + shown_tests(tmp, good) + supply_tests(tmp, good) + review_tests(tmp, good) + big_tests(tmp, good) + volume_tests() + skill_dir_tests() + access_tests(tmp) + direct_tests(tmp) + sample_fix_tests(tmp) + tree_tests(tmp) + tree_rule_tests(tmp) + review_fix_tests(tmp) + schema_tests(tmp, good) + review_gate_tests(tmp, good) + output_check_tests(tmp, good) + answer_tests(tmp, good) + gate_tests(tmp, good) + mech_tests(tmp, good) + size_tests(tmp, good) + link_chain_tests(tmp, good):
             print(f"{'OK  ' if passed else 'SKIP' if passed is None else 'NG  '} {name}")   # None は、道具が無くて飛ばした（合格に数えない）
             ok = ok and passed is not False
             skipped += passed is None

@@ -486,14 +486,15 @@ class Builder:
             sid = f"link{k}"
             at = last[ln["after"]] if ln["after"] else next((x["from"] for x in edges if x["to"] == "end" and x["from"] != "start"), order[-1]["id"])
             src = ln["source"]
-            subs.append({"id": sid, "type": "subprocess", "lane": ln.get("lane") or by[at]["lane"], "label": ln["label"] or f"{d.cats[ln['flow']].get('name')}に進む", "link_flow": ln["flow"],
+            here = by.get(at) or next(s_ for s_ in subs if s_["id"] == at)   # 2 つ目のリンクは、1 つ目のリンクのあとに置く（by には無い）
+            subs.append({"id": sid, "type": "subprocess", "lane": ln.get("lane") or here["lane"], "label": ln["label"] or f"{d.cats[ln['flow']].get('name')}に進む", "link_flow": ln["flow"],
                          "sources": [self.plain(src)]})
-            for x in [x for x in edges if x["from"] == at and by[at]["type"] != "decision"]:      # at → 次 を、at → リンク → 次 にする
+            for x in [x for x in edges if x["from"] == at and here["type"] != "decision"]:      # at → 次 を、at → リンク → 次 にする
                 x["from"] = sid
             edges.append({"from": at, "to": sid})
         # レーン・ノード・帳票
         names = []
-        for n in order:
+        for n in order + subs:                                       # リンクの担当（lane）が、ほかの箱に無いレーンのこともある
             if n["lane"] not in names:
                 names.append(n["lane"])
         lane_of = {n["id"]: n["lane"] for n in order + subs}
